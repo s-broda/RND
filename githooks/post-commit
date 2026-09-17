@@ -1,0 +1,4 @@
+#!/bin/sh
+# Keep GitHub in sync after every local commit.
+git rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1 || exit 0
+git push origin HEAD
