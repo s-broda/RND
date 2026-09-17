@@ -30,3 +30,11 @@ Source: Cboe delayed quotes, `https://cdn.cboe.com/api/global/delayed_quotes/opt
 ## License
 
 Code is MIT (see `LICENSE`). Market data remain Cboe’s; the CSV slices are a research extract for replicating this paper.
+
+## Updating GitHub
+
+The local `main` branch tracks `git@github.com:s-broda/RND.git`. After the first publish, a post-commit hook pushes each commit. First-time publish (requires a one-time `gh auth login` in the browser):
+
+```bash
+sh scripts/publish.sh
+```
