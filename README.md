@@ -1,6 +1,6 @@
 # Closed-form risk-neutral densities from option prices
 
-Replication package for
+Replication code for
 
 > Simon A. Broda, *A New Closed-Form Estimator for the Risk-Neutral Density Implied by Option Prices*.
 
@@ -14,8 +14,6 @@ python3 python/replicate.py
 ```
 
 This prints the Heston ISE table and the listed SPX/NDX pricing table, and writes `figures/ccdf_heston_rnd.pdf` and `figures/ccdf_listed.pdf`.
-
-Compile the paper with `make` (TeX Live with `elsarticle`).
 
 ## Data
 
@@ -33,7 +31,7 @@ Code is MIT (see `LICENSE`). Market data remain Cboe’s; the CSV slices are a r
 
 ## Updating GitHub
 
-The local `main` branch tracks `git@github.com:s-broda/RND.git`. After the first publish, a post-commit hook pushes each commit. First-time publish (requires a one-time `gh auth login` in the browser):
+The local `main` branch tracks `git@github.com:s-broda/RND.git`. A post-commit hook pushes each commit. First-time publish (requires a one-time `gh auth login` in the browser):
 
 ```bash
 sh scripts/publish.sh

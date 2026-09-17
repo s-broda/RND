@@ -2,6 +2,7 @@ other_stuff/
 __pycache__/
 *.pyc
 .DS_Store
+paper.tex
 paper.aux
 paper.bbl
 paper.blg
@@ -10,7 +11,10 @@ paper.out
 paper.spl
 paper.toc
 paper.pdf
+refs.bib
+elsarticle-harv.bst
 *.synctex.gz
+figures/
 python/results/cboe_*.json
 python/results/__pycache__/
 .venv/
