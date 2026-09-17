@@ -29,7 +29,6 @@ from src import black_scholes as bs
 from src.competitors import (
     ait_sahalia_duarte,
     convex_decreasing_ls,
-    iv_spline_bl,
     pca_lognormal,
     yatchew_hardle,
 )
@@ -265,24 +264,6 @@ def _holdout_asd(sl):
     return float(np.mean(rmses))
 
 
-def _holdout_ivs(sl):
-    idx = np.arange(len(sl.K))
-    rmses = []
-    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
-        _, _, iv_at = iv_spline_bl(
-            sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.K[test], q=sl.q
-        )
-        if iv_at is None:
-            rmses.append(float("nan"))
-            continue
-        C_te = bs.call_price(sl.S0, sl.K[test], sl.r, sl.T, iv_at(sl.K[test]), sl.q)
-        P_te = C_te - sl.S0 * np.exp(-sl.q * sl.T) + sl.K[test] * sl.disc
-        otm_hat = np.where(sl.K[test] <= sl.F, P_te, C_te)
-        otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
-        rmses.append(_rmse(otm_hat, otm_true))
-    return float(np.mean(rmses))
-
-
 def _pack(sl, P, C, q, s_grid, ho, iv_mkt, **extra):
     otm, iv = _otm_iv(sl, P, C)
     otm_mkt = _otm(sl, sl.P, sl.C)
@@ -332,12 +313,6 @@ def score_listed(sl, title):
     )
     _print_row("Ours", rec_o, extra=f"  h={ours['h']:.1f}")
 
-    C_ivs, q_ivs, iv_at = iv_spline_bl(sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q)
-    C_ivs_q = bs.call_price(sl.S0, sl.K, sl.r, sl.T, iv_at(sl.K), sl.q)
-    P_ivs_q = C_ivs_q - np.exp(-sl.q * sl.T) * sl.S0 + sl.K * sl.disc
-    rec_ivs = _pack(sl, P_ivs_q, C_ivs_q, q_ivs, s_grid, _holdout_ivs(sl), iv_mkt)
-    _print_row("IV spline", rec_ivs)
-
     C_asd, q_asd, _, _ = ait_sahalia_duarte(
         sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q
     )
@@ -368,7 +343,6 @@ def score_listed(sl, title):
         "s_grid": s_grid,
         "iv_mkt": iv_mkt,
         "ours": rec_o,
-        "ivs": rec_ivs,
         "asd": rec_asd,
         "yh": rec_y,
         "pca": rec_p,
@@ -413,9 +387,6 @@ def plot_listed(rows):
         axiv.set_ylim(max(0.05, y1), min(0.55, y2))
         axiv.plot(sl.K[show], iv_m[show], "k.", ms=3, alpha=0.40, label="market")
         axiv.plot(sl.K[show], rec["ours"]["iv_series"][show], color="#1f77b4", lw=1.2, label="Ours")
-        axiv.plot(
-            sl.K[show], rec["ivs"]["iv_series"][show], color="#9467bd", lw=1.15, ls="--", label="IV spline"
-        )
         axiv.plot(
             sl.K[show], rec["yh"]["iv_series"][show], color="#ff7f0e", lw=1.2, ls=":", label="Yatchew–Härdle"
         )
