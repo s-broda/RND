@@ -119,8 +119,8 @@ def heston_ise():
     rec = {}
     plot_q = {}
     for chain, K_obs in (
-        ("dense", np.linspace(30.0, 220.0, 250)),
-        ("sparse", np.linspace(70.0, 140.0, 40)),
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 64)),
     ):
         P = carr_madan_puts(K_obs, p)
         C = np.maximum(P + p.S0 * np.exp(-p.q * p.T) - K_obs * p.disc, 0.0)
@@ -196,7 +196,7 @@ def heston_ise():
         ax.set_xlabel(r"Strike $K$")
         ax.set_xlim(60.0, 150.0)
         ax.set_ylim(bottom=0.0)
-        ax.set_title(r"Dense, $m=250$" if chain == "dense" else r"Sparse, $m=40$")
+        ax.set_title(r"Dense, $m=256$" if chain == "dense" else r"Sparse, $m=64$")
         ax.legend(frameon=False, loc="upper right")
     axes[0].set_ylabel(r"$f_{\mathbb{Q}}(K)$")
     fig.tight_layout()
