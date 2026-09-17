@@ -2,7 +2,7 @@
 
 The public entry point is ``estimate_rnd``. Copy this file: it is self-contained
 apart from NumPy and SciPy. The estimator rescales calls to a complementary
-cdf, completes the unquoted tails, places masses at cell centres, smears with a
+cdf, completes the unquoted tails, places masses at cell centers, convolves with a
 Gaussian kernel, and (by default) applies Schucany–Sommers twicing.
 """
 
@@ -50,7 +50,7 @@ def estimate_rnd(
     tails : bool
         Linear left wing through the origin and linear call decay to zero.
     midpoints : bool
-        Place each jump at the centre of its cell rather than the right end.
+        Place each jump at the center of its cell rather than the right end.
     n_left, n_right : int
         Number of filler knots on each completed wing.
 
@@ -168,7 +168,7 @@ def _complete_left(K, dG, n_left=80):
 
 
 def _midpoint_support(K, dp):
-    """Place each jump at the centre of (K_{i-1}, K_i] with K_0 := 0."""
+    """Place each jump at the center of (K_{i-1}, K_i] with K_0 := 0."""
     K = np.asarray(K, dtype=float)
     dp = np.asarray(dp, dtype=float)
     left = np.empty_like(K)

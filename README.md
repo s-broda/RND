@@ -4,7 +4,7 @@ Replication code for
 
 > Simon A. Broda, *A New Closed-Form Estimator for the Risk-Neutral Density Implied by Option Prices*.
 
-The headline estimator is `python/rnd.py` (`estimate_rnd`). It rescales European calls to a complementary cdf, completes the unquoted tails, places masses at cell centres, and applies a Gaussian kernel with Schucany–Sommers twicing.
+The headline estimator is `python/rnd.py` (`estimate_rnd`). It rescales European calls to a complementary cdf, completes the unquoted tails, places masses at cell centers, and applies a Gaussian kernel with Schucany–Sommers twicing.
 
 ## Run
 
