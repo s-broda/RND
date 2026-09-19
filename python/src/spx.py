@@ -121,7 +121,7 @@ def build_otm_slice(
     # Forward from near-ATM parity: F = K + e^{rT}(C-P)
     atm = min(both, key=lambda K: abs(K - S0))
     # Keep the SPX 50-point band; scale to ~0.65% of spot on other roots.
-    band_width = 50.0 if root in ("SPX", "SPXW") else max(50.0, 0.0065 * float(S0))
+    band_width = 50.0 if root in ("SPX", "SPXW") else 0.0065 * float(S0)
     band = [K for K in both if abs(K - atm) <= band_width]
     Fs = []
     for K in band:

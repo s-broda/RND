@@ -437,8 +437,15 @@ def main():
         ),
         "NDX 18 Dec 2026",
     )
+    rut_dec = score_listed(
+        listed_slice(
+            "rut_20261218.csv", "cboe_rut.json", "RUT",
+            date(2026, 12, 18), date(2026, 9, 19), root="RUT",
+        ),
+        "RUT 18 Dec 2026",
+    )
     plot_listed([spx_dec, ndx_dec])
-    return spx_dec, spx_mar, ndx_dec
+    return spx_dec, spx_mar, ndx_dec, rut_dec
 
 
 if __name__ == "__main__":
