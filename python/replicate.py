@@ -351,9 +351,9 @@ def score_listed(sl, title):
 
 
 def plot_listed(rows):
-    """rows: list of score_listed dicts to show (typically SPX Dec, NDX Dec)."""
+    """rows: list of score_listed dicts to show (December SPX, NDX, RUT)."""
     _style()
-    fig, axes = plt.subplots(len(rows), 2, figsize=(9.6, 3.4 * len(rows)))
+    fig, axes = plt.subplots(len(rows), 2, figsize=(9.6, 3.15 * len(rows)))
     if len(rows) == 1:
         axes = np.array([axes])
     for axrow, rec in zip(axes, rows):
@@ -444,7 +444,7 @@ def main():
         ),
         "RUT 18 Dec 2026",
     )
-    plot_listed([spx_dec, ndx_dec])
+    plot_listed([spx_dec, ndx_dec, rut_dec])
     return spx_dec, spx_mar, ndx_dec, rut_dec
 
 
