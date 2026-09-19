@@ -2,8 +2,8 @@
 """Replication script for the closed-form call-on-K RND paper.
 
 The shareable estimator is ``rnd.estimate_rnd``. This script is the
-single entry point: it prints Heston ISE and listed SPX/NDX pricing tables,
-and writes figures/ccdf_heston_rnd.pdf and figures/ccdf_listed.pdf.
+single entry point: it prints Heston ISE and listed SPX/NDX/RUT pricing
+tables, and writes figures/ccdf_heston_rnd.pdf and figures/ccdf_listed.pdf.
 
 Run from the repository root::
 
