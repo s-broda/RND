@@ -313,16 +313,6 @@ def score_listed(sl, title):
     )
     _print_row("Ours", rec_o, extra=f"  h={ours['h']:.1f}")
 
-    C_asd, q_asd, _, _ = ait_sahalia_duarte(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q
-    )
-    C_asd_q, _, _, _ = ait_sahalia_duarte(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.K, q=sl.q
-    )
-    P_asd_q = C_asd_q - np.exp(-sl.q * sl.T) * sl.S0 + sl.K * sl.disc
-    rec_asd = _pack(sl, P_asd_q, C_asd_q, q_asd, s_grid, _holdout_asd(sl), iv_mkt)
-    _print_row("Aït-Sahalia–Duarte", rec_asd)
-
     disc = sl.disc
     dfq = np.exp(-sl.q * sl.T)
     intrinsic = disc * np.maximum(sl.F - sl.K, 0.0)
@@ -334,6 +324,16 @@ def score_listed(sl, title):
     rec_y = _pack(sl, P_yh, C_yh, q_yh, s_grid, _holdout_yh(sl), iv_mkt)
     _print_row("Yatchew–Härdle λ=0", rec_y)
 
+    C_asd, q_asd, _, _ = ait_sahalia_duarte(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q
+    )
+    C_asd_q, _, _, _ = ait_sahalia_duarte(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.K, q=sl.q
+    )
+    P_asd_q = C_asd_q - np.exp(-sl.q * sl.T) * sl.S0 + sl.K * sl.disc
+    rec_asd = _pack(sl, P_asd_q, C_asd_q, q_asd, s_grid, _holdout_asd(sl), iv_mkt)
+    _print_row("Aït-Sahalia–Duarte", rec_asd)
+
     q_pca, _ = pca_lognormal(sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q)
     P_p, C_p, _, _ = _prices_from_q(s_grid, q_pca, sl.K, sl.disc)
     rec_p = _pack(sl, P_p, C_p, q_pca, s_grid, _holdout_pca(sl, s_grid), iv_mkt)
@@ -343,8 +343,8 @@ def score_listed(sl, title):
         "s_grid": s_grid,
         "iv_mkt": iv_mkt,
         "ours": rec_o,
-        "asd": rec_asd,
         "yh": rec_y,
+        "asd": rec_asd,
         "pca": rec_p,
         "title": title,
     }
