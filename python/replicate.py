@@ -2,8 +2,9 @@
 """Replication script for the closed-form call-on-K RND paper.
 
 The shareable estimator is ``rnd.estimate_rnd``. This script is the
-single entry point: it prints Heston ISE and listed SPX/NDX/RUT pricing
-tables, and writes figures/ccdf_heston_rnd.pdf and figures/ccdf_listed.pdf.
+single entry point: it prints Heston and variance-gamma ISE and listed
+SPX/NDX/RUT pricing tables, and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
+and figures/ccdf_listed.pdf.
 
 Run from the repository root::
 
@@ -33,6 +34,7 @@ from src.competitors import (
     yatchew_hardle,
 )
 from src.heston import BCC97, carr_madan_puts, heston_spot_density
+from src.vg import CM99, vg_calls, vg_spot_density
 from src.spx import atm_iv, build_otm_slice, fetch_cboe, load_slice, save_slice
 
 FIG = ROOT / "figures"
@@ -172,10 +174,17 @@ def heston_ise():
                 plot_q[chain]["K"] = K_obs
             if name == "Tail+Mid+Twice":
                 plot_q.setdefault(chain, {})["twice"] = mesh["q"]
+    _density_figure(
+        FIG / "ccdf_heston_rnd.pdf", K_eval, q_true, plot_q, "Heston RND"
+    )
+    return rec
+
+
+def _density_figure(path, K_eval, q_true, plot_q, true_label):
     _style()
     fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.6), sharey=True)
     for ax, chain in zip(axes, ("dense", "sparse")):
-        ax.plot(K_eval, q_true, color="black", lw=2.0, label="Heston RND")
+        ax.plot(K_eval, q_true, color="black", lw=2.0, label=true_label)
         ax.plot(K_eval, plot_q[chain]["mid"], color="#1f77b4", lw=1.35, label="Tail+Midpoint")
         ax.plot(
             K_eval,
@@ -200,9 +209,87 @@ def heston_ise():
         ax.legend(frameon=False, loc="upper right")
     axes[0].set_ylabel(r"$f_{\mathbb{Q}}(K)$")
     fig.tight_layout()
-    fig.savefig(FIG / "ccdf_heston_rnd.pdf", facecolor="white")
+    fig.savefig(path, facecolor="white")
     plt.close(fig)
-    print("  wrote ccdf_heston_rnd.pdf")
+    print(f"  wrote {path.name}")
+
+
+def _exact_ise(label, p, C_obs_fn, q_true, K_eval):
+    """Oracle / mesh / density-scale ISE for the four nested estimators."""
+    rec = {}
+    print(f"{label}  S0={p.S0}  F={p.forward:.4f}  T={p.T}")
+    for chain, K_obs in (
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 64)),
+    ):
+        C = np.maximum(C_obs_fn(K_obs), 0.0)
+        specs = (
+            ("Baseline", dict(tails=False, midpoints=False, twice=False)),
+            ("Tail completion", dict(tails=True, midpoints=False, twice=False)),
+            ("Tail+Midpoint", dict(tails=True, midpoints=True, twice=False)),
+            ("Tail+Mid+Twice", dict(tails=True, midpoints=True, twice=True)),
+        )
+        delta = float(np.median(np.diff(K_obs)))
+        hs = np.geomspace(max(0.20 * delta, 1e-3), max(30.0 * delta, 40.0), 40)
+        print(f"\n-- {chain}  m={len(K_obs)}")
+        rec[chain] = {}
+        for name, kw in specs:
+            def ise_at(h, _kw=kw):
+                out = estimate_rnd(
+                    K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h=h, **_kw
+                )
+                return _ise(K_eval, out["q"], q_true)
+
+            best, best_h = np.inf, hs[len(hs) // 2]
+            for h in hs:
+                err = ise_at(h)
+                if err < best:
+                    best, best_h = err, float(h)
+            mesh = estimate_rnd(
+                K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="mesh", **kw
+            )
+            den = estimate_rnd(
+                K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="density", **kw
+            )
+            ise_m = _ise(K_eval, mesh["q"], q_true)
+            ise_d = _ise(K_eval, den["q"], q_true)
+            rec[chain][name] = {
+                "h_star": best_h,
+                "ise_star": best,
+                "h_mesh": mesh["h"],
+                "ise_mesh": ise_m,
+                "h_den": den["h"],
+                "ise_den": ise_d,
+            }
+            print(
+                f"  [{name:18s}]  oracle h={best_h:.4g} ISE={best:.4e}  "
+                f"mesh h={mesh['h']:.4g} ISE={ise_m:.4e}  "
+                f"den h={den['h']:.4g} ISE={ise_d:.4e}"
+            )
+    return rec
+
+
+def vg_ise():
+    p = CM99
+    K_eval = np.linspace(60.0, 150.0, 401)
+    q_true = vg_spot_density(K_eval, p)
+    rec = _exact_ise("VG", p, lambda K: vg_calls(K, p), q_true, K_eval)
+    plot_q = {}
+    for chain, K_obs in (
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 64)),
+    ):
+        C = np.maximum(vg_calls(K_obs, p), 0.0)
+        mid = estimate_rnd(
+            K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="mesh",
+            tails=True, midpoints=True, twice=False,
+        )
+        tw = estimate_rnd(
+            K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="mesh",
+            tails=True, midpoints=True, twice=True,
+        )
+        plot_q[chain] = {"mid": mid["q"], "twice": tw["q"], "K": K_obs}
+    _density_figure(FIG / "ccdf_vg_rnd.pdf", K_eval, q_true, plot_q, "VG RND")
     return rec
 
 
@@ -416,6 +503,7 @@ def listed_slice(csv_name, json_name, symbol, expiry, asof, root="SPX"):
 
 def main():
     heston_ise()
+    vg_ise()
     spx_dec = score_listed(
         listed_slice(
             "spx_20261218.csv", "cboe_spx.json", "SPX",

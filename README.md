@@ -13,7 +13,7 @@ python3 -m pip install -r requirements.txt
 python3 python/replicate.py
 ```
 
-This prints the Heston ISE table and the listed SPX/NDX pricing table, and writes `figures/ccdf_heston_rnd.pdf` and `figures/ccdf_listed.pdf`.
+This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, and `figures/ccdf_listed.pdf`.
 
 ## Data
 
