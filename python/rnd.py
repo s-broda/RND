@@ -25,7 +25,7 @@ def estimate_rnd(
     twice=True,
     tails=True,
     midpoints=True,
-    n_left=80,
+    n_left=None,
     n_right=80,
 ):
     """Headline estimator of the risk-neutral density of ``S_T``.
@@ -51,8 +51,12 @@ def estimate_rnd(
         Linear left wing through the origin and linear call decay to zero.
     midpoints : bool
         Place each jump at the center of its cell rather than the right end.
-    n_left, n_right : int
-        Number of filler knots on each completed wing.
+    n_left : int, optional
+        Number of filler knots on the left wing. Default is
+        ``round(K_1 / median ΔK)``, so the completed mesh continues the
+        quoted spacing through the splice at ``K_1``.
+    n_right : int
+        Number of filler knots on the right wing.
 
     Returns
     -------
@@ -60,7 +64,7 @@ def estimate_rnd(
         ``q`` density on ``K_eval``; ``P``, ``C`` put and call interpolants on
         the quoted ``K``; ``h`` the bandwidth used; ``K_mass``, ``dp`` the
         completed midpoint support; ``n_ext`` mass count after the right wing;
-        ``interpolant(K_pts) -> (P, C)``.
+        ``n_left`` the left-wing count used; ``interpolant(K_pts) -> (P, C)``.
     """
     K = np.asarray(K, dtype=float)
     C = np.asarray(C, dtype=float)
@@ -74,6 +78,11 @@ def estimate_rnd(
         K_eval = K
     else:
         K_eval = np.asarray(K_eval, dtype=float)
+
+    if n_left is None:
+        n_left = _n_left_from_mesh(K)
+    else:
+        n_left = max(int(n_left), 2)
 
     K_work, C_work = K, C
     n_ext = len(K)
@@ -115,6 +124,7 @@ def estimate_rnd(
         "K_mass": Ko,
         "dp": dG,
         "n_ext": int(n_ext),
+        "n_left": int(n_left),
         "F": F,
         "interpolant": interpolant,
     }
@@ -153,7 +163,18 @@ def _complete_c_tail(K, C, F, disc, n_tail=80, k_max=None):
     return np.concatenate([K, K_t]), np.concatenate([C, C_t])
 
 
-def _complete_left(K, dG, n_left=80):
+def _n_left_from_mesh(K):
+    """Continue the quoted median spacing through (0, K_1]."""
+    K = np.asarray(K, dtype=float)
+    if K.size < 2 or K[0] <= 0.0:
+        return 2
+    delta = float(np.median(np.diff(K)))
+    if not np.isfinite(delta) or delta <= 0.0:
+        return 2
+    return max(2, int(round(float(K[0]) / delta)))
+
+
+def _complete_left(K, dG, n_left):
     K = np.asarray(K, dtype=float)
     dG = np.asarray(dG, dtype=float)
     g1 = float(dG[0])
