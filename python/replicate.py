@@ -472,7 +472,7 @@ def plot_listed(rows):
         y1 = float(np.nanpercentile(ivs, 5)) - 0.02 if ivs.size else 0.08
         y2 = float(np.nanpercentile(ivs, 95)) + 0.04 if ivs.size else 0.45
         axiv.set_ylim(max(0.05, y1), min(0.55, y2))
-        axiv.plot(sl.K[show], iv_m[show], "k.", ms=3, alpha=0.40, label="market")
+        axiv.plot(sl.K[show], iv_m[show], "k.", ms=3, alpha=0.40, label="Market")
         axiv.plot(sl.K[show], rec["ours"]["iv_series"][show], color="#1f77b4", lw=1.2, label="Ours")
         axiv.plot(
             sl.K[show], rec["yh"]["iv_series"][show], color="#ff7f0e", lw=1.2, ls=":", label="Yatchew–Härdle"
