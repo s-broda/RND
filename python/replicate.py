@@ -535,6 +535,9 @@ def plot_listed(rows):
         axiv.plot(
             sl.K[show], rec["pca"]["iv_series"][show], color="#2ca02c", lw=1.2, ls="-.", label="PCA"
         )
+        axiv.plot(
+            sl.K[show], rec["pc"]["iv_series"][show], color="#9467bd", lw=1.2, ls=":", label="Priestley–Chao"
+        )
         axiv.axvline(sl.F, color="0.5", ls="--", lw=0.8)
         axiv.set_ylabel("OTM implied vol")
         axiv.set_xlabel(r"Strike $K$")
