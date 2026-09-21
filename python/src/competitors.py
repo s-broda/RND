@@ -68,8 +68,8 @@ def priestley_chao_bl(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
     return qhat, h
 
 
-def priestley_chao_cubic(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
-    """Cubic spline of C, then Gaussian convolution of C''."""
+def priestley_chao_cubic(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None, return_call=False):
+    """Cubic spline of C, then Gaussian convolution of C and of C''."""
     K_obs, C_obs = _sorted(K_obs, C_obs)
     K_eval = np.asarray(K_eval, dtype=float)
     disc = np.exp(-r * T)
@@ -85,9 +85,12 @@ def priestley_chao_cubic(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
     z = np.arange(-half, half + 1) * dK
     kap = np.exp(-0.5 * (z / h) ** 2) / (h * np.sqrt(2.0 * np.pi))
     kap2 = kap * (z**2 / h**4 - 1.0 / h**2)
+    C_smooth = np.convolve(C_grid, kap, mode="same") * dK
     second = np.convolve(C_grid, kap2, mode="same") * dK
-    q_grid = np.exp(r * T) * second
-    q_eval = np.interp(K_eval, K_grid, q_grid, left=0.0, right=0.0)
+    C_eval = np.interp(K_eval, K_grid, np.maximum(C_smooth, 0.0), left=0.0, right=0.0)
+    q_eval = np.exp(r * T) * np.interp(K_eval, K_grid, second, left=0.0, right=0.0)
+    if return_call:
+        return q_eval, h, C_eval
     return q_eval, h
 
 

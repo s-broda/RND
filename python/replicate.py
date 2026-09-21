@@ -381,6 +381,42 @@ def _holdout_asd(sl):
     return float(np.mean(rmses))
 
 
+def _pc_listed_h(K, C, S0, r, T, q):
+    """Second-derivative scale with ATM IV, matching the listed PC row."""
+    n = max(len(K), 8)
+    F = S0 * np.exp((r - q) * T)
+    iv = bs.implied_vol(C, S0, K, r, T, q)
+    atm = np.nanmedian(iv[np.abs(K - F) <= 0.03 * F])
+    if not np.isfinite(atm):
+        atm = np.nanmedian(iv)
+    if not np.isfinite(atm):
+        atm = 0.2
+    return float(1.06 * F * atm * np.sqrt(T) * n ** (-1.0 / 9.0))
+
+
+def _holdout_pc(sl):
+    idx = np.arange(len(sl.K))
+    rmses = []
+    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
+        h = _pc_listed_h(sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.q)
+        _, _, C_te = priestley_chao_cubic(
+            sl.K[train],
+            sl.C[train],
+            sl.S0,
+            sl.r,
+            sl.T,
+            sl.K[test],
+            q=sl.q,
+            h=h,
+            return_call=True,
+        )
+        P_te = C_te - sl.S0 * np.exp(-sl.q * sl.T) + sl.K[test] * sl.disc
+        otm_hat = np.where(sl.K[test] <= sl.F, P_te, C_te)
+        otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
+        rmses.append(_rmse(otm_hat, otm_true))
+    return float(np.mean(rmses))
+
+
 def _pack(sl, P, C, q, s_grid, ho, iv_mkt, **extra):
     otm, iv = _otm_iv(sl, P, C)
     otm_mkt = _otm(sl, sl.P, sl.C)
@@ -430,6 +466,17 @@ def score_listed(sl, title):
     )
     _print_row("Ours", rec_o, extra=f"  h={ours['h']:.1f}")
 
+    h_pc = _pc_listed_h(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q)
+    _, _, C_pc = priestley_chao_cubic(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h_pc, return_call=True
+    )
+    q_pc_g, _, _ = priestley_chao_cubic(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
+    )
+    P_pc = C_pc - np.exp(-sl.q * sl.T) * sl.S0 + sl.K * sl.disc
+    rec_pc = _pack(sl, P_pc, C_pc, q_pc_g, s_grid, _holdout_pc(sl), iv_mkt, h=h_pc)
+    _print_row("Priestley–Chao", rec_pc, extra=f"  h={h_pc:.1f}")
+
     disc = sl.disc
     dfq = np.exp(-sl.q * sl.T)
     intrinsic = disc * np.maximum(sl.F - sl.K, 0.0)
@@ -460,6 +507,7 @@ def score_listed(sl, title):
         "s_grid": s_grid,
         "iv_mkt": iv_mkt,
         "ours": rec_o,
+        "pc": rec_pc,
         "yh": rec_y,
         "asd": rec_asd,
         "pca": rec_p,
@@ -478,14 +526,20 @@ def plot_listed(rows):
         sl, s = rec["sl"], rec["s_grid"]
         lo, hi = 0.55 * sl.F, 1.40 * sl.F
         q_o = np.maximum(rec["ours"]["q"], 0.0)
+        q_pc = np.maximum(rec["pc"]["q"], 0.0)
         q_a = np.maximum(rec["asd"]["q"], 0.0)
         q_p = np.maximum(rec["pca"]["q"], 0.0)
         axq.plot(s, q_o, color="#1f77b4", lw=1.4, label="Ours")
+        axq.plot(s, q_pc, color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao")
         axq.plot(s, q_a, color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte")
         axq.plot(s, q_p, color="#2ca02c", lw=1.4, ls="-.", label="PCA")
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
         ymax = 1.12 * max(
-            float(q_o[core].max()), float(q_a[core].max()), float(q_p[core].max()), 1e-12
+            float(q_o[core].max()),
+            float(q_pc[core].max()),
+            float(q_a[core].max()),
+            float(q_p[core].max()),
+            1e-12,
         )
         axq.axvline(sl.F, color="0.5", ls="--", lw=0.8)
         axq.set_xlim(lo, hi)
