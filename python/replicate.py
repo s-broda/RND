@@ -31,7 +31,6 @@ from src.competitors import (
     ait_sahalia_duarte,
     convex_decreasing_ls,
     pca_lognormal,
-    priestley_chao_bl,
     priestley_chao_cubic,
     yatchew_hardle,
 )
@@ -176,7 +175,6 @@ def heston_ise():
                 plot_q[chain]["K"] = K_obs
             if name == "Tail+Mid+Twice":
                 plot_q.setdefault(chain, {})["twice"] = mesh["q"]
-        _pc_ise_row(K_obs, C, p, K_eval, q_true)
     _density_figure(
         FIG / "ccdf_heston_rnd.pdf", K_eval, q_true, plot_q, "Heston RND"
     )
@@ -269,34 +267,7 @@ def _exact_ise(label, p, C_obs_fn, q_true, K_eval):
                 f"mesh h={mesh['h']:.4g} ISE={ise_m:.4e}  "
                 f"den h={den['h']:.4g} ISE={ise_d:.4e}"
             )
-        _pc_ise_row(K_obs, C, p, K_eval, q_true)
     return rec
-
-
-def _pc_ise_row(K_obs, C, p, K_eval, q_true):
-    """Priestley–Chao of C, with and without a cubic interpolant. n^{-1/9} h."""
-    from rnd import _mesh_h
-
-    delta = float(np.median(np.diff(K_obs)))
-    hs = np.geomspace(max(0.20 * delta, 1e-3), max(30.0 * delta, 40.0), 40)
-    h_mesh = _mesh_h(K_obs)
-    for label, fn in (
-        ("PC cubic", priestley_chao_cubic),
-        ("PC no cubic", priestley_chao_bl),
-    ):
-        best, best_h = np.inf, hs[len(hs) // 2]
-        for h in hs:
-            qh, _ = fn(K_obs, C, p.S0, p.r, p.T, K_eval, q=p.q, h=h)
-            err = _ise(K_eval, qh, q_true)
-            if err < best:
-                best, best_h = err, float(h)
-        q_m, _ = fn(K_obs, C, p.S0, p.r, p.T, K_eval, q=p.q, h=h_mesh)
-        q_d, h_d = fn(K_obs, C, p.S0, p.r, p.T, K_eval, q=p.q, h=None)
-        print(
-            f"  [{label:18s}]  oracle h={best_h:.4g} ISE={best:.4e}  "
-            f"mesh h={h_mesh:.4g} ISE={_ise(K_eval, q_m, q_true):.4e}  "
-            f"C'' h={h_d:.4g} ISE={_ise(K_eval, q_d, q_true):.4e}"
-        )
 
 
 def vg_ise():
@@ -466,17 +437,6 @@ def score_listed(sl, title):
     )
     _print_row("Ours", rec_o, extra=f"  h={ours['h']:.1f}")
 
-    h_pc = _pc_listed_h(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q)
-    _, _, C_pc = priestley_chao_cubic(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h_pc, return_call=True
-    )
-    q_pc_g, _, _ = priestley_chao_cubic(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
-    )
-    P_pc = C_pc - np.exp(-sl.q * sl.T) * sl.S0 + sl.K * sl.disc
-    rec_pc = _pack(sl, P_pc, C_pc, q_pc_g, s_grid, _holdout_pc(sl), iv_mkt, h=h_pc)
-    _print_row("Priestley–Chao", rec_pc, extra=f"  h={h_pc:.1f}")
-
     disc = sl.disc
     dfq = np.exp(-sl.q * sl.T)
     intrinsic = disc * np.maximum(sl.F - sl.K, 0.0)
@@ -502,6 +462,17 @@ def score_listed(sl, title):
     P_p, C_p, _, _ = _prices_from_q(s_grid, q_pca, sl.K, sl.disc)
     rec_p = _pack(sl, P_p, C_p, q_pca, s_grid, _holdout_pca(sl, s_grid), iv_mkt)
     _print_row("PCA", rec_p)
+
+    h_pc = _pc_listed_h(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q)
+    _, _, C_pc = priestley_chao_cubic(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h_pc, return_call=True
+    )
+    q_pc_g, _, _ = priestley_chao_cubic(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
+    )
+    P_pc = C_pc - np.exp(-sl.q * sl.T) * sl.S0 + sl.K * sl.disc
+    rec_pc = _pack(sl, P_pc, C_pc, q_pc_g, s_grid, _holdout_pc(sl), iv_mkt, h=h_pc)
+    _print_row("Priestley–Chao", rec_pc, extra=f"  h={h_pc:.1f}")
     return {
         "sl": sl,
         "s_grid": s_grid,
@@ -530,9 +501,9 @@ def plot_listed(rows):
         q_a = np.maximum(rec["asd"]["q"], 0.0)
         q_p = np.maximum(rec["pca"]["q"], 0.0)
         axq.plot(s, q_o, color="#1f77b4", lw=1.4, label="Ours")
-        axq.plot(s, q_pc, color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao")
         axq.plot(s, q_a, color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte")
         axq.plot(s, q_p, color="#2ca02c", lw=1.4, ls="-.", label="PCA")
+        axq.plot(s, q_pc, color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao")
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
         ymax = 1.12 * max(
             float(q_o[core].max()),
