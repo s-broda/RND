@@ -18,18 +18,44 @@ def _sorted(K, C):
     return K[u], C[u]
 
 
+def _c_second_h(K_obs, C_obs, S0, r, T, q=0.0):
+    """Silverman bandwidth for a second derivative of C: n^{-1/9}."""
+    n = max(len(K_obs), 8)
+    iv = bs.implied_vol(C_obs, S0, K_obs, r, T, q)
+    atm = np.nanmedian(iv)
+    if not np.isfinite(atm):
+        atm = 0.2
+    F = S0 * np.exp((r - q) * T)
+    return float(1.06 * F * atm * np.sqrt(T) * n ** (-1.0 / 9.0))
+
+
+def _cubic_call(K_obs, C_obs, K_grid, disc):
+    """Clamped cubic through quotes, linear wings with slope in [-disc, 0]."""
+    from scipy.interpolate import CubicSpline, PchipInterpolator
+
+    K_obs, C_obs = _sorted(K_obs, C_obs)
+    dC = np.gradient(C_obs, K_obs)
+    sl_l = float(np.clip(dC[0], -disc, 0.0))
+    sl_r = float(np.clip(dC[-1], -disc, 0.0))
+    if len(K_obs) >= 4:
+        spl = CubicSpline(K_obs, C_obs, bc_type=((1, sl_l), (1, sl_r)))
+        C = np.asarray(spl(K_grid), dtype=float)
+    else:
+        C = np.asarray(
+            PchipInterpolator(K_obs, C_obs, extrapolate=True)(K_grid), dtype=float
+        )
+    left, right = K_grid < K_obs[0], K_grid > K_obs[-1]
+    C[left] = C_obs[0] + sl_l * (K_grid[left] - K_obs[0])
+    C[right] = C_obs[-1] + sl_r * (K_grid[right] - K_obs[-1])
+    return np.maximum(C, 0.0)
+
+
 def priestley_chao_bl(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
-    """Priestley–Chao kernel of call *levels*, then C''. q̂ = e^{rT} Ĉ''."""
+    """Priestley–Chao kernel of quoted call *levels*, then C''. No interpolant."""
     K_obs, C_obs = _sorted(K_obs, C_obs)
     K_eval = np.asarray(K_eval, dtype=float)
-    F = S0 * np.exp((r - q) * T)
     if h is None:
-        n = max(len(K_obs), 8)
-        iv = bs.implied_vol(C_obs, S0, K_obs, r, T, q)
-        atm = np.nanmedian(iv)
-        if not np.isfinite(atm):
-            atm = 0.2
-        h = float(1.06 * F * atm * np.sqrt(T) * n ** (-1.0 / 9.0))
+        h = _c_second_h(K_obs, C_obs, S0, r, T, q)
     h = max(float(h), 1e-6)
     dK = np.empty_like(K_obs)
     dK[0] = K_obs[1] - K_obs[0] if len(K_obs) > 1 else 1.0
@@ -40,6 +66,29 @@ def priestley_chao_bl(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
     qhat = np.exp(r * T) * (C_obs * dK)[None, :] * kap2
     qhat = np.nan_to_num(qhat.sum(axis=1), nan=0.0, posinf=0.0, neginf=0.0)
     return qhat, h
+
+
+def priestley_chao_cubic(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
+    """Cubic spline of C, then Gaussian convolution of C''."""
+    K_obs, C_obs = _sorted(K_obs, C_obs)
+    K_eval = np.asarray(K_eval, dtype=float)
+    disc = np.exp(-r * T)
+    if h is None:
+        h = _c_second_h(K_obs, C_obs, S0, r, T, q)
+    h = max(float(h), 1e-6)
+    k_lo = max(1e-6, min(float(K_obs[0]), float(K_eval.min())) - 6.0 * h)
+    k_hi = max(float(K_obs[-1]), float(K_eval.max())) + 6.0 * h
+    K_grid = np.linspace(k_lo, k_hi, 1600)
+    C_grid = _cubic_call(K_obs, C_obs, K_grid, disc)
+    dK = float(K_grid[1] - K_grid[0])
+    half = int(min(K_grid.size // 2 - 1, np.ceil(6.0 * h / dK)))
+    z = np.arange(-half, half + 1) * dK
+    kap = np.exp(-0.5 * (z / h) ** 2) / (h * np.sqrt(2.0 * np.pi))
+    kap2 = kap * (z**2 / h**4 - 1.0 / h**2)
+    second = np.convolve(C_grid, kap2, mode="same") * dK
+    q_grid = np.exp(r * T) * second
+    q_eval = np.interp(K_eval, K_grid, q_grid, left=0.0, right=0.0)
+    return q_eval, h
 
 
 def local_cubic_bl(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
