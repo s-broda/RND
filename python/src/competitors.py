@@ -1,4 +1,4 @@
-"""Competitors used in the paper: YH λ=0, Aït-Sahalia–Duarte, Bondarenko PCA."""
+"""Competitors used in the paper: Priestley–Chao, YH λ=0, ASD, Bondarenko PCA."""
 
 from __future__ import annotations
 
@@ -16,6 +16,30 @@ def _sorted(K, C):
     K, C = K[o], C[o]
     _, u = np.unique(K, return_index=True)
     return K[u], C[u]
+
+
+def priestley_chao_bl(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
+    """Priestley–Chao kernel of call *levels*, then C''. q̂ = e^{rT} Ĉ''."""
+    K_obs, C_obs = _sorted(K_obs, C_obs)
+    K_eval = np.asarray(K_eval, dtype=float)
+    F = S0 * np.exp((r - q) * T)
+    if h is None:
+        n = max(len(K_obs), 8)
+        iv = bs.implied_vol(C_obs, S0, K_obs, r, T, q)
+        atm = np.nanmedian(iv)
+        if not np.isfinite(atm):
+            atm = 0.2
+        h = float(1.06 * F * atm * np.sqrt(T) * n ** (-1.0 / 9.0))
+    h = max(float(h), 1e-6)
+    dK = np.empty_like(K_obs)
+    dK[0] = K_obs[1] - K_obs[0] if len(K_obs) > 1 else 1.0
+    dK[1:] = np.diff(K_obs)
+    u = (K_eval[:, None] - K_obs[None, :]) / h
+    kap = np.exp(-0.5 * u * u) / (h * np.sqrt(2.0 * np.pi))
+    kap2 = kap * (u * u - 1.0) / (h * h)
+    qhat = np.exp(r * T) * (C_obs * dK)[None, :] * kap2
+    qhat = np.nan_to_num(qhat.sum(axis=1), nan=0.0, posinf=0.0, neginf=0.0)
+    return qhat, h
 
 
 def local_cubic_bl(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):

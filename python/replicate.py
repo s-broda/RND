@@ -31,6 +31,7 @@ from src.competitors import (
     ait_sahalia_duarte,
     convex_decreasing_ls,
     pca_lognormal,
+    priestley_chao_bl,
     yatchew_hardle,
 )
 from src.heston import BCC97, carr_madan_puts, heston_spot_density
@@ -174,6 +175,7 @@ def heston_ise():
                 plot_q[chain]["K"] = K_obs
             if name == "Tail+Mid+Twice":
                 plot_q.setdefault(chain, {})["twice"] = mesh["q"]
+        _pc_ise_row(K_obs, C, p, K_eval, q_true)
     _density_figure(
         FIG / "ccdf_heston_rnd.pdf", K_eval, q_true, plot_q, "Heston RND"
     )
@@ -266,7 +268,30 @@ def _exact_ise(label, p, C_obs_fn, q_true, K_eval):
                 f"mesh h={mesh['h']:.4g} ISE={ise_m:.4e}  "
                 f"den h={den['h']:.4g} ISE={ise_d:.4e}"
             )
+        _pc_ise_row(K_obs, C, p, K_eval, q_true)
     return rec
+
+
+def _pc_ise_row(K_obs, C, p, K_eval, q_true):
+    """Priestley–Chao: kernel of call levels, then C''. Mesh and n^{-1/9} h."""
+    from rnd import _mesh_h
+
+    delta = float(np.median(np.diff(K_obs)))
+    hs = np.geomspace(max(0.20 * delta, 1e-3), max(30.0 * delta, 40.0), 40)
+    best, best_h = np.inf, hs[len(hs) // 2]
+    for h in hs:
+        qh, _ = priestley_chao_bl(K_obs, C, p.S0, p.r, p.T, K_eval, q=p.q, h=h)
+        err = _ise(K_eval, qh, q_true)
+        if err < best:
+            best, best_h = err, float(h)
+    h_mesh = _mesh_h(K_obs)
+    q_m, _ = priestley_chao_bl(K_obs, C, p.S0, p.r, p.T, K_eval, q=p.q, h=h_mesh)
+    q_d, h_d = priestley_chao_bl(K_obs, C, p.S0, p.r, p.T, K_eval, q=p.q, h=None)
+    print(
+        f"  [{'Priestley–Chao':18s}]  oracle h={best_h:.4g} ISE={best:.4e}  "
+        f"mesh h={h_mesh:.4g} ISE={_ise(K_eval, q_m, q_true):.4e}  "
+        f"C'' h={h_d:.4g} ISE={_ise(K_eval, q_d, q_true):.4e}"
+    )
 
 
 def vg_ise():
