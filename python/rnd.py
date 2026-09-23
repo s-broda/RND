@@ -26,7 +26,7 @@ def estimate_rnd(
     tails=True,
     midpoints=True,
     n_left=None,
-    n_right=80,
+    n_right=None,
 ):
     """Headline estimator of the risk-neutral density of ``S_T``.
 
@@ -55,8 +55,10 @@ def estimate_rnd(
         Number of filler knots on the left wing. Default is
         ``round(K_1 / median ΔK)``, so the completed mesh continues the
         quoted spacing through the splice at ``K_1``.
-    n_right : int
-        Number of filler knots on the right wing.
+    n_right : int, optional
+        Number of filler knots on the right wing. Default is
+        ``round(8 (K_end - K_m) / (K_m - K_{m-1}))``, eight knots per last
+        quoted gap along the linear call tail.
 
     Returns
     -------
@@ -64,7 +66,8 @@ def estimate_rnd(
         ``q`` density on ``K_eval``; ``P``, ``C`` put and call interpolants on
         the quoted ``K``; ``h`` the bandwidth used; ``K_mass``, ``dp`` the
         completed midpoint support; ``n_ext`` mass count after the right wing;
-        ``n_left`` the left-wing count used; ``interpolant(K_pts) -> (P, C)``.
+        ``n_left`` the left-wing count used; ``n_right`` the right-wing count
+        used; ``interpolant(K_pts) -> (P, C)``.
     """
     K = np.asarray(K, dtype=float)
     C = np.asarray(C, dtype=float)
@@ -83,6 +86,10 @@ def estimate_rnd(
         n_left = _n_left_from_mesh(K)
     else:
         n_left = max(int(n_left), 2)
+    if n_right is None:
+        n_right = _n_right_from_gap(K, C, F, disc)
+    else:
+        n_right = max(int(n_right), 0)
 
     K_work, C_work = K, C
     n_ext = len(K)
@@ -125,6 +132,7 @@ def estimate_rnd(
         "dp": dG,
         "n_ext": int(n_ext),
         "n_left": int(n_left),
+        "n_right": int(n_right),
         "F": F,
         "interpolant": interpolant,
     }
@@ -138,16 +146,16 @@ def _normalized_jumps(K, C, stock):
     return K, dG
 
 
-def _complete_c_tail(K, C, F, disc, n_tail=80, k_max=None):
-    """Linear no-arbitrage decay of leftover C_m to 0."""
+def _right_wing(K, C, F, disc, k_max=None):
+    """Linear intercept of leftover C_m, or None if the wing is empty."""
     K = np.asarray(K, dtype=float)
     C = np.asarray(C, dtype=float)
     if len(K) == 0:
-        return K, C
+        return None
     K_m = float(K[-1])
     C_m = float(max(C[-1], 0.0))
     if C_m <= 1e-8:
-        return K, C
+        return None
     if len(K) >= 2 and K[-1] > K[-2]:
         slp = (C[-1] - C[-2]) / (K[-1] - K[-2])
     else:
@@ -157,6 +165,34 @@ def _complete_c_tail(K, C, F, disc, n_tail=80, k_max=None):
     cap = 8.0 * float(F) if k_max is None else float(k_max)
     K_end = min(max(K_end, K_m * 1.01), cap)
     if K_end <= K_m * 1.001:
+        return None
+    return K_m, C_m, slp, K_end
+
+
+def _n_right_from_gap(K, C, F, disc, k_max=None):
+    """Eight knots per last quoted gap along the linear call tail."""
+    spec = _right_wing(K, C, F, disc, k_max=k_max)
+    if spec is None:
+        return 0
+    K_m, _, _, K_end = spec
+    last = float(K[-1] - K[-2]) if len(K) >= 2 else 0.0
+    if last <= 0.0:
+        return 2
+    return max(1, int(round(8.0 * (K_end - K_m) / last)))
+
+
+def _complete_c_tail(K, C, F, disc, n_tail=None, k_max=None):
+    """Linear no-arbitrage decay of leftover C_m to 0."""
+    K = np.asarray(K, dtype=float)
+    C = np.asarray(C, dtype=float)
+    spec = _right_wing(K, C, F, disc, k_max=k_max)
+    if spec is None:
+        return K, C
+    K_m, C_m, slp, K_end = spec
+    if n_tail is None:
+        n_tail = _n_right_from_gap(K, C, F, disc, k_max=k_max)
+    n_tail = int(n_tail)
+    if n_tail < 1:
         return K, C
     K_t = np.linspace(K_m, K_end, n_tail + 1)[1:]
     C_t = np.maximum(C_m + slp * (K_t - K_m), 0.0)

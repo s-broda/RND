@@ -15,6 +15,16 @@ python3 python/replicate.py
 
 This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, and `figures/ccdf_listed.pdf`.
 
+## Version 2
+
+`paper_v2.tex` is a separate manuscript. It keeps the estimator and the exact-quote ablation, records that the signed density integrates to zero with first moment equal to the forward, and rescores the benchmarks. `python/replicate.py` is unchanged as an entry point. The v2 script is
+
+```bash
+python3 python/replicate_v2.py
+```
+
+It writes `figures_v2/` and `python/results/v2_summary.json`. The positive-convolution centers cover the quoted log-strike range and the fitted weights are not rescaled. The Yatchew–Härdle penalty, the Priestley–Chao bandwidth, and the Aït-Sahalia–Duarte pricing bandwidth are chosen by even/odd cross-validation. The noise study adds one volatility point of Gaussian noise on an irregular strike grid.
+
 ## Data
 
 Cboe delayed quotes cannot be redistributed as a full option-chain dump. The **working slices** used in the paper (strikes, OTM mids, parity-filled other side, and the snapshot metadata) are in `python/results/`:

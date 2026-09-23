@@ -11,6 +11,12 @@ paper.out
 paper.spl
 paper.toc
 paper.pdf
+paper_v2.aux
+paper_v2.bbl
+paper_v2.blg
+paper_v2.log
+paper_v2.out
+paper_v2.spl
 refs.bib
 elsarticle-harv.bst
 *.synctex.gz

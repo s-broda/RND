@@ -426,12 +426,12 @@ def score_listed(sl, title):
     otm_mkt = _otm(sl, sl.P, sl.C)
     _, iv_mkt = _otm_iv(sl, sl.P, sl.C)
     left, right = sl.K <= sl.F, sl.K > sl.F
+    ours = estimate_rnd(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, K_eval=s_grid, twice=True)
     print(
-        f"  n={len(sl.K)}  F={sl.F:.0f}  S={sl.S0:.0f}  T={sl.T:.3f}  "
+        f"  n={len(sl.K)}  n_R={ours['n_right']}  n_ext={ours['n_ext']}  "
+        f"F={sl.F:.0f}  S={sl.S0:.0f}  T={sl.T:.3f}  "
         f"σ={atm_iv(sl):.3f}  K=[{sl.K[0]:.0f},{sl.K[-1]:.0f}]"
     )
-
-    ours = estimate_rnd(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, K_eval=s_grid, twice=True)
     rec_o = _pack(
         sl, ours["P"], ours["C"], ours["q"], s_grid, _holdout_ours(sl, twice=True), iv_mkt, h=ours["h"]
     )
