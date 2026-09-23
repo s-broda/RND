@@ -31,7 +31,7 @@
 \cortext[cor1]{Corresponding author.}
 
 \begin{abstract}
-European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. This paper rescales the calls to a complementary distribution function and smooths the jump measure of that function with a Gaussian kernel. The density estimator is minus the forward times the derivative of the resulting kernel density, one term per strike. The kernel cdf of the same measure is a call interpolant. Completing the unquoted tails, placing masses at cell centers, and combining two kernel widths are quadrature corrections. Inside a filling strike grid the estimator is uniformly consistent for exact quotes. Over the whole line the signed estimator integrates to zero and its first moment equals the forward. On exact Heston quotes the corrections bring the integrated squared error to \(5.0\times 10^{-9}\). When the quotes contain butterfly arbitrage the calls are replaced by their convex projection, the wings are held at the wing implied volatility, and the density is a mixture of the twiced Gaussian and a wider sinc kernel. The bandwidth factor, the mixture weight, and the sinc multiple are chosen by pricing cross-validation after that pipeline is assembled. On thirty noisy Heston replications the mean integrated squared error is \(6.6\times 10^{-4}\). The median is \(4.0\times 10^{-4}\). Under variance gamma the mean is \(4.2\times 10^{-3}\). An equal mixture with the sinc fixed at three times the density-scale bandwidth, chosen instead by integrated squared error on a pilot of eight replications, reaches \(2.8\times 10^{-4}\) and \(1.3\times 10^{-3}\). Pricing cross-validation does not find those constants. On listed slices the unsmoothed projection remains closer to the quotes. The kernel step is what returns a density.
+European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. This paper rescales the calls to a complementary distribution function and smooths the jump measure of that function with a Gaussian kernel. The density estimator is minus the forward times the derivative of the resulting kernel density, one term per strike. The kernel cdf of the same measure is a call interpolant. Completing the unquoted tails, placing masses at cell centers, and combining two kernel widths are quadrature corrections. Inside a filling strike grid the estimator is uniformly consistent for exact quotes. Over the whole line the signed estimator integrates to zero and its first moment equals the forward. On exact Heston quotes the density formula brings the integrated squared error to \(5.0\times 10^{-9}\). Prices are never obtained by integrating that formula. They are read from the kernel cdf. Section~\ref{sec:noise} scores the density. Section~\ref{sec:emp} scores the interpolant on listed slices. Under noise the calls are projected onto the decreasing convex cone and the wings are held at the wing implied volatility before either readout.
 \end{abstract}
 
 \begin{keyword}
@@ -49,7 +49,7 @@ risk-neutral density \sep option prices \sep kernel estimation \sep in-fill cons
 
 This paper estimates the density from a single-maturity strip by rescaling the calls to a complementary distribution function, replacing the empirical jump measure by a Gaussian kernel, and inverting the associated characteristic function. For a Gaussian the inversion is a finite sum, one term per strike. Completing the unquoted tails, placing each mass at the center of its cell, and combining two kernel widths are quadrature corrections. As the strike mesh fills a compact interval and the bandwidth shrinks more slowly than the mesh, the estimator converges to the true density on the interior of that interval.
 
-The usual split in this literature is that interpolants of the call or of implied volatility reprice listed quotes well and do not yield a usable density, while methods that are densities by construction cannot interpolate a dense, slightly arbitrageable chain. \citeauthor{bondarenko2003}'s method is a sieve: with a kernel width that does not shrink as strikes are added, it does not become a local smoother, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by a decreasing convex list; at a zero roughness penalty the second differences of that list are a discrete nonnegative measure, not a curve. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. The estimator of this paper returns a closed-form estimate of \(f_{\Q}\) and, from the same kernel, a call interpolant. They are different objects. Over the whole line the signed density integrates to zero and its first moment equals the forward; the prices are read from the kernel cdf. Sections~\ref{sec:noise} and~\ref{sec:emp} compare both objects with the benchmarks above, with tuning parameters chosen by cross-validation on pricing error, and with a raw SVI slice \citep{gatheral2006,gatheraljacquier2014}. On exact quotes the quadrature corrections are effective. Under noise the kernel is applied only after the calls have been projected and the wings filled at constant implied volatility. A Gaussian--sinc mixture on those masses can undercut the other density estimators, if the weight and the sinc width are chosen by integrated squared error on a pilot. Pricing cross-validation, run after the same pipeline is assembled, does not recover that choice: the mean integrated squared error rises, and under variance gamma it is no longer the smallest in the comparison. On the listed slices the unsmoothed projection remains the closest call. It does not return a density curve. 
+The usual split in this literature is that interpolants of the call or of implied volatility reprice listed quotes well and do not yield a usable density, while methods that are densities by construction cannot interpolate a dense, slightly arbitrageable chain. \citeauthor{bondarenko2003}'s method is a sieve: with a kernel width that does not shrink as strikes are added, it does not become a local smoother, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by a decreasing convex list; at a zero roughness penalty the second differences of that list are a discrete nonnegative measure, not a curve. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. The estimator returns two readouts of one kernel. The density formula is \(-\,F\) times the derivative of the kernel density of the jumps. The call interpolant is the kernel cdf, clipped to \([0,1]\). Over the whole line the signed density integrates to zero and its first moment equals the forward, so the prices are not integrals of \(\hat f_{\Q}\). Section~\ref{sec:noise} scores the density formula on noisy Heston and variance-gamma draws, against the constrained local polynomial, the convolution, and an SVI slice \citep{gatheral2006,gatheraljacquier2014}. Section~\ref{sec:emp} scores the interpolant on four listed slices. Under noise the calls are projected and the wings are filled at constant implied volatility before either readout. On the listed slices the unsmoothed projection remains the closest call. It does not return a density. 
 
 The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} derives the characteristic function of the normalized call and the closed-form estimator, and compares it to kernel smoothing of the call. Section~\ref{sec:refine} records the quadrature corrections and the integral identities. Section~\ref{sec:h} chooses the bandwidth. Section~\ref{sec:ifc} proves in-fill consistency and illustrates it on exact Heston and variance-gamma quotes. Section~\ref{sec:noise} repeats the comparison on irregular strikes with noise in implied volatility, against retuned benchmarks and an SVI slice. Section~\ref{sec:emp} is an illustration on four listed chains from three snapshots. Section~\ref{sec:conc} concludes.
 
@@ -533,9 +533,9 @@ On the dense chain the ranking is the same as under Heston. Completing the tails
 \section{Observation Noise}
 \label{sec:noise}
 
-The chains in Section~\ref{sec:ifc} are exact and equally spaced. A listed chain is neither. This section keeps the Heston and variance-gamma targets and changes the design in three ways. Strikes are irregular: twenty-two geometrically spaced knots on \([0.45F,0.90F)\), twenty-eight equally spaced knots on \([0.90F,1.10F)\), and twenty-two geometrically spaced knots on \([1.10F,1.40F]\), seventy-two strikes in all. The first strike lies inside the integrated-squared-error window \([60,140]\). Black--Scholes implied volatility is observed with independent Gaussian noise of standard deviation \(0.01\), then floored at \(0.02\), and converted back to a call. Thirty replications use the seed \(20260923\). No method sees \(f_{\Q}\) when it chooses a tuning parameter.
+The chains in Section~\ref{sec:ifc} are exact and equally spaced. A listed chain is neither. This section keeps the Heston and variance-gamma targets and changes the design in three ways. Strikes are irregular: twenty-two geometrically spaced knots on \([0.45F,0.90F)\), twenty-eight equally spaced knots on \([0.90F,1.10F)\), and twenty-two geometrically spaced knots on \([1.10F,1.40F]\), seventy-two strikes in all. The first strike lies inside the integrated-squared-error window \([60,140]\). Black--Scholes implied volatility is observed with independent Gaussian noise of standard deviation \(0.01\), then floored at \(0.02\), and converted back to a call. Thirty replications use the seed \(20260923\). Bandwidths and penalties are chosen without \(f_{\Q}\). The pilot mixture row is the exception: its constants minimize integrated squared error on the first eight replications.
 
-The estimator of this paper is scored three times. On the raw quotes, the density-scale rule \eqref{eq:h-den} is the rule used on listed chains, and a second bandwidth is chosen by even/odd cross-validation of out-of-the-money pricing error. The two-step version builds a different call curve and then uses the same kernel at the density-scale bandwidth. The quoted calls are replaced by their Euclidean projection onto the decreasing convex cone with slopes in \([-e^{-rT},0]\), the quadratic program of Section~\ref{sec:emp}. Beyond the first and last strikes, implied volatility is held at its wing value and the calls are repriced on a log grid from \(0.15F\) to \(3F\). The mixture uses those same masses. It puts weight \(\alpha\) on the twiced Gaussian at bandwidth \(c h\) and weight \(1-\alpha\) on a sinc kernel at bandwidth \(s\cdot c h\), where \(h\) is the density-scale bandwidth of the training fold. The triple \((c,\alpha,s)\) is chosen by even/odd cross-validation of out-of-the-money pricing error on the grid \(c\in\{0.75,1,1.25,1.5\}\), \(\alpha\in\{\tfrac12,\tfrac34,1\}\), and \(s\in\{2,3\}\) when \(\alpha<1\). The pilot row freezes \(c=1\), \(\alpha=\tfrac12\), and \(s=3\), the triple with the lowest integrated squared error on the first eight replications of each design. Out-of-the-money premiums are floored at zero before the error is computed. The other methods are:
+Each fit is read twice. The density column is the formula \(\hat f_{\Q}\). The pricing column is the interpolant of the same fit. On the raw quotes, the density-scale rule \eqref{eq:h-den} is the bandwidth of the listed interpolant, and a second bandwidth is chosen by even/odd cross-validation of out-of-the-money pricing error. The two-step version builds a different call curve and then uses the same kernel at the density-scale bandwidth. The quoted calls are replaced by their Euclidean projection onto the decreasing convex cone with slopes in \([-e^{-rT},0]\), the quadratic program of Section~\ref{sec:emp}. Beyond the first and last strikes, implied volatility is held at its wing value and the calls are repriced on a log grid from \(0.15F\) to \(3F\). The mixture uses those same masses. It puts weight \(\alpha\) on the twiced Gaussian at bandwidth \(c h\) and weight \(1-\alpha\) on a sinc kernel at bandwidth \(s\cdot c h\), where \(h\) is the density-scale bandwidth of the training fold. The triple \((c,\alpha,s)\) is chosen by even/odd cross-validation of out-of-the-money pricing error on the grid \(c\in\{0.75,1,1.25,1.5\}\), \(\alpha\in\{\tfrac12,\tfrac34,1\}\), and \(s\in\{2,3\}\) when \(\alpha<1\). The pilot row freezes \(c=1\), \(\alpha=\tfrac12\), and \(s=3\), the triple with the lowest integrated squared error on the first eight replications of each design. Out-of-the-money premiums are floored at zero before the error is computed. The other methods are:
 
 \begin{itemize}
 \item \citeauthor{yatchew2006}, with the roughness penalty chosen by the same cross-validation. The unknown in the quadratic program is the call. Slope increments are not used: that map is ill-conditioned, and a sequential least-squares solver started from those increments stops on an infeasible subproblem and returns the isotonic start. In call coordinates the same program terminates at the projection. The fitted call is convex and decreasing, with slopes in \([-e^{-rT},0]\), so its second derivative is a discrete measure. It is scored on pricing error and not on integrated squared error.
@@ -545,18 +545,18 @@ The estimator of this paper is scored three times. On the raw quotes, the densit
 \item A raw SVI slice \citep{gatheral2006}. Total implied variance is \(a+b\bigl(\rho(k-m)+\sqrt{(k-m)^2+\sigma^2}\bigr)\), fitted to call prices by least squares. The butterfly function \(g(k)\) of \citet{gatheraljacquier2014} is penalized wherever it is negative.
 \end{itemize}
 
-Integrated squared error is \(\int_{60}^{140}(\hat f_{\Q}-f_{\Q})^2\,\mathrm{d}K\), on the signed estimator. Pricing error is out-of-the-money root-mean-square error against the clean calls, not against the noisy quotes.
+Integrated squared error uses the density formula, \(\int_{60}^{140}(\hat f_{\Q}-f_{\Q})^2\,\mathrm{d}K\). The pricing column uses the interpolant, the kernel cdf clipped to \([0,1]\), and is out-of-the-money root-mean-square error against the clean calls. The two columns are not two summaries of one function.
 
 \begin{table}[H]
 \centering
-\caption{Noisy irregular grids, thirty replications. The first line of each method is the mean and the second is the replication standard deviation. ISE is \(\int_{60}^{140}(\hat f_{\Q}-f_{\Q})^2\,\mathrm{d}K\). RMSE is out-of-the-money pricing error against the clean calls. Yatchew--H\"ardle returns a convex call, not a density curve.}
+\caption{Noisy irregular grids, thirty replications. The first line of each method is the mean and the second is the replication standard deviation. Columns \(\hat f_{\Q}\) are integrated squared error of the density formula. Columns \(\hat P\) are out-of-the-money pricing error of the interpolant against the clean calls. Yatchew--H\"ardle has no density formula.}
 \label{tab:noise}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{ll *{4}{S[table-format=1.2e-1,scientific-notation=true]}}
 \toprule
 & & \multicolumn{2}{c}{Heston} & \multicolumn{2}{c}{Variance gamma} \\
 \cmidrule(lr){3-4} \cmidrule(lr){5-6}
-Method & Rule & {ISE} & {RMSE} & {ISE} & {RMSE} \\
+Method & Rule & {$\hat f_{\Q}$} & {$\hat P$} & {$\hat f_{\Q}$} & {$\hat P$} \\
 \midrule
 Mixture & pricing CV
   & 6.62e-4 & 3.21e-2 & 4.23e-3 & 3.49e-2 \\
@@ -626,7 +626,7 @@ Projecting the calls and holding the wings at the wing implied volatility is the
 
 Moving half of that kernel onto a sinc at three times the bandwidth, with the constants chosen by integrated squared error on the first eight replications, lowers the thirty-replication means to \(2.8\times 10^{-4}\) and \(1.3\times 10^{-3}\). That is the smallest integrated squared error in Table~\ref{tab:noise}, on both targets, and the clean-call error is \(0.031\) and \(0.029\) against \(0.029\) for SVI. Those two constants see the true density on the pilot.
 
-Pricing cross-validation is run only after the projection, the wing, and the mixture are in place. It chooses \((c,\alpha,s)\) from the grid in the paragraph above, using held-out quotes and not \(f_{\Q}\). The modal Heston choice is \(c=1.25\), \(\alpha=\tfrac12\), \(s=2\) (nine of thirty draws). The mean integrated squared error rises to \(6.6\times 10^{-4}\) under Heston and \(4.2\times 10^{-3}\) under variance gamma. The Heston median is \(4.0\times 10^{-4}\), so the mean is a few draws on which the cross-validation narrows the kernel. Under Heston the cross-validated mixture still beats the convolution and does not beat the local polynomial. Under variance gamma it beats neither. Clean-call error stays near \(0.03\). The projection's second derivative remains a discrete measure. The kernel, Gaussian or mixed, is the step that returns \(\hat f_{\Q}\).
+Pricing cross-validation of \((c,\alpha,s)\), run after the projection and the wing, uses held-out quotes. The modal Heston choice is \(c=1.25\), \(\alpha=\tfrac12\), \(s=2\) (nine of thirty draws). The mean integrated squared error rises to \(6.6\times 10^{-4}\) under Heston and \(4.2\times 10^{-3}\) under variance gamma. The Heston median is \(4.0\times 10^{-4}\). Under Heston that row still beats the convolution. Under variance gamma it beats neither the convolution nor the local polynomial. It does not recover the pilot pair, and Section~\ref{sec:emp} does not use it. Listed prices are the interpolant of the density-scale kernel and of the two-step Gaussian.
 
 \section{Empirical Illustration}
 \label{sec:emp}
@@ -656,102 +656,84 @@ RUT 18 Dec 2026 & 217 & 216 & 115 & 97 & 56 \\
 }
 \end{table}
 
-\subsection{Pricing and mass}
+\subsection{The interpolant}
 \label{sec:emp-est}
 
-Every method is tuned only on pricing error, by the nested even/odd rule of Section~\ref{sec:noise}: on each half-sample the tuning parameter is chosen from that half alone, and the held-out strikes are scored once. Premiums are floored at zero. Table~\ref{tab:listed} reports in-sample and hold-out root-mean-square error, and the positive and negative parts of \(\hat f_{\Q}\) on \([\max(1,0.15F),2.6F]\). The Yatchew--H\"ardle row has no density column. The convex call's second derivative is atomic.
+This section prices with the interpolant. It does not integrate \(\hat f_{\Q}\). For the kernel, the price is the cdf readout at the density-scale bandwidth: \(\hat P\) clipped to \([0,1]\), and \(C=S_0e^{-qT}(1-\hat P)\). The two-step row is the same readout after the projection and the flat wing of Section~\ref{sec:noise}. Hold-out refits that pipeline on each even/odd half and scores the other half. Premiums are floored at zero. The competitors contribute their own call fits, not a second derivative.
 
 \begin{table}[H]
 \centering
-\caption{Listed slices. RMSE and hold-out are out-of-the-money root-mean-square errors, in index points. Hold-out retunes inside each training half. Positive and negative masses are integrals of \(\max(\hat f_{\Q},0)\) and \(\min(\hat f_{\Q},0)\) on \([\max(1,0.15F),2.6F]\).}
+\caption{Listed slices, interpolant only. Entries are out-of-the-money root-mean-square error in index points. Hold-out refits on each even/odd half. Nothing in this table is an integral of \(\hat f_{\Q}\).}
 \label{tab:listed}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{ll *{4}{S[table-format=-1.2e-1,scientific-notation=true]}}
+\begin{tabular}{ll *{2}{S[table-format=1.2e-1,scientific-notation=true]}}
 \toprule
-Slice & Method & {RMSE} & {Hold-out} & {Positive} & {Negative} \\
+Slice & Method & {In sample} & {Hold-out} \\
 \midrule
-SPX Dec & Kernel, density scale & 4.88e-1 & 9.46e-1 & 1.01e0 & -1.40e-2 \\
- & Two-step & 4.99e-1 & 8.69e-1 & 1.01e0 & -1.20e-2 \\
- & Mixture, pricing CV & 3.29e-1 & 5.71e-1 & 1.12e0 & -1.10e-1 \\
- & Kernel, pricing CV & 4.15e-1 & 2.86e-1 & 4.28e1 & -4.18e1 \\
- & Yatchew--H\"ardle & 2.20e-2 & 5.40e-2 & {---} & {---} \\
- & A\"{\i}t-Sahalia--Duarte & 4.11e-1 & 5.40e-1 & 1.03e0 & -3.85e-1 \\
- & PCA & 3.96e-2 & 4.28e-2 & 1.00e0 & 0.00e0 \\
- & Priestley--Chao, pricing CV & 9.08e-2 & 3.48e-1 & 1.01e0 & -1.21e-2 \\
- & Priestley--Chao, \(n^{-1/9}\) & 2.05e1 & 2.37e1 & 9.99e-1 & -1.07e-2 \\
- & SVI & 5.32e-1 & 5.32e-1 & 1.00e0 & 0.00e0 \\
+SPX Dec & Interpolant & 4.88e-1 & 9.46e-1 \\
+ & Two-step interpolant & 4.99e-1 & 8.69e-1 \\
+ & Yatchew--H\"ardle & 2.20e-2 & 5.40e-2 \\
+ & A\"{\i}t-Sahalia--Duarte & 4.11e-1 & 5.40e-1 \\
+ & PCA & 3.96e-2 & 4.28e-2 \\
+ & Priestley--Chao & 9.08e-2 & 3.48e-1 \\
+ & SVI & 5.32e-1 & 5.32e-1 \\
 \midrule
-SPX Mar & Kernel, density scale & 9.55e-1 & 1.90e0 & 1.02e0 & -2.11e-2 \\
- & Two-step & 9.40e-1 & 1.72e0 & 1.01e0 & -2.20e-2 \\
- & Mixture, pricing CV & 5.12e-1 & 1.32e0 & 1.07e0 & -7.40e-2 \\
- & Kernel, pricing CV & 7.36e-1 & 5.24e-1 & 4.02e1 & -3.92e1 \\
- & Yatchew--H\"ardle & 3.80e-2 & 1.41e-1 & {---} & {---} \\
- & A\"{\i}t-Sahalia--Duarte & 6.51e-1 & 8.61e-1 & 1.02e0 & -3.21e-7 \\
- & PCA & 8.73e-2 & 1.02e-1 & 1.00e0 & 0.00e0 \\
- & Priestley--Chao, pricing CV & 3.22e-1 & 1.28e0 & 1.00e0 & -2.14e-3 \\
- & Priestley--Chao, \(n^{-1/9}\) & 2.86e1 & 3.30e1 & 9.97e-1 & -3.51e-1 \\
- & SVI & 1.16e0 & 1.16e0 & 1.00e0 & -1.71e-8 \\
+SPX Mar & Interpolant & 9.55e-1 & 1.90e0 \\
+ & Two-step interpolant & 9.40e-1 & 1.72e0 \\
+ & Yatchew--H\"ardle & 3.80e-2 & 1.41e-1 \\
+ & A\"{\i}t-Sahalia--Duarte & 6.51e-1 & 8.61e-1 \\
+ & PCA & 8.73e-2 & 1.02e-1 \\
+ & Priestley--Chao & 3.22e-1 & 1.28e0 \\
+ & SVI & 1.16e0 & 1.16e0 \\
 \midrule
-NDX Dec & Kernel, density scale & 6.45e0 & 8.74e0 & 1.16e0 & -1.61e-1 \\
- & Two-step & 6.42e0 & 8.82e0 & 1.16e0 & -1.63e-1 \\
- & Mixture, pricing CV & 5.93e0 & 7.83e0 & 1.29e0 & -2.99e-1 \\
- & Kernel, pricing CV & 6.66e0 & 6.86e0 & 1.14e0 & -1.44e-1 \\
- & Yatchew--H\"ardle & 2.06e0 & 3.05e0 & {---} & {---} \\
- & A\"{\i}t-Sahalia--Duarte & 3.72e0 & 4.73e0 & 1.03e0 & -2.10e-2 \\
- & PCA & 2.93e0 & 3.23e0 & 1.00e0 & 0.00e0 \\
- & Priestley--Chao, pricing CV & 2.88e0 & 7.41e0 & 1.02e0 & -2.44e-2 \\
- & Priestley--Chao, \(n^{-1/9}\) & 1.36e2 & 1.57e2 & 9.99e-1 & -3.28e-1 \\
- & SVI & 3.12e0 & 3.29e0 & 1.00e0 & 0.00e0 \\
+NDX Dec & Interpolant & 6.45e0 & 8.74e0 \\
+ & Two-step interpolant & 6.42e0 & 8.82e0 \\
+ & Yatchew--H\"ardle & 2.06e0 & 3.05e0 \\
+ & A\"{\i}t-Sahalia--Duarte & 3.72e0 & 4.73e0 \\
+ & PCA & 2.93e0 & 3.23e0 \\
+ & Priestley--Chao & 2.88e0 & 7.41e0 \\
+ & SVI & 3.12e0 & 3.29e0 \\
 \midrule
-RUT Dec & Kernel, density scale & 4.03e-1 & 9.64e-1 & 1.01e0 & -7.04e-3 \\
- & Two-step & 4.46e-1 & 8.14e-1 & 1.00e0 & -2.00e-3 \\
- & Mixture, pricing CV & 3.58e-1 & 6.27e-1 & 1.10e0 & -1.21e-1 \\
- & Kernel, pricing CV & 5.30e-1 & 7.44e-1 & 1.01e1 & -9.06e0 \\
- & Yatchew--H\"ardle & 2.30e-2 & 1.55e-1 & {---} & {---} \\
- & A\"{\i}t-Sahalia--Duarte & 3.60e-1 & 4.94e-1 & 9.95e-1 & -1.98e-1 \\
- & PCA & 2.92e-2 & 3.29e-2 & 1.00e0 & 0.00e0 \\
- & Priestley--Chao, pricing CV & 2.11e-1 & 8.36e-1 & 9.99e-1 & -9.74e-4 \\
- & Priestley--Chao, \(n^{-1/9}\) & 1.38e1 & 1.59e1 & 9.98e-1 & -2.49e-1 \\
- & SVI & 1.17e-1 & 1.17e-1 & 1.00e0 & 0.00e0 \\
+RUT Dec & Interpolant & 4.03e-1 & 9.64e-1 \\
+ & Two-step interpolant & 4.46e-1 & 8.14e-1 \\
+ & Yatchew--H\"ardle & 2.30e-2 & 1.55e-1 \\
+ & A\"{\i}t-Sahalia--Duarte & 3.60e-1 & 4.94e-1 \\
+ & PCA & 2.92e-2 & 3.29e-2 \\
+ & Priestley--Chao & 2.11e-1 & 8.36e-1 \\
+ & SVI & 1.17e-1 & 1.17e-1 \\
 \bottomrule
-\end{tabular}%
-}
+\end{tabular}
 \end{table}
 
-On these four slices the Gaussian two-step tracks the raw density-scale kernel. The quotes are already close to the cone, so the projection moves them by hundredths of an index point and the density-scale bandwidth smooths either curve the same way. December S\&P~500 error is \(0.50\) against \(0.49\). Pricing cross-validation of the mixture, the same grid as in Section~\ref{sec:noise}, lowers that strip to \(0.33\) in sample and \(0.57\) on the hold-out. The positive mass on the window is \(1.12\) and the negative part is \(-0.11\). The unsmoothed projection is still the closest call, at \(0.022\), and the convolution is at \(0.040\). The same ordering holds on the other three slices: cross-validation improves the mixture relative to the fixed wide sinc, and the projection and the convolution remain closer to the quotes.
+On these four slices the interpolant and the two-step interpolant are close. The quotes already lie near the decreasing convex cone, so the projection moves them by hundredths of an index point and the density-scale bandwidth smooths either curve the same way. December S\&P~500 error is \(0.49\) for the interpolant and \(0.50\) for the two-step interpolant, with hold-out \(0.95\) and \(0.87\). March is \(0.96\) and \(0.94\). The Nasdaq-100 strip is \(6.45\) and \(6.42\). The Russell~2000 strip is \(0.40\) and \(0.45\).
 
-The convex projection is the closest of these methods to the quotes. On the December S\&P~500 strip its in-sample error is \(0.022\) and its hold-out error is \(0.054\). The cross-validated penalty is \(1\) in the normalized units of Section~\ref{sec:noise}, not zero: a pure interpolating projection is available and is not what the hold-out selects. The same pattern holds on the other three slices (penalties \(1\), \(0.1\), and \(10\)). The quotes are close to the decreasing convex cone once the quadratic program is solved in the call. An earlier implementation, parameterized by slope increments, stopped with an infeasible subproblem and returned an isotonic start whose December S\&P~500 residual was about \(2.25\). That number is not the distance to the cone.
+The convex projection is the closest of these methods to the quotes. On the December S\&P~500 strip its in-sample error is \(0.022\) and its hold-out error is \(0.054\). The cross-validated penalty is \(1\) in the normalized units of Section~\ref{sec:noise}. A pure interpolating projection is available, and the hold-out selects the penalized fit. The same pattern holds on the other three slices (penalties \(1\), \(0.1\), and \(10\)). The quotes are close to the decreasing convex cone once the quadratic program is solved in the call. An earlier implementation, parameterized by slope increments, stopped with an infeasible subproblem and returned an isotonic start whose December S\&P~500 residual was about \(2.25\). The distance to the cone is the solved residual above.
 
-The positive convolution, with centers on the quoted log-strike range and a width at the bottom of the cross-validation grid, is the next pricing method on every slice, and on the Russell~2000 strip it matches the projection on hold-out (\(0.033\) against \(0.155\)). It integrates to one, up to the penalty residual. SVI does as well. Its butterfly function is nonnegative on the monitoring grid, up to a solver tolerance of \(3\times 10^{-7}\) on the March S\&P~500 strip. Both are smoother than the quotes and both are probabilities.
+The positive convolution, with centers on the quoted log-strike range and a width at the bottom of the cross-validation grid, is the next pricing method on every slice. December S\&P~500 error is \(0.040\) in sample and \(0.043\) on hold-out. On the Russell~2000 strip the hold-out errors are \(0.033\) for the convolution and \(0.155\) for the projection. SVI prices the December strip at \(0.53\) and the Russell~2000 strip at \(0.12\). Its butterfly function is nonnegative on the monitoring grid, up to a solver tolerance of \(3\times 10^{-7}\) on the March S\&P~500 strip.
 
-The density-scale rule reprices the December S\&P~500 strip with error \(0.49\), and the Nasdaq-100 strip with error \(6.45\). Both numbers sit above the convex projection and above the convolution. On \([\max(1,0.15F),2.6F]\) the signed mass is \(1.00\) and the positive mass is \(1.01\) on the S\&P~500 and Russell~2000 strips. On the Nasdaq-100 strip the positive mass is \(1.16\) and the negative mass inside the same window is \(-0.16\). On a grid \([-F,8F]\) the signed integral is \(0\) and the first moment equals \(F\), to a forward error below \(10^{-3}\) index points on each of the four slices. The positive and negative parts on that wide grid each integrate to between \(1.07\) and \(1.23\). Equation \eqref{eq:moments} is not an asymptotic remark. It is the estimator.
-
-Pricing cross-validation does not repair the mass. On the December S\&P~500 strip it selects \(h=20\), against a density-scale bandwidth of \(180\). In-sample error falls from \(0.49\) to \(0.42\) and hold-out error from \(0.95\) to \(0.29\), and the positive mass on the window rises to \(42.8\). The March strip and the Russell~2000 strip do the same thing, with positive masses \(40.2\) and \(10.1\). The Nasdaq-100 cross-validation stays near the density-scale bandwidth (\(h=1126\) against \(1082\)) and the mass stays near \(1.14\). A bandwidth chosen for the call is not a bandwidth for the density. Figure~\ref{fig:listed} plots the density-scale estimator, not the cross-validated one.
-
-The Priestley--Chao row at \(n^{-1/9}\) reproduces the large pricing errors of an untuned second-derivative bandwidth: \(20.48\) on the December S\&P~500 strip and \(135.69\) on the Nasdaq-100 strip. At the pricing bandwidth those errors are \(0.09\) and \(2.88\). The local polynomial of \citeauthor{aitsahalia2003}, started from the solved projection rather than from an isotonic start, has December S\&P~500 error \(0.41\). Its hold-out error is larger than its in-sample error on every slice. The local cubic is a poor probability on the extended window: the December S\&P~500 negative mass is \(-0.39\), and the first moment is not the forward. That moment is not reported in the table because the cubic is being integrated outside the region where a local polynomial of a convex call is a density.
+The local polynomial starts from the solved projection. On the December S\&P~500 strip its error is \(0.41\) in sample and \(0.54\) on hold-out. Hold-out error exceeds in-sample error on every slice. Priestley--Chao at its pricing bandwidth has December error \(0.091\) and Nasdaq-100 error \(2.88\). Figure~\ref{fig:listed} is the other readout of the same kernel: the density formula on the December slices. Table~\ref{tab:listed} scores the interpolant.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{figures_v2/ccdf_listed.pdf}
-\caption{December 2026 slices. Left: positive part of the density-scale estimator, the local cubic, the convolution, and SVI. Right: out-of-the-money implied volatility. The dashed line is the forward.}
+\caption{December 2026 slices. Left: the density formula, positive part, with the local cubic, the convolution, and SVI. Right: out-of-the-money implied volatility of the listed quotes. The dashed line is the forward. Table~\ref{tab:listed} scores the kernel cdf of the same estimator.}
 \label{fig:listed}
 \end{figure}
 
 \section{Conclusion}
 \label{sec:conc}
 
-The second strike derivative of a European call is the risk-neutral density of the underlying at expiry. On a finite strike list that derivative is not an estimator. Rescaling the calls to a complementary distribution function makes the object to be smoothed a jump measure. A Gaussian kernel then has a closed form: the density estimator is minus the forward times the derivative of a Gaussian mixture of those jumps, and the call interpolant is the mixture's cdf. Completing the tails, placing masses at cell centers, and combining two widths are quadrature corrections. On exact equally spaced Heston quotes they bring the integrated squared error to \(5.0\times 10^{-9}\). The same ordering holds for variance gamma.
+The second strike derivative of a European call is the risk-neutral density of the underlying at expiry. On a finite strike list that derivative is not an estimator. Rescaling the calls to a complementary distribution function makes the object to be smoothed a jump measure. A Gaussian kernel then has a closed form. The density formula is minus the forward times the derivative of the kernel density of those jumps. The call interpolant is the kernel cdf, clipped to \([0,1]\). Completing the tails, placing masses at cell centers, and combining two widths are quadrature corrections. On exact equally spaced Heston quotes the density formula brings the integrated squared error to \(5.0\times 10^{-9}\). The same ordering holds for variance gamma.
 
-Over the whole line the signed estimator integrates to zero and its first moment equals the forward, before and after twicing. Uniform consistency on a compact interior interval does not put the missing unit of mass back. Prices taken from the clipped cdf are not integrals of the density.
+Over the whole line the signed density integrates to zero and its first moment equals the forward, before and after twicing. Prices are read from the clipped cdf.
 
-On exact quotes the quadrature corrections bring the integrated squared error to \(5.0\times 10^{-9}\). On noisy quotes the jumps of the raw call are the wrong measure. Projecting the calls and holding the wings at the wing implied volatility, then applying the twiced Gaussian, lowers the Heston mean to \(4.3\times 10^{-4}\). An equal Gaussian--sinc mixture with the sinc at three times the bandwidth, with those constants chosen by integrated squared error on eight pilot replications, lowers the thirty-replication means further, to \(2.8\times 10^{-4}\) and \(1.3\times 10^{-3}\). Pricing cross-validation of the same three constants, after the projection and the wing are already in place, does not recover that pair. The means rise to \(6.6\times 10^{-4}\) and \(4.2\times 10^{-3}\). Under Heston the cross-validated mixture still beats the convolution. Under variance gamma it does not beat the convolution or the local polynomial. On listed slices the quotes already lie near the cone. Cross-validation lowers the December S\&P~500 mixture error from the fixed wide sinc to \(0.33\), and the unsmoothed projection remains at \(0.022\).
+On noisy irregular strikes the jumps of the raw call are the wrong measure. Projecting the calls onto the decreasing convex cone and holding the wings at the wing implied volatility, then applying the twiced Gaussian, lowers the Heston mean integrated squared error to \(4.3\times 10^{-4}\), below the local polynomial and the convolution, and the variance-gamma mean to \(2.3\times 10^{-3}\), above both. The pricing column of that comparison is the interpolant of the same fit. An equal Gaussian--sinc mixture with the sinc at three times the bandwidth reaches \(2.8\times 10^{-4}\) and \(1.3\times 10^{-3}\), with those constants chosen by integrated squared error on eight pilot replications. Pricing cross-validation of the same constants does not recover that pair. Section~\ref{sec:emp} prices with the interpolant of the twiced Gaussian, at the density-scale bandwidth, on the raw quotes and on the projected curve.
 
-The estimator is a fast local approximation of \(f_{\Q}\) on a fine exact strip. Under noise, the lowest integrated squared error in the comparison uses the projected call and a Gaussian--sinc mixture whose constants were chosen for that error. Choosing the constants from prices instead gives back part of the gain. Neither version is the closest interpolant of a listed chain that is already nearly convex.
+On the four listed slices those two interpolants are close to each other and well above the unsmoothed projection. December S\&P~500 error is \(0.49\) for the interpolant and \(0.022\) for the projection. The projection's second derivative is a discrete measure. The density formula remains the readout for \(f_{\Q}\).
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:twice} and the replication scripts are available at \url{https://github.com/s-broda/RND}.
 The v2 comparison is \path{python/replicate_v2.py}.
-The two-step mixture is \path{python/src/twostep.py}.
+The two-step estimator is \path{python/src/twostep.py}.
 
 \bibliographystyle{elsarticle-harv}
 \bibliography{refs_v2}
