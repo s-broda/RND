@@ -101,13 +101,24 @@ def _gauss_twice_q_G(K, mu, dp, h, F):
     return q, G
 
 
-def estimate_combined(K, C, S0, r, T, q=0.0, F=None, K_eval=None, alpha=MIX_ALPHA, sinc_factor=SINC_FACTOR):
-    """Two-step masses, then a Gaussian-sinc mixture at the density-scale bandwidth.
+def mixture_q_G(K, mu, dp, h, F, alpha=MIX_ALPHA, sinc_factor=SINC_FACTOR):
+    """Equal-weight default: twiced Gaussian at ``h``, sinc at ``sinc_factor * h``."""
+    q_g, G_g = _gauss_twice_q_G(K, mu, dp, h, F)
+    if alpha >= 1.0 - 1e-12:
+        return q_g, G_g
+    q_s, G_s = _sinc_q_G(K, mu, dp, h * sinc_factor, F)
+    return alpha * q_g + (1.0 - alpha) * q_s, alpha * G_g + (1.0 - alpha) * G_s
+
+
+def estimate_combined(K, C, S0, r, T, q=0.0, F=None, K_eval=None, alpha=MIX_ALPHA, sinc_factor=SINC_FACTOR, h=None):
+    """Two-step masses, then a Gaussian-sinc mixture.
 
     The Gaussian piece is the twiced kernel at bandwidth ``h``. The sinc piece
     uses bandwidth ``sinc_factor * h``. ``alpha`` is the Gaussian weight.
+    ``h=None`` uses the density-scale rule on the projected curve.
     """
-    base = estimate_twostep(K, C, S0, r, T, q=q, F=F, K_eval=K, h="density", twice=True)
+    h_in = "density" if h is None else float(h)
+    base = estimate_twostep(K, C, S0, r, T, q=q, F=F, K_eval=K, h=h_in, twice=True)
     mu, dp, h, F_used = base["K_mass"], base["dp"], base["h"], base["F"]
     if K_eval is None:
         K_eval = np.asarray(K, dtype=float)
