@@ -23,7 +23,11 @@ This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT 
 python3 python/replicate_v2.py
 ```
 
-It writes `figures_v2/` and `python/results/v2_summary.json`. The positive-convolution centers cover the quoted log-strike range and the fitted weights are not rescaled. The Yatchew–Härdle penalty, the Priestley–Chao bandwidth, and the Aït-Sahalia–Duarte pricing bandwidth are chosen by even/odd cross-validation. The noise study adds one volatility point of Gaussian noise on an irregular strike grid.
+It writes `figures_v2/` and `python/results/v2_summary.json`. The positive-convolution centers cover the quoted log-strike range and the fitted weights are not rescaled. The Yatchew–Härdle penalty, the Priestley–Chao bandwidth, and the Aït-Sahalia–Duarte pricing bandwidth are chosen by even/odd cross-validation. The noise study adds one volatility point of Gaussian noise on an irregular strike grid. The two-step estimator projects the calls onto the decreasing convex cone, holds the wing implied volatility fixed, and then calls `estimate_rnd`:
+
+```bash
+python3 python/score_twostep.py
+```
 
 ## Data
 

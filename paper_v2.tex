@@ -31,7 +31,7 @@
 \cortext[cor1]{Corresponding author.}
 
 \begin{abstract}
-European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. This paper rescales the calls to a complementary distribution function and smooths the jump measure of that function with a Gaussian kernel. The density estimator is minus the forward times the derivative of the resulting kernel density, one term per strike. The kernel cdf of the same measure is a call interpolant. Completing the unquoted tails, placing masses at cell centers, and combining two kernel widths are quadrature corrections. Inside a filling strike grid the estimator is uniformly consistent for exact quotes. Over the whole line the signed estimator integrates to zero and its first moment equals the forward. On exact Heston quotes the corrections bring the integrated squared error to \(5.0\times 10^{-9}\). With one volatility point of noise on an irregular grid, a shape-constrained local polynomial and a positive convolution approximation have smaller integrated squared error, and a raw SVI slice has smaller pricing error. On four listed index slices a convex projection solved in the call coordinates reprices the quotes more closely than the kernel cdf. A pricing bandwidth can reduce that gap and, on the December S\&P~500 strip, raises the positive mass on the integration window from \(1.01\) to \(42.8\).
+European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. This paper rescales the calls to a complementary distribution function and smooths the jump measure of that function with a Gaussian kernel. The density estimator is minus the forward times the derivative of the resulting kernel density, one term per strike. The kernel cdf of the same measure is a call interpolant. Completing the unquoted tails, placing masses at cell centers, and combining two kernel widths are quadrature corrections. Inside a filling strike grid the estimator is uniformly consistent for exact quotes. Over the whole line the signed estimator integrates to zero and its first moment equals the forward. On exact Heston quotes the corrections bring the integrated squared error to \(5.0\times 10^{-9}\). When the quotes contain butterfly arbitrage the same kernel is applied to the convex projection of the calls, with the unquoted wings held at the wing implied volatility. On thirty noisy Heston replications that two-step estimator has mean integrated squared error \(4.3\times 10^{-4}\), smaller than the shape-constrained local polynomial, the positive convolution approximation, and a raw SVI slice, and its error in pricing the clean calls matches SVI. On noisy variance-gamma quotes the integrated squared error is a little higher than those two density estimators, and the clean-call error is smaller than either. On listed slices the unsmoothed projection remains closer to the quotes. The kernel step is what returns a density.
 \end{abstract}
 
 \begin{keyword}
@@ -49,7 +49,7 @@ risk-neutral density \sep option prices \sep kernel estimation \sep in-fill cons
 
 This paper estimates the density from a single-maturity strip by rescaling the calls to a complementary distribution function, replacing the empirical jump measure by a Gaussian kernel, and inverting the associated characteristic function. For a Gaussian the inversion is a finite sum, one term per strike. Completing the unquoted tails, placing each mass at the center of its cell, and combining two kernel widths are quadrature corrections. As the strike mesh fills a compact interval and the bandwidth shrinks more slowly than the mesh, the estimator converges to the true density on the interior of that interval.
 
-The usual split in this literature is that interpolants of the call or of implied volatility reprice listed quotes well and do not yield a usable density, while methods that are densities by construction cannot interpolate a dense, slightly arbitrageable chain. \citeauthor{bondarenko2003}'s method is a sieve: with a kernel width that does not shrink as strikes are added, it does not become a local smoother, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by a decreasing convex list; at a zero roughness penalty the second differences of that list are a discrete nonnegative measure, not a curve. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. The estimator of this paper returns a closed-form estimate of \(f_{\Q}\) and, from the same kernel, a call interpolant. They are different objects. Over the whole line the signed density integrates to zero and its first moment equals the forward; the prices are read from the kernel cdf. Sections~\ref{sec:noise} and~\ref{sec:emp} compare both objects with the benchmarks above, with tuning parameters chosen by cross-validation on pricing error, and with a raw SVI slice \citep{gatheral2006,gatheraljacquier2014}. On exact quotes the quadrature corrections are effective. Under noise in implied volatility, the constrained local polynomial and the retuned convolution have smaller integrated squared error. On the listed slices a convex projection solved in the call coordinates, and the retuned convolution, reprice the quotes more closely than the kernel cdf. A kernel of the call at the second-derivative bandwidth does not. 
+The usual split in this literature is that interpolants of the call or of implied volatility reprice listed quotes well and do not yield a usable density, while methods that are densities by construction cannot interpolate a dense, slightly arbitrageable chain. \citeauthor{bondarenko2003}'s method is a sieve: with a kernel width that does not shrink as strikes are added, it does not become a local smoother, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by a decreasing convex list; at a zero roughness penalty the second differences of that list are a discrete nonnegative measure, not a curve. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. The estimator of this paper returns a closed-form estimate of \(f_{\Q}\) and, from the same kernel, a call interpolant. They are different objects. Over the whole line the signed density integrates to zero and its first moment equals the forward; the prices are read from the kernel cdf. Sections~\ref{sec:noise} and~\ref{sec:emp} compare both objects with the benchmarks above, with tuning parameters chosen by cross-validation on pricing error, and with a raw SVI slice \citep{gatheral2006,gatheraljacquier2014}. On exact quotes the quadrature corrections are effective. Under noise in implied volatility the kernel is applied to the convex projection of the calls, after the wings have been filled at constant implied volatility. That two-step estimator matches or beats the constrained local polynomial and the retuned convolution on integrated squared error under Heston, and prices the clean calls as closely as SVI. Under variance gamma its integrated squared error is a little higher than those two densities. On the listed slices the unsmoothed projection remains closer to the quotes, and it does not return a density curve. A kernel of the call at the second-derivative bandwidth does not reprice them. 
 
 The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} derives the characteristic function of the normalized call and the closed-form estimator, and compares it to kernel smoothing of the call. Section~\ref{sec:refine} records the quadrature corrections and the integral identities. Section~\ref{sec:h} chooses the bandwidth. Section~\ref{sec:ifc} proves in-fill consistency and illustrates it on exact Heston and variance-gamma quotes. Section~\ref{sec:noise} repeats the comparison on irregular strikes with noise in implied volatility, against retuned benchmarks and an SVI slice. Section~\ref{sec:emp} is an illustration on four listed chains from three snapshots. Section~\ref{sec:conc} concludes.
 
@@ -535,7 +535,7 @@ On the dense chain the ranking is the same as under Heston. Completing the tails
 
 The chains in Section~\ref{sec:ifc} are exact and equally spaced. A listed chain is neither. This section keeps the Heston and variance-gamma targets and changes the design in three ways. Strikes are irregular: twenty-two geometrically spaced knots on \([0.45F,0.90F)\), twenty-eight equally spaced knots on \([0.90F,1.10F)\), and twenty-two geometrically spaced knots on \([1.10F,1.40F]\), seventy-two strikes in all. The first strike lies inside the integrated-squared-error window \([60,140]\). Black--Scholes implied volatility is observed with independent Gaussian noise of standard deviation \(0.01\), then floored at \(0.02\), and converted back to a call. Thirty replications use the seed \(20260923\). No method sees \(f_{\Q}\) when it chooses a tuning parameter.
 
-The estimator of this paper is scored twice. The density-scale rule \eqref{eq:h-den} is the rule used on listed chains. A second bandwidth is chosen by even/odd cross-validation of out-of-the-money pricing error. Out-of-the-money premiums are floored at zero before the error is computed. The other methods are:
+The estimator of this paper is scored three times. On the raw quotes, the density-scale rule \eqref{eq:h-den} is the rule used on listed chains, and a second bandwidth is chosen by even/odd cross-validation of out-of-the-money pricing error. The two-step version builds a different call curve and then uses the same kernel at the density-scale bandwidth. The quoted calls are replaced by their Euclidean projection onto the decreasing convex cone with slopes in \([-e^{-rT},0]\), the quadratic program of Section~\ref{sec:emp}. Beyond the first and last strikes, implied volatility is held at its wing value and the calls are repriced on a log grid from \(0.15F\) to \(3F\). Out-of-the-money premiums are floored at zero before the error is computed. The other methods are:
 
 \begin{itemize}
 \item \citeauthor{yatchew2006}, with the roughness penalty chosen by the same cross-validation. The unknown in the quadratic program is the call. Slope increments are not used: that map is ill-conditioned, and a sequential least-squares solver started from those increments stops on an infeasible subproblem and returns the isotonic start. In call coordinates the same program terminates at the projection. The fitted call is convex and decreasing, with slopes in \([-e^{-rT},0]\), so its second derivative is a discrete measure. It is scored on pricing error and not on integrated squared error.
@@ -558,6 +558,9 @@ Integrated squared error is \(\int_{60}^{140}(\hat f_{\Q}-f_{\Q})^2\,\mathrm{d}K
 \cmidrule(lr){3-4} \cmidrule(lr){5-6}
 Method & Rule & ISE & RMSE & ISE & RMSE \\
 \midrule
+Two-step & projection, flat wing
+  & 0.00043 & 0.029 & 0.0023 & 0.032 \\
+  & & (0.00026) & (0.009) & (0.0013) & (0.008) \\
 Ours & density scale
   & 0.0057 & 0.037 & 0.089 & 0.042 \\
   & & (0.0076) & (0.014) & (0.115) & (0.014) \\
@@ -594,9 +597,16 @@ SVI & price fit
 \label{fig:noise-heston}
 \end{figure}
 
-On integrated squared error the ranking is stable across the two targets. The local cubic of the convex projection and the retuned convolution are an order of magnitude closer to \(f_{\Q}\) than the density-scale rule, and the gap is larger for variance gamma, whose density is more peaked. Cross-validating the bandwidth of this paper's estimator on pricing error makes the density worse: the mean integrated squared error rises from \(0.0057\) to \(0.077\) under Heston, and the replication standard deviation from \(0.008\) to \(0.26\). The second-derivative Priestley--Chao bandwidth has integrated squared error comparable to the convolution, and pricing error an order of magnitude larger (\(0.43\) against \(0.045\) under Heston). The same cubic at a pricing bandwidth reverses the two errors. The comparison in which that estimator is run only at \(n^{-1/9}\) and then judged on pricing error is a comparison of bandwidths.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{figures_v2/noise_twostep.pdf}
+\caption{The Heston replication in which the raw kernel's integrated squared error exceeds the two-step estimator by the most: \(0.025\) against \(2.9\times 10^{-4}\). Curves are truncated at zero for display.}
+\label{fig:twostep}
+\end{figure}
 
-Against the clean calls, SVI has the smallest pricing error on both targets (\(0.029\)). The convolution is next. The density-scale rule is close behind on price (\(0.037\) under Heston, \(0.042\) under variance gamma) and far behind on the density. Figure~\ref{fig:noise-heston} is the median Heston draw: the density-scale curve undershoots the peak and wiggles on the left shoulder; the convolution and SVI track the peak.
+On the raw quotes the local cubic and the retuned convolution are an order of magnitude closer to \(f_{\Q}\) than the density-scale rule. The gap is larger for variance gamma. Cross-validating the kernel bandwidth on pricing error makes that density worse: under Heston the mean integrated squared error rises from \(0.0057\) to \(0.077\). The second-derivative Priestley--Chao bandwidth has pricing error \(0.43\) under Heston; the same cubic at a pricing bandwidth has pricing error \(0.045\) and a worse density. Judging that estimator only at \(n^{-1/9}\) is a comparison of bandwidths.
+
+The two-step row is the same kernel on a different call curve. Under Heston its mean integrated squared error is \(4.3\times 10^{-4}\), below the local polynomial (\(4.7\times 10^{-4}\)), the convolution (\(8.1\times 10^{-4}\)), and SVI (\(2.5\times 10^{-3}\)). Its clean-call error is \(0.029\), the same as SVI to the reported precision. Under variance gamma the integrated squared error is \(2.3\times 10^{-3}\), above the convolution (\(1.7\times 10^{-3}\)) and the local polynomial (\(2.0\times 10^{-3}\)), and the clean-call error is \(0.032\), below both of those and above SVI (\(0.029\)). Figure~\ref{fig:twostep} is the draw that produces the gap: the raw kernel oscillates, and the kernel on the projected call tracks \(f_{\Q}\). The projection contributes no density of its own. Its second derivative is atomic. The kernel is the step that returns \(\hat f_{\Q}\).
 
 \section{Empirical Illustration}
 \label{sec:emp}
@@ -641,6 +651,7 @@ Every method is tuned only on pricing error, by the nested even/odd rule of Sect
 Slice & Method & {RMSE} & {Hold-out} & {Positive} & {Negative} \\
 \midrule
 SPX Dec & Ours, density scale & 0.49 & 0.95 & 1.01 & -0.01 \\
+ & Two-step & 0.50 & 0.87 & 1.01 & -0.01 \\
  & Ours, pricing CV & 0.42 & 0.29 & 42.84 & -41.85 \\
  & Yatchew--H\"ardle & 0.02 & 0.05 & --- & --- \\
  & A\"{\i}t-Sahalia--Duarte & 0.41 & 0.54 & 1.03 & -0.39 \\
@@ -650,6 +661,7 @@ SPX Dec & Ours, density scale & 0.49 & 0.95 & 1.01 & -0.01 \\
  & SVI & 0.53 & 0.53 & 1.00 & 0.00 \\
 \midrule
 SPX Mar & Ours, density scale & 0.95 & 1.90 & 1.02 & -0.02 \\
+ & Two-step & 0.94 & 1.72 & 1.02 & -0.02 \\
  & Ours, pricing CV & 0.74 & 0.52 & 40.22 & -39.22 \\
  & Yatchew--H\"ardle & 0.04 & 0.14 & --- & --- \\
  & A\"{\i}t-Sahalia--Duarte & 0.65 & 0.86 & 1.02 & 0.00 \\
@@ -659,6 +671,7 @@ SPX Mar & Ours, density scale & 0.95 & 1.90 & 1.02 & -0.02 \\
  & SVI & 1.16 & 1.16 & 1.00 & 0.00 \\
 \midrule
 NDX Dec & Ours, density scale & 6.45 & 8.74 & 1.16 & -0.16 \\
+ & Two-step & 6.42 & 8.82 & 1.16 & -0.16 \\
  & Ours, pricing CV & 6.66 & 6.86 & 1.14 & -0.14 \\
  & Yatchew--H\"ardle & 2.06 & 3.05 & --- & --- \\
  & A\"{\i}t-Sahalia--Duarte & 3.72 & 4.73 & 1.03 & -0.02 \\
@@ -668,6 +681,7 @@ NDX Dec & Ours, density scale & 6.45 & 8.74 & 1.16 & -0.16 \\
  & SVI & 3.12 & 3.29 & 1.00 & 0.00 \\
 \midrule
 RUT Dec & Ours, density scale & 0.40 & 0.96 & 1.01 & -0.01 \\
+ & Two-step & 0.45 & 0.81 & 1.00 & -0.00 \\
  & Ours, pricing CV & 0.53 & 0.74 & 10.06 & -9.06 \\
  & Yatchew--H\"ardle & 0.02 & 0.16 & --- & --- \\
  & A\"{\i}t-Sahalia--Duarte & 0.36 & 0.49 & 1.00 & -0.20 \\
@@ -679,6 +693,8 @@ RUT Dec & Ours, density scale & 0.40 & 0.96 & 1.01 & -0.01 \\
 \end{tabular}%
 }
 \end{table}
+
+On these four slices the two-step estimator tracks the raw density-scale kernel. The quotes are already close to the cone, so the projection moves them by hundredths of an index point, and the density-scale bandwidth then does the same smoothing either way. December S\&P~500 error is \(0.50\) against \(0.49\). The unsmoothed projection remains the closest call in the table.
 
 The convex projection is the closest of these methods to the quotes. On the December S\&P~500 strip its in-sample error is \(0.022\) and its hold-out error is \(0.054\). The cross-validated penalty is \(1\) in the normalized units of Section~\ref{sec:noise}, not zero: a pure interpolating projection is available and is not what the hold-out selects. The same pattern holds on the other three slices (penalties \(1\), \(0.1\), and \(10\)). The quotes are close to the decreasing convex cone once the quadratic program is solved in the call. An earlier implementation, parameterized by slope increments, stopped with an infeasible subproblem and returned an isotonic start whose December S\&P~500 residual was about \(2.25\). That number is not the distance to the cone.
 
@@ -704,12 +720,12 @@ The second strike derivative of a European call is the risk-neutral density of t
 
 Over the whole line the signed estimator integrates to zero and its first moment equals the forward, before and after twicing. Uniform consistency on a compact interior interval does not put the missing unit of mass back. Prices taken from the clipped cdf are not integrals of the density.
 
-With one volatility point of noise on an irregular grid, a local cubic of the convex projection and a positive convolution with nodes on the quoted range have smaller integrated squared error than the density-scale rule. A raw SVI slice has the smallest pricing error. Cross-validating this paper's bandwidth on pricing error increases the integrated squared error. On four listed slices the same pattern appears in the prices. A convex projection solved in the call coordinates has in-sample root-mean-square error \(0.022\) on the December S\&P~500 strip. The density-scale interpolant has error \(0.49\). A pricing bandwidth can cut that error and, on this strip, raises the positive mass on the integration window from \(1.01\) to \(42.8\). The second-derivative bandwidth of a kernel of the call, which produces pricing errors above \(20\), is a different estimator from the same kernel at a bandwidth chosen for the call.
+Applied to raw noisy quotes, the density-scale rule has larger integrated squared error than a local cubic of the convex projection and than a positive convolution. Applied to the projected call, with the wings held at the wing implied volatility, the same rule has mean integrated squared error \(4.3\times 10^{-4}\) on thirty noisy Heston replications, below both, and clean-call error \(0.029\), level with a raw SVI slice. On noisy variance-gamma quotes the integrated squared error is \(2.3\times 10^{-3}\), a little above the convolution and the local polynomial, and the clean-call error is \(0.032\), below both. The projection's own second derivative is a discrete measure. The kernel is the step that returns a density. On the listed slices the quotes already lie near the cone, the two-step estimator tracks the raw kernel, and the unsmoothed projection remains the closest call: \(0.022\) against \(0.50\) on December S\&P~500. A pricing bandwidth can cut the kernel's error on that strip and raises the positive mass on the integration window from \(1.01\) to \(42.8\).
 
-The estimator is a fast local approximation of \(f_{\Q}\) when the quotes are exact and the mesh is fine. It is not, on these designs, the most accurate density under noise, and it is not the most accurate interpolant of a listed chain.
+The estimator is a fast local approximation of \(f_{\Q}\) on a fine exact strip, and, once the calls have been projected, a smooth density that matches the constrained estimators under Heston noise. It is not the closest interpolant of a listed chain that is already nearly convex.
 
 \section*{Code and Data Availability}
-A Python implementation of \eqref{eq:twice} and the two replication scripts are available at \url{https://github.com/s-broda/RND}. The v2 comparison is \texttt{python/replicate\_v2.py}.
+A Python implementation of \eqref{eq:twice} and the two replication scripts are available at \url{https://github.com/s-broda/RND}. The v2 comparison is \texttt{python/replicate\_v2.py}. The two-step estimator is \texttt{python/src/twostep.py}, scored by \texttt{python/score\_twostep.py}.
 
 \bibliographystyle{elsarticle-harv}
 \bibliography{refs_v2}
