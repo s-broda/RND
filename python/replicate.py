@@ -336,90 +336,23 @@ def _otm_rmse_slice(sl, C_hat, test=None):
     return _rmse(otm_hat, otm_true)
 
 
-_CV_FACTORS = np.array([0.05, 0.1, 0.15, 0.25, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0])
+def _pc_listed_h(K, C, S0, r, T, q):
+    """Second-derivative bandwidth, 1.06 F σ_ATM √T n^{-1/9}.
 
-
-def _ours_factor_error(sl, fac):
-    errs = []
-    for train, test in _folds(len(sl.K)):
-        base = estimate_rnd(
-            sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.q, twice=True
-        )
-        out = estimate_rnd(
-            sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.q,
-            h=float(fac) * float(base["h"]), twice=True,
-        )
-        _, C_te = out["interpolant"](sl.K[test])
-        errs.append(_otm_rmse_slice(sl, C_te, test))
-    return float(np.mean(errs))
-
-
-def _pc_grid(K, C, S0, r, T, q, F):
+    Pricing cross-validation on these chains picks a fraction of the median
+    strike gap. The smoothed second derivative at that width is not a density.
+    n is the number of strikes in the fit, so each even/odd half has its own h.
+    """
     K = np.asarray(K, dtype=float)
     n = max(len(K), 8)
-    delta = float(np.median(np.diff(K))) if K.size > 1 else 1.0
+    F = float(S0) * np.exp((float(r) - float(q)) * float(T))
     iv = bs.implied_vol(C, S0, K, r, T, q)
     atm = np.nanmedian(iv[np.abs(K - F) <= 0.03 * F])
     if not np.isfinite(atm):
         atm = np.nanmedian(iv)
     if not np.isfinite(atm) or atm <= 0.0:
         atm = 0.2
-    s = float(F) * float(atm) * np.sqrt(T)
-    raw = np.concatenate(
-        [
-            delta * np.array([0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0]),
-            s * n ** (-0.2) * np.array([0.25, 0.5, 1.0, 2.0]),
-            s * n ** (-1.0 / 9.0) * np.array([0.35, 0.7, 1.0]),
-        ]
-    )
-    lo = max(0.25 * delta, 1e-3)
-    return np.unique(np.clip(raw, lo, max(2.5 * s, delta * 4.0)))
-
-
-def _pc_cv_arrays(K, C, S0, r, T, q, F):
-    """Even/odd bandwidth for the cubic Priestley--Chao call."""
-    K = np.asarray(K, dtype=float)
-    C = np.asarray(C, dtype=float)
-    grid = _pc_grid(K, C, S0, r, T, q, F)
-    best_h, best = float(grid[len(grid) // 2]), np.inf
-    disc = float(np.exp(-r * T))
-    stock = float(S0) * float(np.exp(-q * T))
-    for h in grid:
-        errs = []
-        for train, test in _folds(len(K)):
-            if int(train.sum()) < 6 or int(test.sum()) < 2:
-                continue
-            _, _, C_te = priestley_chao_cubic(
-                K[train], C[train], S0, r, T, K[test], q=q, h=float(h), return_call=True
-            )
-            C_te = np.maximum(C_te, 0.0)
-            C_ref = np.maximum(C[test], 0.0)
-            P_te = np.maximum(C_te - stock + K[test] * disc, 0.0)
-            P_ref = np.maximum(C_ref - stock + K[test] * disc, 0.0)
-            a = np.where(K[test] <= F, P_te, C_te)
-            b = np.where(K[test] <= F, P_ref, C_ref)
-            errs.append(_rmse(a, b))
-        if errs and float(np.mean(errs)) < best:
-            best = float(np.mean(errs))
-            best_h = float(h)
-    return best_h
-
-
-def _pc_cv(sl):
-    return _pc_cv_arrays(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-
-
-def _ours_cv(sl):
-    """Even/odd bandwidth for the interpolant. Returns (factor, hold-out, h)."""
-    factors = _CV_FACTORS
-    scores = {float(f): _ours_factor_error(sl, f) for f in factors}
-    # If the minimum sits on the narrow edge, extend the grid once.
-    if min(scores, key=scores.get) <= float(factors[0]) + 1e-12:
-        for f in (0.02, 0.03, 0.04):
-            scores[f] = _ours_factor_error(sl, f)
-    fac = min(scores, key=scores.get)
-    base = estimate_rnd(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, twice=True)
-    return fac, scores[fac], float(fac) * float(base["h"])
+    return float(1.06 * F * float(atm) * np.sqrt(T) * n ** (-1.0 / 9.0))
 
 
 def _holdout_tuned(sl, method):
@@ -440,7 +373,7 @@ def _holdout_tuned(sl, method):
             h = pca_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
             C_te, _, _, _, _ = pca_fit(Kt, Ct, sl.r, sl.T, sl.F, h, Ke, Ke[:1])
         elif method == "pc":
-            h = _pc_cv_arrays(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
+            h = _pc_listed_h(Kt, Ct, sl.S0, sl.r, sl.T, sl.q)
             _, _, C_te = priestley_chao_cubic(
                 Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
             )
@@ -474,9 +407,9 @@ def _pack(sl, P, C, q, s_grid, ho, iv_mkt, **extra):
 
 def _print_row(name, rec, extra=""):
     print(
-        f"  [{name:22s}]  OTM={rec['otm']:.4f} (puts {rec['puts']:.4f}, "
-        f"calls {rec['calls']:.4f})  mass={rec['mass']:.4f}  "
-        f"hold-out={rec['ho']:.4f}{extra}"
+        f"  [{name:22s}]  OTM={rec['otm']:.3f} (puts {rec['puts']:.3f}, "
+        f"calls {rec['calls']:.3f})  mass={rec['mass']:.2f}  "
+        f"hold-out={rec['ho']:.3f}{extra}"
     )
 
 
@@ -498,15 +431,6 @@ def score_listed(sl, title):
         sl, ours["P"], ours["C"], ours["q"], s_grid, _holdout_ours(sl, twice=True), iv_mkt, h=ours["h"]
     )
     _print_row("Ours", rec_o, extra=f"  h={ours['h']:.4f}")
-
-    fac, ho_cv, h_cv = _ours_cv(sl)
-    cv = estimate_rnd(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, K_eval=s_grid, h=h_cv, twice=True
-    )
-    rec_cv = _pack(
-        sl, cv["P"], cv["C"], cv["q"], s_grid, ho_cv, iv_mkt, h=h_cv, factor=fac
-    )
-    _print_row("Ours CV", rec_cv, extra=f"  h={h_cv:.4f}  factor={fac:.2f}")
 
     lam = yatchew_cv_lambda(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
     C_yh, m_yh = yatchew_fit(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, lam)
@@ -532,7 +456,7 @@ def score_listed(sl, title):
     rec_p = _pack(sl, P_p, C_p, q_pca, s_grid, _holdout_tuned(sl, "pca"), iv_mkt, h=h_pca)
     _print_row("PCA", rec_p, extra=f"  h={h_pca:.4f}")
 
-    h_pc = _pc_cv(sl)
+    h_pc = _pc_listed_h(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q)
     q_pc, _, C_pc = priestley_chao_cubic(
         sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
     )
@@ -548,7 +472,6 @@ def score_listed(sl, title):
         "s_grid": s_grid,
         "iv_mkt": iv_mkt,
         "ours": rec_o,
-        "ours_cv": rec_cv,
         "pc": rec_pc,
         "yh": rec_y,
         "asd": rec_asd,
@@ -638,28 +561,28 @@ def main():
     spx_dec = score_listed(
         listed_slice(
             "spx_20261218.csv", "cboe_spx.json", "SPX",
-            date(2026, 12, 18), date(2026, 9, 6),
+            date(2026, 12, 18), date(2026, 9, 23),
         ),
         "SPX 18 Dec 2026",
     )
     spx_mar = score_listed(
         listed_slice(
             "spx_20270319.csv", "cboe_spx.json", "SPX",
-            date(2027, 3, 19), date(2026, 9, 6),
+            date(2027, 3, 19), date(2026, 9, 23),
         ),
         "SPX 19 Mar 2027",
     )
     ndx_dec = score_listed(
         listed_slice(
             "ndx_20261218.csv", "cboe_ndx.json", "NDX",
-            date(2026, 12, 18), date(2026, 9, 8), root="NDX",
+            date(2026, 12, 18), date(2026, 9, 23), root="NDX",
         ),
         "NDX 18 Dec 2026",
     )
     rut_dec = score_listed(
         listed_slice(
             "rut_20261218.csv", "cboe_rut.json", "RUT",
-            date(2026, 12, 18), date(2026, 9, 19), root="RUT",
+            date(2026, 12, 18), date(2026, 9, 23), root="RUT",
         ),
         "RUT 18 Dec 2026",
     )

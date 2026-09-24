@@ -15,16 +15,16 @@ python3 python/replicate.py
 
 This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, and `figures/ccdf_listed.pdf`.
 
-The listed comparison chooses the Yatchew–Härdle penalty, the Aït-Sahalia–Duarte pricing bandwidth, the positive-convolution width, and the Priestley–Chao cubic bandwidth by even/odd out-of-the-money error. A second row of the kernel uses the same rule on a multiple of the density-scale bandwidth. The figure stays on the density-scale bandwidth. Exact Heston and variance-gamma quotes are scored only for the kernel.
+The listed comparison chooses the Yatchew–Härdle penalty, the Aït-Sahalia–Duarte pricing bandwidth, and the positive-convolution width by even/odd out-of-the-money error. The kernel prices from the interpolant at the density-scale bandwidth. Priestley–Chao is the cubic convolved at \(1.06 F\hat\sigma\sqrt{T}\,n^{-1/9}\), the second-derivative rate, which is also the bandwidth of its density. Exact Heston and variance-gamma quotes are scored only for the kernel. The four working slices are one Cboe session, 23 September 2026.
 
 ## Data
 
 Cboe delayed quotes cannot be redistributed as a full option-chain dump. The **working slices** used in the paper (strikes, OTM mids, parity-filled other side, and the snapshot metadata) are in `python/results/`:
 
-- `spx_20261218.csv` — SPX 18 December 2026, snapshot 6 September 2026
+- `spx_20261218.csv` — SPX 18 December 2026, snapshot 23 September 2026
 - `spx_20270319.csv` — SPX 19 March 2027, same snapshot
-- `ndx_20261218.csv` — NDX 18 December 2026, snapshot 8 September 2026
-- `rut_20261218.csv` — RUT 18 December 2026, snapshot 19 September 2026
+- `ndx_20261218.csv` — NDX 18 December 2026, same date
+- `rut_20261218.csv` — RUT 18 December 2026, same date
 
 Source: Cboe delayed quotes, `https://cdn.cboe.com/api/global/delayed_quotes/options/_SPX.json` (and `_NDX.json`, `_RUT.json`). The slices are provided solely so the tables and figures in the paper can be reproduced.
 
