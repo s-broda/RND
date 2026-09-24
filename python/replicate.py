@@ -348,25 +348,6 @@ def _otm_rmse_slice(sl, C_hat, test=None):
     return _rmse(otm_hat, otm_true)
 
 
-def _pc_listed_h(K, C, S0, r, T, q):
-    """Second-derivative bandwidth, 1.06 F σ_ATM √T n^{-1/9}.
-
-    Pricing cross-validation on these chains picks a fraction of the median
-    strike gap. The smoothed second derivative at that width is not a density.
-    n is the number of strikes in the fit, so each even/odd half has its own h.
-    """
-    K = np.asarray(K, dtype=float)
-    n = max(len(K), 8)
-    F = float(S0) * np.exp((float(r) - float(q)) * float(T))
-    iv = bs.implied_vol(C, S0, K, r, T, q)
-    atm = np.nanmedian(iv[np.abs(K - F) <= 0.03 * F])
-    if not np.isfinite(atm):
-        atm = np.nanmedian(iv)
-    if not np.isfinite(atm) or atm <= 0.0:
-        atm = 0.2
-    return float(1.06 * F * float(atm) * np.sqrt(T) * n ** (-1.0 / 9.0))
-
-
 def _holdout_tuned(sl, method):
     """Even/odd hold-out. Tuning uses only the training strikes."""
     errs = []
@@ -386,7 +367,7 @@ def _holdout_tuned(sl, method):
             h = pca_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
             C_te, _, _, _, _ = pca_fit(Kt, Ct, sl.r, sl.T, sl.F, h, Ke, Ke[:1])
         elif method == "pc":
-            h = _pc_listed_h(Kt, Ct, sl.S0, sl.r, sl.T, sl.q)
+            h = estimate_rnd(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, twice=True)["h"]
             _, _, C_te = priestley_chao_cubic(
                 Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
             )
@@ -470,7 +451,7 @@ def score_listed(sl, title):
     rec_p = _pack(sl, P_p, C_p, q_pca, s_grid, _holdout_tuned(sl, "pca"), iv_mkt, h=h_pca)
     _print_row("PCA", rec_p, extra=f"  h={h_pca:.4f}")
 
-    h_pc = _pc_listed_h(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q)
+    h_pc = float(ours["h"])
     q_pc, _, C_pc = priestley_chao_cubic(
         sl.K, C_in, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
     )

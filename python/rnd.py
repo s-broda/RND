@@ -42,8 +42,9 @@ def estimate_rnd(
         Strikes at which to return the density. Defaults to ``K``.
     h : float, optional
         Gaussian bandwidth. Default is the density-scale rule
-        ``1.06 F σ_ATM √T n^{-1/5}`` with ``n`` the number of masses after the
-        right wing. Pass a number, or ``"mesh"`` for ``h = 1.2 × median ΔK``.
+        ``0.75 × 1.06 F σ_ATM √T n^{-1/5}`` with ``n`` the number of masses
+        after the right wing. Pass a number, or ``"mesh"`` for
+        ``h = 1.2 × median ΔK``.
     twice : bool
         If True (default), return ``2 f_h − f_{h√2}`` and the same combination
         of the interpolant.
@@ -277,13 +278,18 @@ def _qhat(K_eval, K_obs, dG, h, F):
 
 
 def _density_h(K, C, S0, r, T, q, F, n_ext):
+    """Three quarters of Silverman's rule on the scale of S_T.
+
+    The factor is part of the rule. On the listed chains it lowers
+    out-of-the-money error, and the density in the core window stays one hump.
+    """
     n = max(int(n_ext), 8)
     iv = _implied_vol(C, S0, K, r, T, q)
     atm = np.nanmedian(iv[np.abs(K - F) <= 0.03 * F])
     if not np.isfinite(atm):
         med = np.nanmedian(iv)
         atm = float(med) if np.isfinite(med) else 0.16
-    return float(1.06 * F * atm * np.sqrt(T) * n ** (-0.2))
+    return float(0.75 * 1.06 * F * atm * np.sqrt(T) * n ** (-0.2))
 
 
 def _d1_d2(S, K, r, T, sig, q=0.0):
