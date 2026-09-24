@@ -140,10 +140,14 @@ def estimate_rnd(
 
 
 def _normalized_jumps(K, C, stock):
-    c = np.clip(C / max(float(stock), 1e-16), 0.0, 1.0)
-    c = np.minimum.accumulate(c)
-    G = np.maximum.accumulate(np.clip(1.0 - c, 0.0, 1.0))
-    dG = np.maximum(np.diff(G, prepend=0.0), 0.0)
+    """Jumps of \(P=1-C/(S_0 e^{-qT})\).
+
+    The call is already decreasing and lies in \([0, S_0 e^{-qT}]\), so the
+    normalized call needs no clip and no running minimum.
+    """
+    c = np.asarray(C, dtype=float) / max(float(stock), 1e-16)
+    G = 1.0 - c
+    dG = np.diff(G, prepend=0.0)
     return K, dG
 
 
