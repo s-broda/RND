@@ -156,11 +156,20 @@ def _right_wing(K, C, F, disc, k_max=None):
     C_m = float(max(C[-1], 0.0))
     if C_m <= 1e-8:
         return None
-    if len(K) >= 2 and K[-1] > K[-2]:
-        slp = (C[-1] - C[-2]) / (K[-1] - K[-2])
-    else:
+    slp = None
+    # A flat last step (two quotes on the premium floor) is not a decay.
+    # Counting the cap-to-8F quadrature as observations then shrinks h.
+    for i in range(len(K) - 1, 0, -1):
+        dk = float(K[i] - K[i - 1])
+        if dk <= 0.0:
+            continue
+        step = float(C[i] - C[i - 1]) / dk
+        if step < -1e-8:
+            slp = step
+            break
+    if slp is None:
         slp = -float(disc) * C_m / max(K_m, 1.0)
-    slp = float(np.clip(slp, -float(disc), -1e-16))
+    slp = float(np.clip(slp, -float(disc), -1e-8))
     K_end = K_m + C_m / (-slp)
     cap = 8.0 * float(F) if k_max is None else float(k_max)
     K_end = min(max(K_end, K_m * 1.01), cap)

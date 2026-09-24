@@ -91,11 +91,18 @@ def _parse_rows(raw: dict):
     return rows, float(raw["data"]["current_price"]), str(raw.get("timestamp", ""))
 
 
-def _keep_quote(row, min_mid=0.25, max_rel_spread=0.50, max_abs_spread=15.0):
-    """Drop tick-noise and crossed/gaping wings; keep crash puts with real bids."""
+def _keep_quote(row, S0, min_mid=0.25, max_rel_spread=0.50, max_abs_spread=15.0):
+    """Drop tick-noise and crossed/gaping wings; keep crash puts with real bids.
+
+    The 15-point cap is the S&P tolerance. On a higher index the same
+    economic spread is larger in points, so the cap scales as 0.002*S0
+    and is never tighter than 15. A fixed 15-point cap deletes Nasdaq-100
+    puts a dollar or two over that line and opens a multi-thousand-point hole.
+    """
     if row["mid"] < min_mid:
         return False
-    if row["spread"] > max(max_abs_spread, max_rel_spread * row["mid"]):
+    abs_cap = max(float(max_abs_spread), 0.002 * float(S0))
+    if row["spread"] > max(abs_cap, max_rel_spread * row["mid"]):
         return False
     return True
 
@@ -112,7 +119,7 @@ def build_otm_slice(
     if asof is None:
         asof = date.today()
     T = max((expiry - asof).days, 1) / 365.25
-    cand = [x for x in rows if x["root"] == root and x["exp"] == expiry and _keep_quote(x)]
+    cand = [x for x in rows if x["root"] == root and x["exp"] == expiry and _keep_quote(x, S0)]
     puts = {x["K"]: x for x in cand if x["cp"] == "P"}
     calls = {x["K"]: x for x in cand if x["cp"] == "C"}
     both = sorted(set(puts) & set(calls))
