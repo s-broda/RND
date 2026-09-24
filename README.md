@@ -15,7 +15,7 @@ python3 python/replicate.py
 
 This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, and `figures/ccdf_listed.pdf`.
 
-The listed comparison chooses the Yatchew–Härdle penalty, the Aït-Sahalia–Duarte pricing bandwidth, and the positive-convolution width by even/odd out-of-the-money error. The kernel prices from the interpolant at the density-scale bandwidth. Priestley–Chao is the cubic convolved at \(1.06 F\hat\sigma\sqrt{T}\,n^{-1/9}\), the second-derivative rate, which is also the bandwidth of its density. Exact Heston and variance-gamma quotes are scored only for the kernel. The four working slices are one Cboe session, 23 September 2026.
+Every listed fit starts from the same unpenalized decreasing-convex projection of the quoted calls, the step shared by Yatchew–Härdle and Aït-Sahalia–Duarte, and is scored against the quoted mids. The listed comparison then chooses the Yatchew–Härdle penalty, the Aït-Sahalia–Duarte pricing bandwidth, and the positive-convolution width by even/odd out-of-the-money error. The kernel prices from the interpolant at the density-scale bandwidth. Priestley–Chao is the cubic convolved at \(1.06 F\hat\sigma\sqrt{T}\,n^{-1/9}\), the second-derivative rate, which is also the bandwidth of its density. Exact Heston and variance-gamma quotes are scored only for the kernel. The four working slices are one Cboe session, 23 September 2026.
 
 ## Data
 

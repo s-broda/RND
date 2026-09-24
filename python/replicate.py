@@ -34,6 +34,7 @@ from src.competitors import (
     pca_cv_bandwidth,
     pca_fit,
     priestley_chao_cubic,
+    shape_fit_calls,
     yatchew_cv_lambda,
     yatchew_fit,
 )
@@ -297,12 +298,23 @@ def vg_ise():
     return rec
 
 
+def _projected_calls(K, C, r, T, F):
+    """λ=0 decreasing convex call. Shared input of every listed estimator."""
+    K = np.asarray(K, dtype=float)
+    C = np.asarray(C, dtype=float)
+    disc = float(np.exp(-float(r) * float(T)))
+    intrinsic = disc * np.maximum(float(F) - K, 0.0)
+    m = shape_fit_calls(K, C, disc, lam=0.0, intrinsic=intrinsic)
+    return np.maximum(np.asarray(m, dtype=float), 0.0)
+
+
 def _holdout_ours(sl, twice=True):
     idx = np.arange(len(sl.K))
     rmses = []
     for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
+        C_tr = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
         out = estimate_rnd(
-            sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.q, twice=twice
+            sl.K[train], C_tr, sl.S0, sl.r, sl.T, sl.q, twice=twice
         )
         P_te, C_te = out["interpolant"](sl.K[test])
         otm_hat = np.where(sl.K[test] <= sl.F, P_te, C_te)
@@ -359,7 +371,8 @@ def _holdout_tuned(sl, method):
     """Even/odd hold-out. Tuning uses only the training strikes."""
     errs = []
     for train, test in _folds(len(sl.K)):
-        Kt, Ct = sl.K[train], sl.C[train]
+        Kt = sl.K[train]
+        Ct = _projected_calls(Kt, sl.C[train], sl.r, sl.T, sl.F)
         Ke = sl.K[test]
         if method == "yh":
             lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
@@ -421,7 +434,8 @@ def score_listed(sl, title):
     otm_mkt = _otm(sl, sl.P, sl.C)
     _, iv_mkt = _otm_iv(sl, sl.P, sl.C)
     left, right = sl.K <= sl.F, sl.K > sl.F
-    ours = estimate_rnd(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, K_eval=s_grid, twice=True)
+    C_in = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
+    ours = estimate_rnd(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, K_eval=s_grid, twice=True)
     print(
         f"  n={len(sl.K)}  n_R={ours['n_right']}  n_ext={ours['n_ext']}  "
         f"F={sl.F:.0f}  S={sl.S0:.0f}  T={sl.T:.3f}  "
@@ -432,16 +446,16 @@ def score_listed(sl, title):
     )
     _print_row("Ours", rec_o, extra=f"  h={ours['h']:.4f}")
 
-    lam = yatchew_cv_lambda(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_yh, m_yh = yatchew_fit(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, lam)
+    lam = yatchew_cv_lambda(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    C_yh, m_yh = yatchew_fit(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, lam)
     P_yh, C_yh = _parity(sl, C_yh)
     q_yh = np.interp(s_grid, sl.K, _second_diff_q(sl.K, m_yh, sl.r * sl.T), left=0.0, right=0.0)
     rec_y = _pack(sl, P_yh, C_yh, q_yh, s_grid, _holdout_tuned(sl, "yh"), iv_mkt, lam=lam)
     _print_row("Yatchew–Härdle", rec_y, extra=f"  lam={lam:.4g}")
 
-    h_asd, h_asd_d = asd_cv_bandwidth(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    h_asd, h_asd_d = asd_cv_bandwidth(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F)
     C_asd, q_asd, _ = asd_fit(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s_grid, h_asd, h_asd_d
+        sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s_grid, h_asd, h_asd_d
     )
     P_asd, C_asd = _parity(sl, C_asd)
     rec_asd = _pack(
@@ -450,19 +464,19 @@ def score_listed(sl, title):
     )
     _print_row("Aït-Sahalia–Duarte", rec_asd, extra=f"  h={h_asd:.4f}")
 
-    h_pca = pca_cv_bandwidth(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_p, q_pca, _, _, _ = pca_fit(sl.K, sl.C, sl.r, sl.T, sl.F, h_pca, sl.K, s_grid)
+    h_pca = pca_cv_bandwidth(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    C_p, q_pca, _, _, _ = pca_fit(sl.K, C_in, sl.r, sl.T, sl.F, h_pca, sl.K, s_grid)
     P_p, C_p = _parity(sl, C_p)
     rec_p = _pack(sl, P_p, C_p, q_pca, s_grid, _holdout_tuned(sl, "pca"), iv_mkt, h=h_pca)
     _print_row("PCA", rec_p, extra=f"  h={h_pca:.4f}")
 
-    h_pc = _pc_listed_h(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q)
+    h_pc = _pc_listed_h(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q)
     q_pc, _, C_pc = priestley_chao_cubic(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
+        sl.K, C_in, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
     )
     # Prices are the smoothed cubic at the quoted strikes, not at s_grid.
     _, _, C_pc = priestley_chao_cubic(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h_pc, return_call=True
+        sl.K, C_in, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h_pc, return_call=True
     )
     P_pc, C_pc = _parity(sl, C_pc)
     rec_pc = _pack(sl, P_pc, C_pc, q_pc, s_grid, _holdout_tuned(sl, "pc"), iv_mkt, h=h_pc)
