@@ -15,19 +15,7 @@ python3 python/replicate.py
 
 This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, and `figures/ccdf_listed.pdf`.
 
-## Version 2
-
-`paper_v2.tex` is a separate manuscript. It keeps the estimator and the exact-quote ablation, records that the signed density integrates to zero with first moment equal to the forward, and rescores the benchmarks. `python/replicate.py` is unchanged as an entry point. The v2 script is
-
-```bash
-python3 python/replicate_v2.py
-```
-
-It writes `figures_v2/` and `python/results/v2_summary.json`. The positive-convolution centers cover the quoted log-strike range and the fitted weights are not rescaled. The Yatchew–Härdle penalty, the Priestley–Chao bandwidth, and the Aït-Sahalia–Duarte pricing bandwidth are chosen by even/odd cross-validation. The noise study adds one volatility point of Gaussian noise on an irregular strike grid. The two-step estimator projects the calls onto the decreasing convex cone, holds the wing implied volatility fixed, and then calls `estimate_rnd`:
-
-```bash
-python3 python/score_twostep.py
-```
+The listed comparison chooses the Yatchew–Härdle penalty, the Aït-Sahalia–Duarte pricing bandwidth, the positive-convolution width, and the Priestley–Chao cubic bandwidth by even/odd out-of-the-money error. A second row of the kernel uses the same rule on a multiple of the density-scale bandwidth. The figure stays on the density-scale bandwidth. Exact Heston and variance-gamma quotes are scored only for the kernel.
 
 ## Data
 

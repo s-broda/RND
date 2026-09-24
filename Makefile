@@ -3,9 +3,6 @@ all: replicate
 replicate:
 	python3 python/replicate.py
 
-replicate-v2:
-	python3 python/replicate_v2.py
-
 paper.pdf: paper.tex refs.bib
 	pdflatex -interaction=nonstopmode paper
 	bibtex paper

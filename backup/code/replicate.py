@@ -28,14 +28,11 @@ sys.path.insert(0, str(PY))
 from rnd import estimate_rnd
 from src import black_scholes as bs
 from src.competitors import (
-    _second_diff_q,
-    asd_cv_bandwidth,
-    asd_fit,
-    pca_cv_bandwidth,
-    pca_fit,
+    ait_sahalia_duarte,
+    convex_decreasing_ls,
+    pca_lognormal,
     priestley_chao_cubic,
-    yatchew_cv_lambda,
-    yatchew_fit,
+    yatchew_hardle,
 )
 from src.heston import BCC97, carr_madan_puts, heston_spot_density
 from src.vg import CM99, vg_calls, vg_spot_density
@@ -311,143 +308,84 @@ def _holdout_ours(sl, twice=True):
     return float(np.mean(rmses))
 
 
-def _parity(sl, C):
-    """Floored call and the parity put, also floored."""
-    C = np.maximum(np.asarray(C, dtype=float), 0.0)
-    P = np.maximum(C - sl.S0 * np.exp(-sl.q * sl.T) + sl.K * sl.disc, 0.0)
-    return P, C
-
-
-def _folds(n):
-    idx = np.arange(n)
-    return ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0))
-
-
-def _otm_rmse_slice(sl, C_hat, test=None):
-    if test is None:
-        test = np.ones(len(sl.K), dtype=bool)
-    C_hat = np.asarray(C_hat, dtype=float)
-    P = np.maximum(
-        C_hat - sl.S0 * np.exp(-sl.q * sl.T) + sl.K[test] * sl.disc, 0.0
-    )
-    C_hat = np.maximum(C_hat, 0.0)
-    otm_hat = np.where(sl.K[test] <= sl.F, P, C_hat)
-    otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
-    return _rmse(otm_hat, otm_true)
-
-
-_CV_FACTORS = np.array([0.05, 0.1, 0.15, 0.25, 0.35, 0.5, 0.75, 1.0, 1.5, 2.0])
-
-
-def _ours_factor_error(sl, fac):
-    errs = []
-    for train, test in _folds(len(sl.K)):
-        base = estimate_rnd(
-            sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.q, twice=True
+def _holdout_yh(sl):
+    idx = np.arange(len(sl.K))
+    rmses = []
+    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
+        intrinsic = sl.disc * np.maximum(sl.F - sl.K[train], 0.0)
+        m = convex_decreasing_ls(
+            sl.K[train], sl.C[train], sl.disc, intrinsic=intrinsic
         )
-        out = estimate_rnd(
-            sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.q,
-            h=float(fac) * float(base["h"]), twice=True,
+        C_te = np.interp(sl.K[test], sl.K[train], m)
+        P_te = C_te - sl.S0 * np.exp(-sl.q * sl.T) + sl.K[test] * sl.disc
+        otm_hat = np.where(sl.K[test] <= sl.F, P_te, C_te)
+        otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
+        rmses.append(_rmse(otm_hat, otm_true))
+    return float(np.mean(rmses))
+
+
+def _holdout_pca(sl, s_grid):
+    idx = np.arange(len(sl.K))
+    rmses = []
+    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
+        q, _ = pca_lognormal(
+            sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, s_grid, q=sl.q
         )
-        _, C_te = out["interpolant"](sl.K[test])
-        errs.append(_otm_rmse_slice(sl, C_te, test))
-    return float(np.mean(errs))
+        P, C, _, _ = _prices_from_q(s_grid, q, sl.K[test], sl.disc)
+        otm_hat = np.where(sl.K[test] <= sl.F, P, C)
+        otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
+        rmses.append(_rmse(otm_hat, otm_true))
+    return float(np.mean(rmses))
 
 
-def _pc_grid(K, C, S0, r, T, q, F):
-    K = np.asarray(K, dtype=float)
+def _holdout_asd(sl):
+    idx = np.arange(len(sl.K))
+    rmses = []
+    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
+        C_te, _, _, _ = ait_sahalia_duarte(
+            sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.K[test], q=sl.q
+        )
+        P_te = C_te - sl.S0 * np.exp(-sl.q * sl.T) + sl.K[test] * sl.disc
+        otm_hat = np.where(sl.K[test] <= sl.F, P_te, C_te)
+        otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
+        rmses.append(_rmse(otm_hat, otm_true))
+    return float(np.mean(rmses))
+
+
+def _pc_listed_h(K, C, S0, r, T, q):
+    """Second-derivative scale with ATM IV, matching the listed PC row."""
     n = max(len(K), 8)
-    delta = float(np.median(np.diff(K))) if K.size > 1 else 1.0
+    F = S0 * np.exp((r - q) * T)
     iv = bs.implied_vol(C, S0, K, r, T, q)
     atm = np.nanmedian(iv[np.abs(K - F) <= 0.03 * F])
     if not np.isfinite(atm):
         atm = np.nanmedian(iv)
-    if not np.isfinite(atm) or atm <= 0.0:
+    if not np.isfinite(atm):
         atm = 0.2
-    s = float(F) * float(atm) * np.sqrt(T)
-    raw = np.concatenate(
-        [
-            delta * np.array([0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0]),
-            s * n ** (-0.2) * np.array([0.25, 0.5, 1.0, 2.0]),
-            s * n ** (-1.0 / 9.0) * np.array([0.35, 0.7, 1.0]),
-        ]
-    )
-    lo = max(0.25 * delta, 1e-3)
-    return np.unique(np.clip(raw, lo, max(2.5 * s, delta * 4.0)))
+    return float(1.06 * F * atm * np.sqrt(T) * n ** (-1.0 / 9.0))
 
 
-def _pc_cv_arrays(K, C, S0, r, T, q, F):
-    """Even/odd bandwidth for the cubic Priestley--Chao call."""
-    K = np.asarray(K, dtype=float)
-    C = np.asarray(C, dtype=float)
-    grid = _pc_grid(K, C, S0, r, T, q, F)
-    best_h, best = float(grid[len(grid) // 2]), np.inf
-    disc = float(np.exp(-r * T))
-    stock = float(S0) * float(np.exp(-q * T))
-    for h in grid:
-        errs = []
-        for train, test in _folds(len(K)):
-            if int(train.sum()) < 6 or int(test.sum()) < 2:
-                continue
-            _, _, C_te = priestley_chao_cubic(
-                K[train], C[train], S0, r, T, K[test], q=q, h=float(h), return_call=True
-            )
-            C_te = np.maximum(C_te, 0.0)
-            C_ref = np.maximum(C[test], 0.0)
-            P_te = np.maximum(C_te - stock + K[test] * disc, 0.0)
-            P_ref = np.maximum(C_ref - stock + K[test] * disc, 0.0)
-            a = np.where(K[test] <= F, P_te, C_te)
-            b = np.where(K[test] <= F, P_ref, C_ref)
-            errs.append(_rmse(a, b))
-        if errs and float(np.mean(errs)) < best:
-            best = float(np.mean(errs))
-            best_h = float(h)
-    return best_h
-
-
-def _pc_cv(sl):
-    return _pc_cv_arrays(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-
-
-def _ours_cv(sl):
-    """Even/odd bandwidth for the interpolant. Returns (factor, hold-out, h)."""
-    factors = _CV_FACTORS
-    scores = {float(f): _ours_factor_error(sl, f) for f in factors}
-    # If the minimum sits on the narrow edge, extend the grid once.
-    if min(scores, key=scores.get) <= float(factors[0]) + 1e-12:
-        for f in (0.02, 0.03, 0.04):
-            scores[f] = _ours_factor_error(sl, f)
-    fac = min(scores, key=scores.get)
-    base = estimate_rnd(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, twice=True)
-    return fac, scores[fac], float(fac) * float(base["h"])
-
-
-def _holdout_tuned(sl, method):
-    """Even/odd hold-out. Tuning uses only the training strikes."""
-    errs = []
-    for train, test in _folds(len(sl.K)):
-        Kt, Ct = sl.K[train], sl.C[train]
-        Ke = sl.K[test]
-        if method == "yh":
-            lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            C_te, _ = yatchew_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, lam)
-        elif method == "asd":
-            h_p, _h_d = asd_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            C_te, _, _ = asd_fit(
-                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h_p, _h_d
-            )
-        elif method == "pca":
-            h = pca_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            C_te, _, _, _, _ = pca_fit(Kt, Ct, sl.r, sl.T, sl.F, h, Ke, Ke[:1])
-        elif method == "pc":
-            h = _pc_cv_arrays(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            _, _, C_te = priestley_chao_cubic(
-                Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
-            )
-        else:
-            raise ValueError(method)
-        errs.append(_otm_rmse_slice(sl, C_te, test))
-    return float(np.mean(errs))
+def _holdout_pc(sl):
+    idx = np.arange(len(sl.K))
+    rmses = []
+    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
+        h = _pc_listed_h(sl.K[train], sl.C[train], sl.S0, sl.r, sl.T, sl.q)
+        _, _, C_te = priestley_chao_cubic(
+            sl.K[train],
+            sl.C[train],
+            sl.S0,
+            sl.r,
+            sl.T,
+            sl.K[test],
+            q=sl.q,
+            h=h,
+            return_call=True,
+        )
+        P_te = C_te - sl.S0 * np.exp(-sl.q * sl.T) + sl.K[test] * sl.disc
+        otm_hat = np.where(sl.K[test] <= sl.F, P_te, C_te)
+        otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
+        rmses.append(_rmse(otm_hat, otm_true))
+    return float(np.mean(rmses))
 
 
 def _pack(sl, P, C, q, s_grid, ho, iv_mkt, **extra):
@@ -474,9 +412,9 @@ def _pack(sl, P, C, q, s_grid, ho, iv_mkt, **extra):
 
 def _print_row(name, rec, extra=""):
     print(
-        f"  [{name:22s}]  OTM={rec['otm']:.4f} (puts {rec['puts']:.4f}, "
-        f"calls {rec['calls']:.4f})  mass={rec['mass']:.4f}  "
-        f"hold-out={rec['ho']:.4f}{extra}"
+        f"  [{name:22s}]  OTM={rec['otm']:.2f} (puts {rec['puts']:.2f}, "
+        f"calls {rec['calls']:.2f})  mass={rec['mass']:.3f}  "
+        f"hold-out={rec['ho']:.2f}{extra}"
     )
 
 
@@ -497,58 +435,49 @@ def score_listed(sl, title):
     rec_o = _pack(
         sl, ours["P"], ours["C"], ours["q"], s_grid, _holdout_ours(sl, twice=True), iv_mkt, h=ours["h"]
     )
-    _print_row("Ours", rec_o, extra=f"  h={ours['h']:.4f}")
+    _print_row("Ours", rec_o, extra=f"  h={ours['h']:.1f}")
 
-    fac, ho_cv, h_cv = _ours_cv(sl)
-    cv = estimate_rnd(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, K_eval=s_grid, h=h_cv, twice=True
+    disc = sl.disc
+    dfq = np.exp(-sl.q * sl.T)
+    intrinsic = disc * np.maximum(sl.F - sl.K, 0.0)
+    C_yh = convex_decreasing_ls(sl.K, sl.C, disc, intrinsic=intrinsic)
+    P_yh = C_yh - dfq * sl.S0 + sl.K * disc
+    _, q_yh, _, _ = yatchew_hardle(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q, lam=0.0
     )
-    rec_cv = _pack(
-        sl, cv["P"], cv["C"], cv["q"], s_grid, ho_cv, iv_mkt, h=h_cv, factor=fac
-    )
-    _print_row("Ours CV", rec_cv, extra=f"  h={h_cv:.4f}  factor={fac:.2f}")
+    rec_y = _pack(sl, P_yh, C_yh, q_yh, s_grid, _holdout_yh(sl), iv_mkt)
+    _print_row("Yatchew–Härdle λ=0", rec_y)
 
-    lam = yatchew_cv_lambda(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_yh, m_yh = yatchew_fit(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, lam)
-    P_yh, C_yh = _parity(sl, C_yh)
-    q_yh = np.interp(s_grid, sl.K, _second_diff_q(sl.K, m_yh, sl.r * sl.T), left=0.0, right=0.0)
-    rec_y = _pack(sl, P_yh, C_yh, q_yh, s_grid, _holdout_tuned(sl, "yh"), iv_mkt, lam=lam)
-    _print_row("Yatchew–Härdle", rec_y, extra=f"  lam={lam:.4g}")
-
-    h_asd, h_asd_d = asd_cv_bandwidth(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_asd, q_asd, _ = asd_fit(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s_grid, h_asd, h_asd_d
+    C_asd, q_asd, _, _ = ait_sahalia_duarte(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q
     )
-    P_asd, C_asd = _parity(sl, C_asd)
-    rec_asd = _pack(
-        sl, P_asd, C_asd, q_asd, s_grid, _holdout_tuned(sl, "asd"), iv_mkt,
-        h=h_asd, h_dens=h_asd_d,
+    C_asd_q, _, _, _ = ait_sahalia_duarte(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, sl.K, q=sl.q
     )
-    _print_row("Aït-Sahalia–Duarte", rec_asd, extra=f"  h={h_asd:.4f}")
+    P_asd_q = C_asd_q - np.exp(-sl.q * sl.T) * sl.S0 + sl.K * sl.disc
+    rec_asd = _pack(sl, P_asd_q, C_asd_q, q_asd, s_grid, _holdout_asd(sl), iv_mkt)
+    _print_row("Aït-Sahalia–Duarte", rec_asd)
 
-    h_pca = pca_cv_bandwidth(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_p, q_pca, _, _, _ = pca_fit(sl.K, sl.C, sl.r, sl.T, sl.F, h_pca, sl.K, s_grid)
-    P_p, C_p = _parity(sl, C_p)
-    rec_p = _pack(sl, P_p, C_p, q_pca, s_grid, _holdout_tuned(sl, "pca"), iv_mkt, h=h_pca)
-    _print_row("PCA", rec_p, extra=f"  h={h_pca:.4f}")
+    q_pca, _ = pca_lognormal(sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q)
+    P_p, C_p, _, _ = _prices_from_q(s_grid, q_pca, sl.K, sl.disc)
+    rec_p = _pack(sl, P_p, C_p, q_pca, s_grid, _holdout_pca(sl, s_grid), iv_mkt)
+    _print_row("PCA", rec_p)
 
-    h_pc = _pc_cv(sl)
-    q_pc, _, C_pc = priestley_chao_cubic(
-        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
-    )
-    # Prices are the smoothed cubic at the quoted strikes, not at s_grid.
+    h_pc = _pc_listed_h(sl.K, sl.C, sl.S0, sl.r, sl.T, sl.q)
     _, _, C_pc = priestley_chao_cubic(
         sl.K, sl.C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h_pc, return_call=True
     )
-    P_pc, C_pc = _parity(sl, C_pc)
-    rec_pc = _pack(sl, P_pc, C_pc, q_pc, s_grid, _holdout_tuned(sl, "pc"), iv_mkt, h=h_pc)
-    _print_row("Priestley–Chao", rec_pc, extra=f"  h={h_pc:.4f}")
+    q_pc_g, _, _ = priestley_chao_cubic(
+        sl.K, sl.C, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
+    )
+    P_pc = C_pc - np.exp(-sl.q * sl.T) * sl.S0 + sl.K * sl.disc
+    rec_pc = _pack(sl, P_pc, C_pc, q_pc_g, s_grid, _holdout_pc(sl), iv_mkt, h=h_pc)
+    _print_row("Priestley–Chao", rec_pc, extra=f"  h={h_pc:.1f}")
     return {
         "sl": sl,
         "s_grid": s_grid,
         "iv_mkt": iv_mkt,
         "ours": rec_o,
-        "ours_cv": rec_cv,
         "pc": rec_pc,
         "yh": rec_y,
         "asd": rec_asd,
@@ -576,15 +505,13 @@ def plot_listed(rows):
         axq.plot(s, q_p, color="#2ca02c", lw=1.4, ls="-.", label="PCA")
         axq.plot(s, q_pc, color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao")
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
-        peaks = [
-            float(np.nanmax(q_o[core])),
-            float(np.nanmax(q_a[core])),
-            float(np.nanmax(q_p[core])),
-        ]
-        pc_peak = float(np.nanmax(np.maximum(q_pc[core], 0.0)))
-        if pc_peak <= 2.5 * max(peaks):
-            peaks.append(pc_peak)
-        ymax = 1.12 * max(max(peaks), 1e-12)
+        ymax = 1.12 * max(
+            float(q_o[core].max()),
+            float(q_pc[core].max()),
+            float(q_a[core].max()),
+            float(q_p[core].max()),
+            1e-12,
+        )
         axq.axvline(sl.F, color="0.5", ls="--", lw=0.8)
         axq.set_xlim(lo, hi)
         axq.set_ylim(0.0, ymax)

@@ -1,9 +1,15 @@
-"""Competitors used in the paper: Priestley–Chao, YH λ=0, ASD, Bondarenko PCA."""
+"""Competitors for the listed comparison.
+
+The historical λ=0 / fixed-bandwidth routines remain in this file. The
+listed table uses the routines at the bottom: a solved call-coordinate
+projection, cross-validated tuning, Bondarenko weights that are not
+rescaled, and the cubic Priestley--Chao smoother.
+"""
 
 from __future__ import annotations
 
 import numpy as np
-from scipy.optimize import nnls
+from scipy.optimize import LinearConstraint, minimize, nnls
 from scipy.stats import norm
 
 from . import black_scholes as bs
@@ -78,7 +84,12 @@ def priestley_chao_cubic(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None, return_c
     h = max(float(h), 1e-6)
     k_lo = max(1e-6, min(float(K_obs[0]), float(K_eval.min())) - 6.0 * h)
     k_hi = max(float(K_obs[-1]), float(K_eval.max())) + 6.0 * h
-    K_grid = np.linspace(k_lo, k_hi, 1600)
+    # Resolve the kernel: a fixed 1600-point mesh is coarser than a narrow h
+    # and the second-derivative kernel then fails to integrate.
+    span = max(k_hi - k_lo, h)
+    dK_target = min(span / 1599.0, h / 12.0)
+    n_grid = int(np.clip(np.ceil(span / dK_target) + 1, 400, 20000))
+    K_grid = np.linspace(k_lo, k_hi, n_grid)
     C_grid = _cubic_call(K_obs, C_obs, K_grid, disc)
     dK = float(K_grid[1] - K_grid[0])
     half = int(min(K_grid.size // 2 - 1, np.ceil(6.0 * h / dK)))
@@ -391,3 +402,393 @@ def yatchew_hardle(K_obs, C_obs, S0, r, T, K_eval, q=0.0, lam=0.0):
     q_obs = _second_diff_q(K_obs, m, r * T)
     q_hat = np.interp(K_eval, K_obs, q_obs, left=0.0, right=0.0)
     return C_hat, q_hat, lam, m
+
+
+# --- Listed comparison: the methods as the source papers specify them ---
+
+
+def _otm_rmse(K, C_hat, C_ref, S0, r, T, q, F):
+    """Floored out-of-the-money premium. Puts at K <= F, calls at K >= F."""
+    K = np.asarray(K, dtype=float)
+    disc = float(np.exp(-r * T))
+    stock = float(S0) * float(np.exp(-q * T))
+    C_hat = np.maximum(np.asarray(C_hat, dtype=float), 0.0)
+    C_ref = np.maximum(np.asarray(C_ref, dtype=float), 0.0)
+    P_hat = np.maximum(C_hat - stock + K * disc, 0.0)
+    P_ref = np.maximum(C_ref - stock + K * disc, 0.0)
+    a = np.where(K <= F, P_hat, C_hat)
+    b = np.where(K <= F, P_ref, C_ref)
+    ok = np.isfinite(a) & np.isfinite(b)
+    if not np.any(ok):
+        return float("nan")
+    d = a[ok] - b[ok]
+    return float(np.sqrt(np.mean(d * d)))
+
+
+def _splits(n):
+    idx = np.arange(n)
+    return ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0))
+
+
+def _atm_vol(C, S0, K, r, T, q, F):
+    iv = bs.implied_vol(C, S0, K, r, T, q)
+    atm = np.nanmedian(iv[np.abs(K - F) <= 0.03 * F])
+    if not np.isfinite(atm):
+        atm = np.nanmedian(iv)
+    if not np.isfinite(atm) or atm <= 0.0:
+        atm = 0.2
+    return float(atm)
+
+
+def shape_fit_calls(K, C, disc, lam=0.0, intrinsic=None):
+    """Euclidean projection onto decreasing convex calls, in call coordinates.
+
+    Slopes lie in [-e^{-rT}, 0]. A positive ``lam`` penalizes squared second
+    differences of the slope, scaled by the fourth power of the median gap
+    so that ``lam`` is dimensionless. The unknown is the call, not a
+    slope increment: the pricing Hessian is the identity.
+    """
+    K = np.asarray(K, dtype=float)
+    C = np.asarray(C, dtype=float)
+    n = len(K)
+    if n < 3:
+        return C.copy()
+    dK = np.maximum(np.diff(K), 1e-16)
+    disc = float(disc)
+    lam = float(lam)
+    span = np.maximum(0.5 * (dK[:-1] + dK[1:]), 1e-16)
+    B = np.zeros((max(n - 2, 0), n))
+    for i in range(n - 2):
+        B[i, i] = -1.0 / (dK[i] * span[i])
+        B[i, i + 1] = (1.0 / dK[i] + 1.0 / dK[i + 1]) / span[i]
+        B[i, i + 2] = -1.0 / (dK[i + 1] * span[i])
+    rows, rhs = [], []
+    for i in range(n - 1):
+        dec = np.zeros(n)
+        dec[i], dec[i + 1] = -1.0, 1.0
+        rows.append(dec)
+        rhs.append(0.0)
+        floor = np.zeros(n)
+        floor[i], floor[i + 1] = 1.0, -1.0
+        rows.append(floor)
+        rhs.append(disc * dK[i])
+    for i in range(n - 2):
+        rows.append(B[i])
+        rhs.append(0.0)
+    if intrinsic is not None:
+        intrinsic = np.asarray(intrinsic, dtype=float)
+        for i in range(n):
+            row = np.zeros(n)
+            row[i] = -1.0
+            rows.append(row)
+            rhs.append(-float(intrinsic[i]))
+    A = np.vstack(rows)
+    ub = np.asarray(rhs, dtype=float)
+    cons = LinearConstraint(A, -np.inf * np.ones(len(ub)), ub)
+    pen_scale = float(np.median(span) ** 4)
+
+    def objective(m):
+        r = m - C
+        sse = 0.5 * float(r @ r)
+        if lam > 0.0 and n >= 3:
+            d2 = np.nan_to_num(B @ m, nan=0.0, posinf=0.0, neginf=0.0)
+            sse += 0.5 * lam * pen_scale * float(d2 @ d2)
+        return sse
+
+    def gradient(m):
+        g = m - C
+        if lam > 0.0 and n >= 3:
+            Bm = np.nan_to_num(B @ m, nan=0.0, posinf=0.0, neginf=0.0)
+            g = g + (lam * pen_scale) * (B.T @ Bm)
+            g = np.nan_to_num(g, nan=0.0, posinf=0.0, neginf=0.0)
+        return g
+
+    res = minimize(
+        objective,
+        C.copy(),
+        jac=gradient,
+        method="SLSQP",
+        constraints=cons,
+        options={"maxiter": 200, "ftol": 1e-12, "disp": False},
+    )
+    m = np.asarray(res.x if res.success else C, dtype=float)
+    s = np.diff(m) / dK
+    if (not res.success) or np.any(s < -disc - 1e-6) or np.any(s > 1e-6) or np.any(np.diff(s) < -1e-6):
+        s = np.clip(s, -disc, 0.0)
+        s = _pava_increasing(s)
+        s = np.clip(s, -disc, 0.0)
+        m = np.concatenate([[float(m[0])], m[0] + np.cumsum(s * dK)])
+    if intrinsic is not None:
+        m = np.maximum(m, np.asarray(intrinsic, dtype=float))
+    return np.maximum(m, 0.0)
+
+
+def _lambda_grid():
+    return np.concatenate([[0.0], np.logspace(-2, 4, 7)])
+
+
+def yatchew_cv_lambda(K, C, S0, r, T, q, F):
+    """Even/odd penalty for Yatchew--Härdle. Returns λ."""
+    K, C = _sorted(K, C)
+    disc = float(np.exp(-r * T))
+    best_lam, best = 0.0, np.inf
+    for lam in _lambda_grid():
+        errs = []
+        for train, test in _splits(len(K)):
+            if int(train.sum()) < 4 or int(test.sum()) < 2:
+                continue
+            m = shape_fit_calls(K[train], C[train], disc, lam=float(lam))
+            C_te = np.interp(K[test], K[train], m)
+            errs.append(_otm_rmse(K[test], C_te, C[test], S0, r, T, q, F))
+        if errs and float(np.mean(errs)) < best:
+            best = float(np.mean(errs))
+            best_lam = float(lam)
+    return best_lam
+
+
+def yatchew_fit(K, C, S0, r, T, q, F, K_eval, lam):
+    K, C = _sorted(K, C)
+    disc = float(np.exp(-r * T))
+    intrinsic = disc * np.maximum(F - K, 0.0)
+    m = shape_fit_calls(K, C, disc, lam=float(lam), intrinsic=intrinsic)
+    C_hat = np.interp(np.asarray(K_eval, dtype=float), K, m, left=m[0], right=m[-1])
+    return C_hat, m
+
+
+def _local_linear(K, Y, K_eval, h):
+    K = np.asarray(K, dtype=float)
+    Y = np.asarray(Y, dtype=float)
+    K_eval = np.asarray(K_eval, dtype=float)
+    h = max(float(h), 1e-6)
+    level = np.empty_like(K_eval)
+    half = 5.0 * h
+    for j, x in enumerate(K_eval):
+        sel = np.abs(K - x) <= half
+        if int(sel.sum()) < 2:
+            sel = np.ones(K.size, dtype=bool)
+        dx = K[sel] - x
+        yy = Y[sel]
+        w = np.exp(-0.5 * (dx / h) ** 2)
+        sw = np.sqrt(np.maximum(w, 0.0))
+        X = np.column_stack([np.ones_like(dx), dx])
+        beta, *_ = np.linalg.lstsq(X * sw[:, None], yy * sw, rcond=None)
+        level[j] = beta[0]
+    return level
+
+
+def _local_cubic_second(K, Y, K_eval, h):
+    """Twice the quadratic coefficient of a local cubic. Caller scales by e^{rT}."""
+    K = np.asarray(K, dtype=float)
+    Y = np.asarray(Y, dtype=float)
+    K_eval = np.asarray(K_eval, dtype=float)
+    h = max(float(h), 1e-6)
+    out = np.zeros_like(K_eval)
+    half = 5.0 * h
+    for j, x in enumerate(K_eval):
+        sel = np.abs(K - x) <= half
+        if int(sel.sum()) < 4:
+            sel = np.ones(K.size, dtype=bool)
+        dx = K[sel] - x
+        yy = Y[sel]
+        w = np.exp(-0.5 * (dx / h) ** 2)
+        if w.sum() < 1e-14:
+            continue
+        sw = np.sqrt(w)
+        X = np.column_stack([np.ones_like(dx), dx, dx**2, dx**3])
+        beta, *_ = np.linalg.lstsq(X * sw[:, None], yy * sw, rcond=None)
+        out[j] = 2.0 * beta[2]
+    return out
+
+
+def asd_cv_bandwidth(K, C, S0, r, T, q, F):
+    """Even/odd local-linear bandwidth on the solved projection.
+
+    Returns ``(h_price, h_density)``. The density bandwidth is the fixed
+    second-derivative rate ``0.9 F σ √T n^{-1/9}``.
+    """
+    K, C = _sorted(K, C)
+    disc = float(np.exp(-r * T))
+    n = max(len(K), 8)
+    sig = _atm_vol(C, S0, K, r, T, q, F)
+    s = F * sig * np.sqrt(T)
+    h_dens = float(0.9 * s * n ** (-1.0 / 9.0))
+    grid = s * n ** (-0.2) * np.array([0.25, 0.5, 1.0, 2.0, 4.0])
+    best_h, best = float(grid[2]), np.inf
+    folds = []
+    for train, test in _splits(len(K)):
+        if int(train.sum()) < 4 or int(test.sum()) < 2:
+            continue
+        m_tr = shape_fit_calls(K[train], C[train], disc, lam=0.0)
+        folds.append((train, test, m_tr))
+    for h in grid:
+        errs = []
+        for train, test, m_tr in folds:
+            C_te = _local_linear(K[train], m_tr, K[test], float(h))
+            errs.append(_otm_rmse(K[test], C_te, C[test], S0, r, T, q, F))
+        if errs and float(np.mean(errs)) < best:
+            best = float(np.mean(errs))
+            best_h = float(h)
+    return best_h, h_dens
+
+
+def asd_fit(K, C, S0, r, T, q, F, K_price, K_dens, h_price, h_dens):
+    K, C = _sorted(K, C)
+    disc = float(np.exp(-r * T))
+    intrinsic = disc * np.maximum(F - K, 0.0)
+    m = shape_fit_calls(K, C, disc, lam=0.0, intrinsic=intrinsic)
+    C_hat = _local_linear(K, m, K_price, h_price)
+    q_hat = np.exp(r * T) * _local_cubic_second(K, m, K_dens, h_dens)
+    return C_hat, q_hat, m
+
+
+def _pca_centers(K, n_centers=41):
+    K = np.asarray(K, dtype=float)
+    lo = np.log(max(float(K[0]), 1e-8))
+    hi = np.log(max(float(K[-1]), float(K[0]) * 1.01))
+    if hi <= lo:
+        hi = lo + 0.05
+    return np.linspace(lo, hi, int(n_centers))
+
+
+def _pca_h_grid(K):
+    z = _pca_centers(K, 41)
+    dz = float(z[1] - z[0]) if z.size > 1 else 0.05
+    return np.unique(np.clip(dz * np.array([1.0, 2.0, 4.0, 8.0, 16.0]), 0.015, 1.25))
+
+
+def _pca_matrices(K, z, h, F, disc):
+    h = max(float(h), 1e-4)
+    K = np.asarray(K, dtype=float)
+    z = np.asarray(z, dtype=float)
+    d2 = np.clip((z[None, :] - np.log(np.maximum(K, 1e-12))[:, None]) / h, -30.0, 30.0)
+    d1 = d2 + h
+    Fm = np.exp(z + 0.5 * h * h)
+    W = disc * (Fm[None, :] * norm.cdf(d1) - K[:, None] * norm.cdf(d2))
+    return np.nan_to_num(W, nan=0.0, posinf=0.0, neginf=0.0), Fm
+
+
+def _pca_density(K_eval, z, h, a):
+    h = max(float(h), 1e-4)
+    K_eval = np.asarray(K_eval, dtype=float)
+    x = np.log(np.maximum(K_eval, 1e-12))[:, None]
+    u = np.clip((x - z[None, :]) / h, -20.0, 20.0)
+    kern = np.exp(-0.5 * u * u) / (
+        np.maximum(K_eval[:, None], 1e-12) * h * np.sqrt(2.0 * np.pi)
+    )
+    a = np.clip(np.nan_to_num(np.asarray(a, dtype=float), nan=0.0), 0.0, 1.0)
+    return np.nan_to_num(kern @ a, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def _pca_weights(W, C, Fm, F):
+    """NNLS with sum-to-one and forward penalties. Weights are not rescaled."""
+    n = W.shape[1]
+    col = np.maximum(np.linalg.norm(W, axis=0), 1e-12)
+    scale = max(float(np.median(np.abs(C))), 1e-6)
+    lam = 8.0 * scale
+    W_aug = np.vstack([W / col, lam / col, lam * Fm / (max(float(F), 1e-12) * col)])
+    c_aug = np.concatenate([np.asarray(C, dtype=float), [lam, lam]])
+    W_aug = np.nan_to_num(W_aug, nan=0.0, posinf=0.0, neginf=0.0)
+    try:
+        with np.errstate(all="ignore"):
+            a_n, _ = nnls(W_aug, c_aug, maxiter=500)
+    except Exception:
+        a_n = np.zeros(n)
+    a = np.maximum(a_n / col, 0.0)
+    return np.clip(np.nan_to_num(a, nan=0.0), 0.0, 1.0)
+
+
+def pca_cv_bandwidth(K, C, S0, r, T, q, F):
+    K, C = _sorted(K, C)
+    disc = float(np.exp(-r * T))
+    grid = _pca_h_grid(K)
+    best_h, best = float(grid[0]), np.inf
+    for h in grid:
+        errs = []
+        for train, test in _splits(len(K)):
+            if int(train.sum()) < 6 or int(test.sum()) < 2:
+                continue
+            z = _pca_centers(K[train], 41)
+            W, Fm = _pca_matrices(K[train], z, float(h), F, disc)
+            a = _pca_weights(W, C[train], Fm, F)
+            W_te, _ = _pca_matrices(K[test], z, float(h), F, disc)
+            pred = np.nan_to_num(W_te @ a, nan=0.0, posinf=0.0, neginf=0.0)
+            errs.append(_otm_rmse(K[test], pred, C[test], S0, r, T, q, F))
+        if errs and float(np.mean(errs)) < best:
+            best = float(np.mean(errs))
+            best_h = float(h)
+    return best_h
+
+
+def pca_fit(K, C, r, T, F, h, K_price, K_dens, n_centers=41):
+    K, C = _sorted(K, C)
+    disc = float(np.exp(-r * T))
+    z = _pca_centers(K, n_centers)
+    W, Fm = _pca_matrices(K, z, h, F, disc)
+    a = _pca_weights(W, C, Fm, F)
+    W_price, _ = _pca_matrices(np.asarray(K_price, dtype=float), z, h, F, disc)
+    C_hat = np.nan_to_num(W_price @ a, nan=0.0, posinf=0.0, neginf=0.0)
+    q_hat = _pca_density(K_dens, z, h, a)
+    return C_hat, q_hat, a, z, h
+
+
+def _spacing(K):
+    K = np.asarray(K, dtype=float)
+    dK = np.empty_like(K)
+    if K.size < 2:
+        dK[:] = 1.0
+        return dK
+    dK[0] = K[1] - K[0]
+    dK[1:] = np.diff(K)
+    return np.maximum(dK, 0.0)
+
+
+def priestley_chao_kernel(K, C, K_eval, h, r=0.0):
+    """Priestley--Chao (1972) kernel of the call, and its Breeden--Litzenberger density.
+
+    ``sum ΔK_i C_i κ_h(K-K_i)``, with ``ΔK_1 = K_2-K_1``. The density is
+    ``e^{rT}`` times the second strike derivative of that kernel.
+    """
+    K, C = _sorted(K, C)
+    K_eval = np.asarray(K_eval, dtype=float)
+    h = max(float(h), 1e-6)
+    dK = _spacing(K)
+    u = (K_eval[:, None] - K[None, :]) / h
+    kap = np.exp(-0.5 * u * u) / (h * np.sqrt(2.0 * np.pi))
+    kap2 = kap * (u * u - 1.0) / (h * h)
+    weight = (dK * C)[None, :]
+    call = np.nan_to_num((weight * kap).sum(axis=1), nan=0.0, posinf=0.0, neginf=0.0)
+    dens = np.exp(r) * np.nan_to_num((weight * kap2).sum(axis=1), nan=0.0, posinf=0.0, neginf=0.0)
+    return call, dens
+
+
+def _pc_h_grid(K, C, S0, r, T, q, F):
+    K = np.asarray(K, dtype=float)
+    n = max(len(K), 8)
+    delta = float(np.median(np.diff(K))) if K.size > 1 else 1.0
+    sig = _atm_vol(C, S0, K, r, T, q, F)
+    s = F * sig * np.sqrt(T)
+    raw = np.concatenate(
+        [
+            delta * np.array([1.0, 2.0, 4.0, 8.0, 16.0]),
+            s * n ** (-0.2) * np.array([0.25, 0.5, 1.0, 2.0]),
+        ]
+    )
+    return np.unique(np.clip(raw, max(delta, 1e-3), max(2.5 * s, delta * 4)))
+
+
+def priestley_chao_cv(K, C, S0, r, T, q, F):
+    """Even/odd bandwidth for the Priestley--Chao call kernel."""
+    K, C = _sorted(K, C)
+    grid = _pc_h_grid(K, C, S0, r, T, q, F)
+    best_h, best = float(grid[len(grid) // 2]), np.inf
+    for h in grid:
+        errs = []
+        for train, test in _splits(len(K)):
+            if int(train.sum()) < 6 or int(test.sum()) < 2:
+                continue
+            C_te, _ = priestley_chao_kernel(K[train], C[train], K[test], float(h), r=r * T)
+            errs.append(_otm_rmse(K[test], C_te, C[test], S0, r, T, q, F))
+        if errs and float(np.mean(errs)) < best:
+            best = float(np.mean(errs))
+            best_h = float(h)
+    return best_h
