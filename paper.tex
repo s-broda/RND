@@ -599,7 +599,7 @@ Averaging the out-of-the-money hold-out error across the four chains, one obtain
 \section{Conclusion}
 \label{sec:conc}
 
-The construction in the paper produces both an in-fill consistent estimate of the RND and a pricing interpolant. In terms of repricing accuracy, it improves upon a naive kernel smoother by a large margin and is competitive with the other established methods. The \citeauthor{yatchew2006} projection remains closer in sample, and PCA is closer on the weighted hold-out.
+The construction in the paper produces both an in-fill consistent estimate of the RND and a pricing interpolant. In terms of repricing accuracy, it improves upon a naive kernel smoother by a large margin and is competitive with other established methods. The \citeauthor{yatchew2006} projection remains slightly closer in sample (but cannot produce a density), and PCA is marginally closer on the weighted hold-out (but is not consistent without modifications).
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:twice} and a replication script are available at \url{https://github.com/s-broda/RND}.
