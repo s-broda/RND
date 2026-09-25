@@ -2,7 +2,6 @@ other_stuff/
 __pycache__/
 *.pyc
 .DS_Store
-paper.tex
 paper.aux
 paper.bbl
 paper.blg
