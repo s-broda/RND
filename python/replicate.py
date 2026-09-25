@@ -30,6 +30,7 @@ from src.competitors import (
     asd_cv_bandwidth,
     asd_fit,
     pca_cv_bandwidth,
+    _second_diff_q,
     pca_fit,
     priestley_chao_cubic,
     shape_fit_calls,
@@ -198,35 +199,130 @@ def _mass_peaks(F, q, s):
     return mass, peaks
 
 
-def _holdout(sl, C_in):
-    idx = np.arange(len(sl.K))
+def _folds(n):
+    idx = np.arange(n)
+    return ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0))
+
+
+def _otm_rmse_slice(sl, C_hat, test):
+    C_hat = np.maximum(np.asarray(C_hat, float), 0.0)
+    P = np.maximum(C_hat - sl.S0 * np.exp(-sl.q * sl.T) + sl.K[test] * sl.disc, 0.0)
+    hat = np.where(sl.K[test] <= sl.F, P, C_hat)
+    mkt = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
+    e = hat - mkt
+    return float(np.sqrt(np.mean(e ** 2)))
+
+
+def _holdout_method(sl, method):
+    """Even/odd hold-out. Tuning uses only the training strikes."""
     errs = []
-    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
-        Kt, Ct = sl.K[train], C_in[train]
-        fit = estimate_rnd(
-            Kt, Ct, sl.S0, sl.r, sl.T, sl.q,
-            K_eval=sl.K[test], K_price=sl.K[test], tails=True, twice=True,
-        )
-        o, _, _ = _otm_slice(sl, test, fit["C"])
-        errs.append(o)
+    for train, test in _folds(len(sl.K)):
+        Kt, Ct = sl.K[train], _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
+        Ke = sl.K[test]
+        if method == "ours":
+            C_te = estimate_rnd(
+                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=Ke, tails=True, twice=True,
+            )["C"]
+        elif method == "yh":
+            lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
+            C_te, _ = yatchew_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, lam)
+        elif method == "asd":
+            h_p, h_d = asd_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
+            C_te, _, _ = asd_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h_p, h_d)
+        elif method == "pca":
+            h = pca_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
+            C_te, _, _, _, _ = pca_fit(Kt, Ct, sl.r, sl.T, sl.F, h, Ke, Ke[:1])
+        elif method == "pc":
+            h = estimate_rnd(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, tails=True, twice=True)["h"]
+            _, _, C_te = priestley_chao_cubic(
+                Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
+            )
+        else:
+            raise ValueError(method)
+        errs.append(_otm_rmse_slice(sl, C_te, test))
     return float(np.mean(errs))
 
 
-def _otm_slice(sl, test, C_hat):
-    K = sl.K[test]
-    C_hat = np.maximum(np.asarray(C_hat, float), 0.0)
-    stock = sl.S0 * np.exp(-sl.q * sl.T)
-    disc = np.exp(-sl.r * sl.T)
-    P = np.maximum(C_hat - stock + K * disc, 0.0)
-    mkt = np.where(K <= sl.F, sl.P[test], sl.C[test])
-    hat = np.where(K <= sl.F, P, C_hat)
-    e = hat - mkt
-    return float(np.sqrt(np.mean(e ** 2))), None, None
+def _row_metrics(sl, C_hat, q, s, ho):
+    o, pu, ca = _otm(sl, C_hat)
+    mass, _ = _mass_peaks(sl.F, q, s)
+    return np.array([o, pu, ca, ho, mass], dtype=float)
+
+
+_METHODS = ("Ours", "Yatchew–Härdle", "Aït-Sahalia–Duarte", "PCA", "Priestley–Chao")
+
+
+def _print_metrics(name, m):
+    print(
+        f"  {name:22} OTM {m[0]:.3f} puts {m[1]:.3f} calls {m[2]:.3f} "
+        f"hold {m[3]:.3f} mass {m[4]:.2f}"
+    )
+
+
+def _chain_scores(sl):
+    """In-sample prices, densities, and even/odd hold-out for Table 4."""
+    C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
+    s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
+    fit = estimate_rnd(
+        sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, tails=True, twice=True,
+    )
+    h = fit["h"]
+    lam = yatchew_cv_lambda(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    C_yh, m_yh = yatchew_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, lam)
+    q_yh = np.interp(s, sl.K, _second_diff_q(sl.K, m_yh, sl.r * sl.T), left=0.0, right=0.0)
+    h_asd, h_asd_d = asd_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    C_asd, q_asd, _ = asd_fit(
+        sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asd, h_asd_d
+    )
+    h_pca = pca_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    C_pca, q_pca, _, _, _ = pca_fit(sl.K, C, sl.r, sl.T, sl.F, h_pca, sl.K, s)
+    q_pc, _, _ = priestley_chao_cubic(sl.K, C, sl.S0, sl.r, sl.T, s, q=sl.q, h=h, return_call=True)
+    _, _, C_pc = priestley_chao_cubic(
+        sl.K, C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h, return_call=True
+    )
+    calls = {
+        "Ours": fit["C"],
+        "Yatchew–Härdle": C_yh,
+        "Aït-Sahalia–Duarte": C_asd,
+        "PCA": C_pca,
+        "Priestley–Chao": C_pc,
+    }
+    dens = {
+        "Ours": fit["q"],
+        "Yatchew–Härdle": q_yh,
+        "Aït-Sahalia–Duarte": q_asd,
+        "PCA": q_pca,
+        "Priestley–Chao": q_pc,
+    }
+    keys = {"Ours": "ours", "Yatchew–Härdle": "yh", "Aït-Sahalia–Duarte": "asd", "PCA": "pca", "Priestley–Chao": "pc"}
+    metrics = {
+        name: _row_metrics(sl, calls[name], dens[name], s, _holdout_method(sl, keys[name]))
+        for name in _METHODS
+    }
+    bundle = dict(
+        C=C, fit=fit, h=h, s=s, q_pc=q_pc, q_asd=q_asd, q_pca=q_pca,
+        C_yh=C_yh, C_pca=C_pca, C_pc=C_pc,
+        h_asd_d=h_asd_d, h_pca=h_pca, lam=lam,
+    )
+    return metrics, bundle
+
+
+def _average_rows(chain_metrics, forwards):
+    names = _METHODS
+    raw, inv = {}, {}
+    w = (1.0 / forwards) / np.sum(1.0 / forwards)
+    for name in names:
+        stack = np.vstack([chain_metrics[title][name] for title in chain_metrics])
+        raw[name] = stack.mean(axis=0)
+        inv[name] = (stack * w[:, None]).sum(axis=0)
+    return raw, inv, w
 
 
 def listed():
     print("\nListed")
-    rows = []
+    chain_metrics = {}
+    forwards = []
+    titles = []
     scored = []
     for csv, title in (
         ("spx_20261218.csv", "SPX Dec"),
@@ -235,25 +331,24 @@ def listed():
         ("rut_20261218.csv", "RUT Dec"),
     ):
         sl = load_slice(RES / csv)
-        C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
-        s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
-        fit = estimate_rnd(
-            sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, tails=True, twice=True,
-        )
-        h = fit["h"]
-        o, pu, ca = _otm(sl, fit["C"])
-        mass, pk = _mass_peaks(sl.F, fit["q"], s)
-        ho = _holdout(sl, C)
-        print(f"  {title:8} h={h:.2f} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} hold {ho:.3f} mass {mass:.2f} peaks {pk}")
-        q_pc, _, _ = priestley_chao_cubic(sl.K, C, sl.S0, sl.r, sl.T, s, q=sl.q, h=h, return_call=True)
-        _, _, Cpc = priestley_chao_cubic(sl.K, C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h, return_call=True)
-        op, pp, cp = _otm(sl, Cpc)
-        mp, kp = _mass_peaks(sl.F, q_pc, s)
-        print(f"  {'PC':8} h={h:.2f} OTM {op:.3f} puts {pp:.3f} calls {cp:.3f} mass {mp:.2f} peaks {kp}")
-        rows.append((title, h, o, pu, ca, ho, mass, pk, op, pp, cp, mp))
-        scored.append((title, sl, C, fit, h, s, q_pc))
+        metrics, bundle = _chain_scores(sl)
+        chain_metrics[title] = metrics
+        forwards.append(sl.F)
+        titles.append(title)
+        print(f"  {title:8} F={sl.F:.1f} h={bundle['h']:.2f}")
+        for name in _METHODS:
+            _print_metrics(name, metrics[name])
+        scored.append((title, sl, bundle))
+    raw, inv, w = _average_rows(chain_metrics, np.asarray(forwards, float))
+    print("  weights 1/F " + " ".join(f"{t} {wi:.3f}" for t, wi in zip(titles, w)))
+    print("  Equal weight")
+    for name in _METHODS:
+        _print_metrics(name, raw[name])
+    print("  Inverse forward")
+    for name in _METHODS:
+        _print_metrics(name, inv[name])
     _plot_listed(scored)
-    return rows, scored
+    return chain_metrics, raw, inv
 
 
 def _iv_ylim(columns):
@@ -282,23 +377,13 @@ def _plot_listed(scored):
     want = {"SPX Dec", "NDX Dec", "RUT Dec"}
     _style()
     fig, axes = plt.subplots(3, 2, figsize=(9.6, 8.4))
-    for row, (title, sl, C, fit, h, s, q_pc) in enumerate(x for x in scored if x[0] in want):
-        # Densities at each method's own rule. ASD and PCA bandwidths are
-        # cross-validated or the n^{-1/9} rule; Priestley–Chao uses h above.
-        h_asd, h_asd_d = asd_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-        _, q_asd, _ = asd_fit(
-            sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K[:2], s, h_asd, h_asd_d
-        )
-        h_pca = pca_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-        C_pca, q_pca, _, _, _ = pca_fit(sl.K, C, sl.r, sl.T, sl.F, h_pca, sl.K, s)
-        lam = yatchew_cv_lambda(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-        C_yh, _ = yatchew_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, lam)
-        _, _, C_pc = priestley_chao_cubic(
-            sl.K, C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h, return_call=True
-        )
+    for row, (title, sl, bundle) in enumerate(x for x in scored if x[0] in want):
+        fit, h, s = bundle["fit"], bundle["h"], bundle["s"]
+        q_asd, q_pca, q_pc = bundle["q_asd"], bundle["q_pca"], bundle["q_pc"]
+        C_yh, C_pca, C_pc = bundle["C_yh"], bundle["C_pca"], bundle["C_pc"]
         print(
-            f"  fig {title}: ASD h={h_asd_d:.1f}  PCA h={h_pca:.4f}  "
-            f"YH λ={lam:.4g}  PC h={h:.1f}"
+            f"  fig {title}: ASD h={bundle['h_asd_d']:.1f}  PCA h={bundle['h_pca']:.4f}  "
+            f"YH λ={bundle['lam']:.4g}  PC h={h:.1f}"
         )
         ax = axes[row, 0]
         ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.4, label="Ours")
