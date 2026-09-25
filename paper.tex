@@ -62,7 +62,7 @@ A first family of methods specifies the density of \(S_T\) as a parametric curve
 
 A second, and in applied work the most common, family interpolates the Black--Scholes implied-volatility function of strike and converts the interpolant back to prices before differentiating twice. \citet{shimko1993} fitted a quadratic in strike; \citet{malz1997} used a cubic spline in delta; \citet{bliss2002} a smoothing spline. \citet{figlewski2010} completes the tails with a generalized extreme-value distribution. Because implied volatility is a much flatter function of strike than the call itself, a low-order interpolant often has small bias when quotes are accurate. The drawback is that implied volatility is a nonlinear transformation that inflates price noise where the derivative of price with respect to implied volatility is small, i.e.\ in the tails. An interpolating spline then treats those noisy tail quotes as exact, and the second derivative of the resulting call curve oscillates and can become negative. Shape-constrained smoothers of the implied-volatility surface \citep{fengler2005,fengler2009,gatheraljacquier2014,ludwig2015} address the sign problem at the cost of a more involved optimization.
 
-A third family estimates the call as a function of strike by kernel regression or local polynomials and obtains the second derivative from the fit. \citet{priestley1972} fitted a kernel to observed function values at the design points; the risk-neutral density is obtained by differentiating that fit twice. \citet{aitsahalia1998} estimated the call as a function of \((S,K,T,r,q)\) by kernel regression; \citet{aitsahalia2000} used the estimator to recover an implied risk-aversion function. The method is data intensive and, in the original application, pooled option prices across many trading dates. \citet{aitsahalia2003} developed a local polynomial estimator that imposes monotonicity and convexity of \(C\) in \(K\), hence nonnegativity of the density. Related constrained least-squares estimators are studied by \citet{yatchew2006} and \citet{birke2009}; \citet{grith2012} survey the kernel literature. \citet{fanmancini2009} combine a parametric guide with a nonparametric correction. In each case the density is the second strike derivative of a smoother of \(C\). The estimator of Section~\ref{sec:est} rescales the calls to a complementary cumulative distribution function (cdf), interpolates that function by a cubic spline, and smooths the spline with a Gaussian kernel. The convolution is closed form. Section~\ref{sec:naive} records the comparison. Section~\ref{sec:emp} implements the cubic of Section~\ref{sec:naive} at the bandwidth \eqref{eq:h-den}, and the two-step procedure of \citeauthor{aitsahalia2003}: a least-squares projection of the quoted calls onto the decreasing convex cone, followed by a local polynomial of the constrained values whose pricing bandwidth is chosen the same way.
+A third family estimates the call as a function of strike by kernel regression or local polynomials and obtains the second derivative from the fit. \citet{priestley1972} fitted a kernel to observed function values at the design points; the risk-neutral density is obtained by differentiating that fit twice. \citet{aitsahalia1998} estimated the call as a function of \((S,K,T,r,q)\) by kernel regression; \citet{aitsahalia2000} used the estimator to recover an implied risk-aversion function. The method is data intensive and, in the original application, pooled option prices across many trading dates. \citet{aitsahalia2003} developed a local polynomial estimator that imposes monotonicity and convexity of \(C\) in \(K\), hence nonnegativity of the density. Related constrained least-squares estimators are studied by \citet{yatchew2006} and \citet{birke2009}; \citet{grith2012} survey the kernel literature. \citet{fanmancini2009} combine a parametric guide with a nonparametric correction. In each case the density is the second strike derivative of a smoother of \(C\). The estimator of Section~\ref{sec:est} rescales the calls to a complementary cumulative distribution function (cdf), interpolates that function by a cubic spline, and smooths the spline with a Gaussian kernel. The convolution is closed form. Section~\ref{sec:naive} records the comparison. Section~\ref{sec:emp} implements the cubic of Section~\ref{sec:naive} at the bandwidth \eqref{eq:h-d2}, and the two-step procedure of \citeauthor{aitsahalia2003}: a least-squares projection of the quoted calls onto the decreasing convex cone, followed by a local polynomial of the constrained values whose pricing bandwidth is chosen the same way.
 
 \citet{bondarenko2003} proposed the positive convolution approximation (PCA). The density is required to lie in the set of functions obtained by convolving a discrete probability with a positive kernel, and the discrete probability is chosen to minimize the sum of squared pricing errors. The kernel enforces smoothness and, together with positive weights, guarantees that the result is a density. In \citeauthor{bondarenko2003}'s comparison, the method dominated mixtures of lognormals, Hermite expansions, and several regularization methods. Subsequent simulation evidence on affine jump-diffusions is consistent with this ranking \citep{lu2019}. Section~\ref{sec:emp} implements a log-price analog: forty-one lognormals of common width, centered on a uniform grid in log strike from the first quoted strike to the last, fitted by nonnegative least squares. Sum-to-one and forward-mean penalties stay penalties; the weights are not rescaled after the fit. The width is chosen by even/odd pricing error. The same section chooses the \citeauthor{yatchew2006} roughness penalty the same way.
 
@@ -356,7 +356,7 @@ Theorem~\ref{thm:ifc} is a statement about exact quotes. Theorem~\ref{thm:noise}
 \section{Choice of Bandwidth}
 \label{sec:h}
 
-The width \(h\) is the only tuning constant in \eqref{eq:twice}. Three rules are used below. Each is checked against Theorems~\ref{thm:ifc} and \ref{thm:noise}.
+The width \(h\) is the only tuning constant in \eqref{eq:twice}. Two rules are used below. Each is checked against Theorems~\ref{thm:ifc} and \ref{thm:noise}.
 
 With exact quotes the bias is the usual \(O(h^2)\) kernel bias, or \(O(h^4)\) after twicing, and the spline error vanishes with the mesh. For a Gaussian it is enough that \(h\) be a small multiple of the typical quoted gap. Write \(\delta\) for the median of \(\{K_i-K_{i-1}\}\) on the quoted strikes, not on the filled wings, and take
 \begin{equation}
@@ -365,25 +365,16 @@ h
 \;=\;
 \min\bigl(1.2\,\delta,\; 0.30\,(K_m-K_1)\bigr).
 \end{equation}
-The cap binds only on a very short chain. On an equally spaced grid every gap equals \(\delta\). Whenever \(\delta\to 0\), this rule satisfies \(h\to 0\), which is what Theorem~\ref{thm:ifc} requires. It does not satisfy \(nh^5\to\infty\). A noisy chain with mesh \(\delta\) and \(h\propto\delta\) has \(nh^5\) of order \(\delta^4\to 0\), so the variance in the proof of Theorem~\ref{thm:noise} explodes.
+The cap binds only on a very short chain. On an equally spaced grid every gap equals \(\delta\). Whenever \(\delta\to 0\), this rule satisfies \(h\to 0\), which is what Theorem~\ref{thm:ifc} requires. It does not satisfy \(nh^5\to\infty\). A noisy chain with mesh \(\delta\) and \(h\propto\delta\) has \(nh^5\) of order \(\delta^4\to 0\), so the variance in the proof of Theorem~\ref{thm:noise} explodes. The exponent \(n^{-1/5}\) familiar from kernel density estimation leaves the same product bounded, so it is not used.
 
-A second rule replaces the mesh by the width of \(S_T\) and uses the Gaussian exponent of \citet{silverman1986},
-\begin{equation}
-\label{eq:h-den}
-h
-\;=\;
-c\times 1.06\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/5}.
-\end{equation}
-Here \(\hat\sigma_{\mathrm{ATM}}\) is the at-the-money Black--Scholes implied volatility, the median of contracts with \(|K-F|\le 0.03F\) (or the median of all finite implied volatilities if that window is empty), and \(n\) is the number of knots after the right wing of Section~\ref{sec:tails}. The scale is the scale of \(S_T\), not the standard deviation of the jumps of \(P\). On a sequence of grids with \(\delta\propto n^{-1}\) and \(F\hat\sigma\sqrt{T}\) of order one, \(h\to 0\), so Theorem~\ref{thm:ifc} applies. The product \(nh^5\) tends to a constant, so this rule does not meet Theorem~\ref{thm:noise}. The exact-quote columns below use \(c=0.55\).
-
-The density is a second derivative. The bandwidth that balances an \(O(h^2)\) bias against a variance of order \(1/(nh^5)\) is of order \(n^{-1/9}\), the rate \citet{aitsahalia2003} use for their local cubic. Any fixed positive multiple of that rate satisfies Theorem~\ref{thm:noise}. The multiple
+The density is a second derivative. The bandwidth that balances an \(O(h^2)\) bias against a variance of order \(1/(nh^5)\) is of order \(n^{-1/9}\), the rate \citet{aitsahalia2003} use for their local cubic. Any fixed positive multiple satisfies both theorems: \(h\to 0\) and \(nh^5\to\infty\). Write \(\hat\sigma_{\mathrm{ATM}}\) for the at-the-money Black--Scholes implied volatility, the median of contracts with \(|K-F|\le 0.03F\) (or the median of all finite implied volatilities if that window is empty), and take
 \begin{equation}
 \label{eq:h-d2}
 h
 \;=\;
 c\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/9},
 \end{equation}
-with \(n\) the number of quoted strikes and \(c=0.34\), lies within a few percent of \eqref{eq:h-den} at \(c=0.55\) on chains of one to several hundred strikes. The two sequences separate only as \(n\) grows: \(n^{-1/9}\) shrinks more slowly, and \(nh^5\) grows like \(n^{4/9}\). Section~\ref{sec:emp} uses \eqref{eq:h-d2} for our estimator and for \citeauthor{priestley1972}. Section~\ref{sec:heston} reports all three rules.
+with \(n\) the number of quoted strikes and \(c=0.34\). On chains of one to several hundred strikes this bandwidth is the one used for the listed prices below. Section~\ref{sec:emp} uses it for our estimator and for \citeauthor{priestley1972}. Section~\ref{sec:heston} reports both rules.
 
 \subsection{Numerical Illustration}
 \label{sec:heston}
@@ -396,11 +387,11 @@ f_{\Q}(K)
 \frac1{K\pi}\int_0^\infty
 \mathrm{Re}\bigl[e^{-\mathrm{i}u\log K}\varphi(u)\bigr]\,\mathrm{d}u,
 \end{equation}
-where \(\varphi(u)=\E^{\Q}[e^{\mathrm{i}u\log S_T}]\). Two chains are used: a dense grid of \(m=256\) equally spaced strikes on \([30,220]\) (spacing \(\delta=0.745\)) and a sparse grid of \(m=32\) equally spaced strikes on \([70,140]\) (spacing \(\delta=2.26\)). Integrated squared error (ISE) is \(\int_{60}^{150}(\hat f_{\Q}-f_{\Q})^2\,\mathrm{d}K\), evaluated by the trapezoidal rule on \(401\) equally spaced points. Table~\ref{tab:heston-tail} reports ISE for the three nested estimators at the oracle \(h^{\ast}\), at the mesh rule \eqref{eq:h-mesh}, at \eqref{eq:h-den} with \(c=0.55\), and at \eqref{eq:h-d2} with \(c=0.34\). The oracle minimizes the integral on a geometric grid in \(h\).
+where \(\varphi(u)=\E^{\Q}[e^{\mathrm{i}u\log S_T}]\). Two chains are used: a dense grid of \(m=256\) equally spaced strikes on \([30,220]\) (spacing \(\delta=0.745\)) and a sparse grid of \(m=32\) equally spaced strikes on \([70,140]\) (spacing \(\delta=2.26\)). Integrated squared error (ISE) is \(\int_{60}^{150}(\hat f_{\Q}-f_{\Q})^2\,\mathrm{d}K\), evaluated by the trapezoidal rule on \(401\) equally spaced points. Table~\ref{tab:heston-tail} reports ISE for the three nested estimators at the oracle \(h^{\ast}\), at the mesh rule \eqref{eq:h-mesh}, and at \eqref{eq:h-d2}. The oracle minimizes the integral on a geometric grid in \(h\).
 
 \begin{table}[H]
 \centering
-\caption{Integrated squared error on exact Heston quotes for the cubic-spline estimator. Mesh \(h\) is \eqref{eq:h-mesh}. Den.\ is \eqref{eq:h-den} with \(c=0.55\). The last pair is \eqref{eq:h-d2} with \(c=0.34\). Quoted spline uses only the observed strikes. Tails adds the wings of Section~\ref{sec:tails}. Tails+Twice applies \eqref{eq:twice}.}
+\caption{Integrated squared error on exact Heston quotes for the cubic-spline estimator. Mesh \(h\) is \eqref{eq:h-mesh}. The last pair is \eqref{eq:h-d2}. Quoted spline uses only the observed strikes. Tails adds the wings of Section~\ref{sec:tails}. Tails+Twice applies \eqref{eq:twice}.}
 \label{tab:heston-tail}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{ll
@@ -409,26 +400,24 @@ where \(\varphi(u)=\E^{\Q}[e^{\mathrm{i}u\log S_T}]\). Two chains are used: a de
   S[table-format=2.2]
   S[table-format=1.2e-1, scientific-notation=true]
   S[table-format=2.2]
-  S[table-format=1.2e-1, scientific-notation=true]
-  S[table-format=2.2]
   S[table-format=1.2e-1, scientific-notation=true]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Estimator} &
-  {\(h^{\ast}\)} & {Oracle ISE} & {Mesh \(h\)} & {Mesh ISE} & {Den.\ \(h\)} & {Den.\ ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
+  {\(h^{\ast}\)} & {Oracle ISE} & {Mesh \(h\)} & {Mesh ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.88 & 1.33e-5 & 1.79 & 1.11e-5 \\
+  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.79 & 1.11e-5 \\
 Dense & Tails
-  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.88 & 1.33e-5 & 1.79 & 1.11e-5 \\
+  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.79 & 1.11e-5 \\
 Dense & Tails+Twice
-  & 0.39 & 2.68e-12 & 0.89 & 6.32e-10 & 1.88 & 1.59e-7 & 1.79 & 1.14e-7 \\
+  & 0.39 & 2.68e-12 & 0.89 & 6.32e-10 & 1.79 & 1.14e-7 \\
 \midrule
 Sparse & Quoted spline
-  & 16.19 & 1.80e-2 & 2.71 & 1.04e-1 & 2.72 & 1.03e-1 & 2.24 & 1.25e-1 \\
+  & 16.19 & 1.80e-2 & 2.71 & 1.04e-1 & 2.24 & 1.25e-1 \\
 Sparse & Tails
-  & 0.45 & 1.13e-6 & 2.71 & 5.29e-5 & 2.72 & 5.33e-5 & 2.24 & 2.64e-5 \\
+  & 0.45 & 1.13e-6 & 2.71 & 5.29e-5 & 2.24 & 2.64e-5 \\
 Sparse & Tails+Twice
-  & 1.64 & 9.67e-7 & 2.71 & 2.66e-6 & 2.72 & 2.69e-6 & 2.24 & 1.35e-6 \\
+  & 1.64 & 9.67e-7 & 2.71 & 2.66e-6 & 2.24 & 1.35e-6 \\
 \bottomrule
 \end{tabular}%
 }
@@ -441,7 +430,7 @@ Sparse & Tails+Twice
 \label{fig:heston-rnd}
 \end{figure}
 
-On the dense grid the first strike lies left of the window and the last call is already zero, so the wings do not move the error. The spline without twicing has mesh integrated squared error \(7.36\times 10^{-7}\). Twicing cuts that to \(6.32\times 10^{-10}\), against an oracle \(2.68\times 10^{-12}\). The rule \eqref{eq:h-den} is wider than the mesh (\(h=1.88\) against \(0.89\)) and the twiced error is \(1.59\times 10^{-7}\). Equation \eqref{eq:h-d2} is close to it on this grid (\(h=1.79\)) and the twiced error is \(1.14\times 10^{-7}\). On the sparse grid the quoted spline without tails is useless: mesh integrated squared error \(0.104\). The left line \eqref{eq:left} brings the untwiced mesh error to \(5.29\times 10^{-5}\). Twicing then reaches \(2.66\times 10^{-6}\) at the mesh, \(2.69\times 10^{-6}\) at \eqref{eq:h-den}, and \(1.35\times 10^{-6}\) at \eqref{eq:h-d2}, against an oracle \(9.67\times 10^{-7}\). At this spacing the mesh bandwidth and \eqref{eq:h-den} are almost the same number (\(h=2.71\) and \(h=2.72\)); \eqref{eq:h-d2} is \(h=2.24\). Figure~\ref{fig:heston-rnd} plots the three estimators at the mesh bandwidth.
+On the dense grid the first strike lies left of the window and the last call is already zero, so the wings do not move the error. The spline without twicing has mesh integrated squared error \(7.36\times 10^{-7}\). Twicing cuts that to \(6.32\times 10^{-10}\), against an oracle \(2.68\times 10^{-12}\). Equation \eqref{eq:h-d2} is wider (\(h=1.79\)) and the twiced error is \(1.14\times 10^{-7}\). On the sparse grid the quoted spline without tails is useless: mesh integrated squared error \(0.104\). The left line \eqref{eq:left} brings the untwiced mesh error to \(5.29\times 10^{-5}\). Twicing then reaches \(2.66\times 10^{-6}\) at the mesh and \(1.35\times 10^{-6}\) at \eqref{eq:h-d2} (\(h=2.24\)), against an oracle \(9.67\times 10^{-7}\). Figure~\ref{fig:heston-rnd} plots the three estimators at the mesh bandwidth.
 
 Table~\ref{tab:vg-tail} repeats the design for the variance-gamma process of \citet{madan1998}. The process parameters are those of \citet{carrmadan1999}: \(\sigma=0.12\), \(\nu=0.2\), \(\theta=-0.14\). Spot, rate, dividend yield, and maturity are as above, as are the two strike grids and the ISE window. Variance gamma is a pure-jump L\'evy process. The true density of \(\log S_T\) is a modified Bessel function \citep{madan1998}; the density of \(S_T\) is that formula times \(1/K\). Calls are the discounted payoff of that density, evaluated by the trapezoidal rule.
 
@@ -456,26 +445,24 @@ Table~\ref{tab:vg-tail} repeats the design for the variance-gamma process of \ci
   S[table-format=2.2]
   S[table-format=1.2e-1, scientific-notation=true]
   S[table-format=2.2]
-  S[table-format=1.2e-1, scientific-notation=true]
-  S[table-format=2.2]
   S[table-format=1.2e-1, scientific-notation=true]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Estimator} &
-  {\(h^{\ast}\)} & {Oracle ISE} & {Mesh \(h\)} & {Mesh ISE} & {Den.\ \(h\)} & {Den.\ ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
+  {\(h^{\ast}\)} & {Oracle ISE} & {Mesh \(h\)} & {Mesh ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.20 & 1.27e-4 & 1.14 & 1.10e-4 \\
+  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.14 & 1.10e-4 \\
 Dense & Tails
-  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.20 & 1.27e-4 & 1.14 & 1.10e-4 \\
+  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.14 & 1.10e-4 \\
 Dense & Tails+Twice
-  & 0.33 & 3.93e-7 & 0.89 & 8.34e-6 & 1.20 & 2.53e-5 & 1.14 & 2.13e-5 \\
+  & 0.33 & 3.93e-7 & 0.89 & 8.34e-6 & 1.14 & 2.13e-5 \\
 \midrule
 Sparse & Quoted spline
-  & 14.03 & 3.27e-2 & 2.71 & 1.05e-1 & 1.69 & 1.67e-1 & 1.42 & 1.99e-1 \\
+  & 14.03 & 3.27e-2 & 2.71 & 1.05e-1 & 1.42 & 1.99e-1 \\
 Sparse & Tails
-  & 0.45 & 3.97e-5 & 2.71 & 1.25e-3 & 1.69 & 3.63e-4 & 1.42 & 2.25e-4 \\
+  & 0.45 & 3.97e-5 & 2.71 & 1.25e-3 & 1.42 & 2.25e-4 \\
 Sparse & Tails+Twice
-  & 0.80 & 3.31e-5 & 2.71 & 4.39e-4 & 1.69 & 1.00e-4 & 1.42 & 6.18e-5 \\
+  & 0.80 & 3.31e-5 & 2.71 & 4.39e-4 & 1.42 & 6.18e-5 \\
 \bottomrule
 \end{tabular}%
 }
@@ -488,48 +475,46 @@ Sparse & Tails+Twice
 \label{fig:vg-rnd}
 \end{figure}
 
-On the dense chain the wings again do not move the digits. Twicing cuts the mesh error from \(5.08\times 10^{-5}\) to \(8.34\times 10^{-6}\), against an oracle \(3.93\times 10^{-7}\). At \eqref{eq:h-den} the twiced error is \(2.53\times 10^{-5}\), and at \eqref{eq:h-d2} it is \(2.13\times 10^{-5}\) (\(h=1.14\)). The density of \(S_T\) is more peaked than under Heston, and the absolute errors are larger. On the sparse chain the quoted spline without tails has mesh error \(0.105\). Tails bring the untwiced mesh error to \(1.25\times 10^{-3}\), and twicing lowers it to \(4.39\times 10^{-4}\) at the mesh, \(1.00\times 10^{-4}\) at \eqref{eq:h-den}, and \(6.18\times 10^{-5}\) at \eqref{eq:h-d2} (\(h=1.42\)), against an oracle \(3.31\times 10^{-5}\). Here the mesh bandwidth \(h=2.71\) is the widest of the three. Figure~\ref{fig:vg-rnd} plots the three estimators at the mesh bandwidth.
+On the dense chain the wings again do not move the digits. Twicing cuts the mesh error from \(5.08\times 10^{-5}\) to \(8.34\times 10^{-6}\), against an oracle \(3.93\times 10^{-7}\). At \eqref{eq:h-d2} the twiced error is \(2.13\times 10^{-5}\) (\(h=1.14\)). The density of \(S_T\) is more peaked than under Heston, and the absolute errors are larger. On the sparse chain the quoted spline without tails has mesh error \(0.105\). Tails bring the untwiced mesh error to \(1.25\times 10^{-3}\), and twicing lowers it to \(4.39\times 10^{-4}\) at the mesh and \(6.18\times 10^{-5}\) at \eqref{eq:h-d2} (\(h=1.42\)), against an oracle \(3.31\times 10^{-5}\). Here the mesh bandwidth \(h=2.71\) is the wider of the two. Figure~\ref{fig:vg-rnd} plots the three estimators at the mesh bandwidth.
 
 \subsection{Noisy Heston Quotes}
 \label{sec:noise}
 
-The same Heston chain is observed with noise in the implied volatility. Each exact call is converted to a Black--Scholes implied volatility, an independent \(N(0,0.01^2)\) shock is added, the volatility is floored at \(0.02\), and the call is repriced. The decreasing-convex projection of Section~\ref{sec:data} is then applied, and the spline is fit to that projection. Thirty replications use the seed \(20260923\). Table~\ref{tab:heston-noise} reports the mean integrated squared error on \([60,150]\) at the three bandwidths of Section~\ref{sec:h}. The bandwidth itself moves slightly from one replication to the next, because \(\hat\sigma_{\mathrm{ATM}}\) is computed from the noisy projection; the table shows the mean bandwidth.
+The same Heston chain is observed with noise in the implied volatility. Each exact call is converted to a Black--Scholes implied volatility, an independent \(N(0,0.01^2)\) shock is added, the volatility is floored at \(0.02\), and the call is repriced. The decreasing-convex projection of Section~\ref{sec:data} is then applied, and the spline is fit to that projection. Thirty replications use the seed \(20260923\). Table~\ref{tab:heston-noise} reports the mean integrated squared error on \([60,150]\) at the two bandwidths of Section~\ref{sec:h}. The bandwidth in \eqref{eq:h-d2} moves slightly from one replication to the next, because \(\hat\sigma_{\mathrm{ATM}}\) is computed from the noisy projection; the table shows the mean.
 
 \begin{table}[H]
 \centering
-\caption{Mean integrated squared error on noisy Heston quotes, thirty replications. Columns are the three rules of Section~\ref{sec:h}.}
+\caption{Mean integrated squared error on noisy Heston quotes, thirty replications. Columns are the two rules of Section~\ref{sec:h}.}
 \label{tab:heston-noise}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{ll
   S[table-format=1.2]
   S[table-format=1.2e-1, scientific-notation=true]
   S[table-format=1.2]
-  S[table-format=1.2e-1, scientific-notation=true]
-  S[table-format=1.2]
   S[table-format=1.2e-1, scientific-notation=true]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Estimator} &
-  {Mesh \(h\)} & {Mesh ISE} & {Den.\ \(h\)} & {Den.\ ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
+  {Mesh \(h\)} & {Mesh ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.89 & 1.69e-2 & 1.87 & 2.24e-3 & 1.79 & 2.62e-3 \\
+  & 0.89 & 1.69e-2 & 1.79 & 2.62e-3 \\
 Dense & Tails
-  & 0.89 & 1.69e-2 & 1.87 & 2.24e-3 & 1.79 & 2.62e-3 \\
+  & 0.89 & 1.69e-2 & 1.79 & 2.62e-3 \\
 Dense & Tails+Twice
-  & 0.89 & 3.24e-2 & 1.87 & 5.27e-3 & 1.79 & 6.09e-3 \\
+  & 0.89 & 3.24e-2 & 1.79 & 6.09e-3 \\
 \midrule
 Sparse & Quoted spline
-  & 2.71 & 1.05e-1 & 2.63 & 1.09e-1 & 2.24 & 1.28e-1 \\
+  & 2.71 & 1.05e-1 & 2.24 & 1.28e-1 \\
 Sparse & Tails
-  & 2.71 & 1.21e-3 & 2.63 & 1.48e-3 & 2.24 & 2.53e-3 \\
+  & 2.71 & 1.21e-3 & 2.24 & 2.53e-3 \\
 Sparse & Tails+Twice
-  & 2.71 & 2.98e-3 & 2.63 & 3.61e-3 & 2.24 & 6.09e-3 \\
+  & 2.71 & 2.98e-3 & 2.24 & 6.09e-3 \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-On the dense grid the mesh bandwidth is too short for this noise. The twiced error is \(3.24\times 10^{-2}\), against \(5.27\times 10^{-3}\) at \eqref{eq:h-den} and \(6.09\times 10^{-3}\) at \eqref{eq:h-d2}. Twicing raises that mesh error: the negative sidelobes amplify the noise when \(h\) is only one gap wide. The two longer rules are close, which is what \(c=0.34\) was chosen to do at this \(n\). On the sparse grid the three bandwidths all sit near \(2.5\), and the twiced errors are \(2.98\times 10^{-3}\), \(3.61\times 10^{-3}\), and \(6.09\times 10^{-3}\). Tails still matter. Without them the sparse error stays near \(0.1\).
+On the dense grid the mesh bandwidth is too short for this noise. The twiced error is \(3.24\times 10^{-2}\), against \(6.09\times 10^{-3}\) at \eqref{eq:h-d2}. Twicing raises that mesh error: the negative sidelobes amplify the noise when \(h\) is only one gap wide. On the sparse grid the two bandwidths are \(2.71\) and \(2.24\), and the twiced errors are \(2.98\times 10^{-3}\) and \(6.09\times 10^{-3}\). Tails still matter. Without them the sparse error stays near \(0.1\).
 
 \section{Empirical Applications}
 \label{sec:emp}

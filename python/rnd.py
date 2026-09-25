@@ -14,7 +14,6 @@ from scipy.interpolate import CubicSpline
 from scipy.special import erf
 from scipy.stats import norm
 
-FACTOR = 0.55
 DERIV_C = 0.34
 
 
@@ -45,13 +44,10 @@ def estimate_rnd(
         Strikes at which to return the density. Defaults to ``K``.
     K_price : array_like, optional
         Strikes at which to return the call interpolant. Omitted if None.
-    h : float or {"cubic", "mesh", "density", "deriv"}, optional
-        Bandwidth. The default ``"cubic"`` rule is
-        ``0.55 × 1.06 F σ_ATM √T n^{-1/5}``, with ``n`` the number of quoted
-        strikes plus the notional right-wing count. ``"mesh"`` is
-        ``min(1.2 δ, 0.30(K_m − K_1))``. ``"density"`` is the Silverman
-        rule without the factor 0.55. ``"deriv"`` is
-        ``0.34 F σ_ATM √T n^{-1/9}`` with ``n`` the number of quoted strikes.
+    h : float or {"deriv", "mesh"}, optional
+        Bandwidth. The default ``"deriv"`` rule is
+        ``0.34 F σ_ATM √T n^{-1/9}``, with ``n`` the number of quoted
+        strikes. ``"mesh"`` is ``min(1.2 δ, 0.30(K_m − K_1))``.
         A number is used as given.
     tails : bool
         Add the knots ``(0, 0)`` and, when the call has not died,
@@ -77,9 +73,9 @@ def estimate_rnd(
         K_eval = K
     else:
         K_eval = np.asarray(K_eval, dtype=float)
-    if h is None or h == "cubic":
-        h_use = _bandwidth(K, C, S0, r, T, q, F, "cubic")
-    elif h in ("mesh", "density", "deriv"):
+    if h is None or h == "deriv":
+        h_use = _bandwidth(K, C, S0, r, T, q, F, "deriv")
+    elif h == "mesh":
         h_use = _bandwidth(K, C, S0, r, T, q, F, h)
     else:
         h_use = float(h)
@@ -183,20 +179,12 @@ def _atm_sigma(K, C, S0, r, T, q, F):
 
 
 def _bandwidth(K, C, S0, r, T, q, F, rule):
-    """``mesh``, ``cubic`` (0.55 times density-scale), ``density``, or ``deriv``."""
+    """``mesh`` or ``deriv`` (``0.34 F σ √T n^{-1/9}``)."""
     if rule == "mesh":
         return _mesh_h(K)
-    if rule == "deriv":
-        n = max(len(K), 8)
-        sig = _atm_sigma(K, C, S0, r, T, q, F)
-        return float(DERIV_C * F * sig * np.sqrt(T) * n ** (-1.0 / 9.0))
-    disc = float(np.exp(-float(r) * float(T)))
-    n_right = _n_right_from_gap(K, C, F, disc)
-    n_ext = len(K) + int(n_right)
-    h = _density_h(K, C, S0, r, T, q, F, n_ext)
-    if rule == "density":
-        return h
-    return FACTOR * h
+    n = max(len(K), 8)
+    sig = _atm_sigma(K, C, S0, r, T, q, F)
+    return float(DERIV_C * F * sig * np.sqrt(T) * n ** (-1.0 / 9.0))
 
 
 def _right_wing(K, C, F, disc, k_max=None):
@@ -231,30 +219,11 @@ def _right_wing(K, C, F, disc, k_max=None):
     return K_m, C_m, slp, K_end
 
 
-def _n_right_from_gap(K, C, F, disc, k_max=None):
-    """Eight knots per last quoted gap along the linear call tail."""
-    spec = _right_wing(K, C, F, disc, k_max=k_max)
-    if spec is None:
-        return 0
-    K_m, _, _, K_end = spec
-    last = float(K[-1] - K[-2]) if len(K) >= 2 else 0.0
-    if last <= 0.0:
-        return 2
-    return max(1, int(round(8.0 * (K_end - K_m) / last)))
-
-
 def _mesh_h(K):
     K = np.sort(np.asarray(K, dtype=float))
     delta = float(np.median(np.diff(K)))
     span = float(K[-1] - K[0])
     return float(min(1.2 * delta, 0.30 * span))
-
-
-def _density_h(K, C, S0, r, T, q, F, n_ext):
-    """Silverman's Gaussian rule on the scale of S_T."""
-    n = max(int(n_ext), 8)
-    atm = _atm_sigma(K, C, S0, r, T, q, F)
-    return float(1.06 * F * atm * np.sqrt(T) * n ** (-0.2))
 
 
 def _d1_d2(S, K, r, T, sig, q=0.0):

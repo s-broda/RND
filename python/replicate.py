@@ -126,26 +126,20 @@ def _exact(label, p, calls, q_true, K_eval):
                 K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
                 h="mesh", tails=tails, twice=twice,
             )
-            fit_d = estimate_rnd(
-                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                tails=tails, twice=twice,
-            )
             fit_9 = estimate_rnd(
                 K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
                 h="deriv", tails=tails, twice=twice,
             )
-            q_m, q_d, q_9 = fit_m["q"], fit_d["q"], fit_9["q"]
+            q_m, q_9 = fit_m["q"], fit_9["q"]
             rec[chain][name] = dict(
                 h_star=best_h, ise_star=best,
                 h_mesh=fit_m["h"], ise_mesh=_ise(K_eval, q_m, q_true),
-                h_den=fit_d["h"], ise_den=_ise(K_eval, q_d, q_true),
                 h_9=fit_9["h"], ise_9=_ise(K_eval, q_9, q_true),
             )
             row = rec[chain][name]
             print(
                 f"    {name:16} oracle {row['h_star']:.4g} {row['ise_star']:.4e}  "
                 f"mesh {row['h_mesh']:.4g} {row['ise_mesh']:.4e}  "
-                f"rule {row['h_den']:.4g} {row['ise_den']:.4e}  "
                 f"n^-1/9 {row['h_9']:.4g} {row['ise_9']:.4e}"
             )
             plot.setdefault(chain, {})[{"Quoted spline": "quoted", "Tails": "tails", "Tails+Twice": "twice"}[name]] = q_m
@@ -473,7 +467,7 @@ def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
         ("Tails", True, False),
         ("Tails+Twice", True, True),
     )
-    rules = ("mesh", "cubic", "deriv")
+    rules = ("mesh", "deriv")
     for chain, K in (
         ("dense", np.linspace(30.0, 220.0, 256)),
         ("sparse", np.linspace(70.0, 140.0, 32)),
