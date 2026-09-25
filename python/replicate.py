@@ -386,10 +386,10 @@ def _plot_listed(scored):
             f"YH λ={bundle['lam']:.4g}  PC h={h:.1f}"
         )
         ax = axes[row, 0]
-        ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.4, label="Ours")
-        ax.plot(s, np.maximum(q_asd, 0), color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte")
-        ax.plot(s, np.maximum(q_pca, 0), color="#2ca02c", lw=1.15, ls="-.", label="PCA")
-        ax.plot(s, np.maximum(q_pc, 0), color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao")
+        h_ours, = ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.4, label="Ours")
+        h_asd, = ax.plot(s, np.maximum(q_asd, 0), color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte")
+        h_pca, = ax.plot(s, np.maximum(q_pca, 0), color="#2ca02c", lw=1.15, ls="-.", label="PCA")
+        h_pc, = ax.plot(s, np.maximum(q_pc, 0), color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao")
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlim(0.55 * sl.F, 1.40 * sl.F)
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
@@ -397,7 +397,11 @@ def _plot_listed(scored):
         ax.set_ylim(0, 1.15 * ymax)
         ax.set_title(title)
         ax.set_xlabel(r"Strike $K$")
-        ax.legend(frameon=False, fontsize=7.5, loc="upper right")
+        ax.legend(
+            [h_ours, h_pca, h_pc, h_asd],
+            ["Ours", "PCA", "Priestley–Chao", "Aït-Sahalia–Duarte"],
+            frameon=False, fontsize=7.5, loc="upper right",
+        )
         if row == 0:
             ax.set_ylabel(r"$f_{\mathbb{Q}}(K)$")
 
@@ -418,14 +422,18 @@ def _plot_listed(scored):
             [iv_m[show], iv[show], iv_yh[show], iv_pca[show], iv_pc[show]]
         )
         ax.set_ylim(y1, y2)
-        ax.plot(sl.K[show], iv_m[show], "k.", ms=2.6, alpha=0.40, label="Market", zorder=2)
-        ax.plot(sl.K[show], iv_pc[show], color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao", zorder=3)
-        ax.plot(sl.K[show], iv_pca[show], color="#2ca02c", lw=1.15, ls="-.", label="PCA", zorder=4)
-        ax.plot(sl.K[show], iv_yh[show], color="#ff7f0e", lw=1.15, ls=":", label="Yatchew–Härdle", zorder=5)
-        ax.plot(sl.K[show], iv[show], color="#1f77b4", lw=1.35, label="Ours", zorder=6)
+        h_mkt, = ax.plot(sl.K[show], iv_m[show], "k.", ms=2.6, alpha=0.40, label="Market", zorder=2)
+        h_pc, = ax.plot(sl.K[show], iv_pc[show], color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao", zorder=3)
+        h_pca, = ax.plot(sl.K[show], iv_pca[show], color="#2ca02c", lw=1.15, ls="-.", label="PCA", zorder=4)
+        h_yh, = ax.plot(sl.K[show], iv_yh[show], color="#ff7f0e", lw=1.15, ls=":", label="Yatchew–Härdle", zorder=5)
+        h_ours, = ax.plot(sl.K[show], iv[show], color="#1f77b4", lw=1.35, label="Ours", zorder=6)
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlabel(r"Strike $K$")
-        ax.legend(frameon=False, fontsize=7.5, loc="upper right")
+        ax.legend(
+            [h_mkt, h_ours, h_pca, h_pc, h_yh],
+            ["Market", "Ours", "PCA", "Priestley–Chao", "Yatchew–Härdle"],
+            frameon=False, fontsize=7.5, loc="upper right",
+        )
         if row == 0:
             ax.set_ylabel("OTM implied vol")
     fig.tight_layout()
