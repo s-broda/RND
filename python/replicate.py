@@ -234,9 +234,7 @@ def _holdout_method(sl, method):
             h = pca_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
             C_te, _, _, _, _ = pca_fit(Kt, Ct, sl.r, sl.T, sl.F, h, Ke, Ke[:1])
         elif method == "pc":
-            h = estimate_rnd(
-                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, h="deriv", tails=True, twice=True,
-            )["h"]
+            h = _pc_cubic_cv(sl, Kt, Ct)
             _, _, C_te = priestley_chao_cubic(
                 Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
             )
@@ -244,6 +242,37 @@ def _holdout_method(sl, method):
             raise ValueError(method)
         errs.append(_otm_rmse_slice(sl, C_te, test))
     return float(np.mean(errs))
+
+
+def _pc_cubic_cv(sl, K, C):
+    """Even/odd pricing bandwidth for the Priestley--Chao cubic.
+
+    The grid starts at the median strike gap. On these chains the minimum is selected.
+    """
+    from src.competitors import _pc_h_grid
+
+    grid = _pc_h_grid(K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    best_h, best = float(grid[0]), np.inf
+    idx = np.arange(len(K))
+    for h in grid:
+        errs = []
+        for tr, te in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
+            if int(tr.sum()) < 6 or int(te.sum()) < 2:
+                continue
+            _, _, C_te = priestley_chao_cubic(
+                K[tr], C[tr], sl.S0, sl.r, sl.T, K[te], q=sl.q, h=float(h), return_call=True
+            )
+            C_te = np.maximum(C_te, 0.0)
+            P_te = np.maximum(C_te - sl.S0 * np.exp(-sl.q * sl.T) + K[te] * sl.disc, 0.0)
+            hat = np.where(K[te] <= sl.F, P_te, C_te)
+            # Quoted mids live on the full slice; training knots are a subset.
+            pos = np.searchsorted(sl.K, K[te])
+            mkt = np.where(K[te] <= sl.F, sl.P[pos], sl.C[pos])
+            errs.append(float(np.sqrt(np.mean((hat - mkt) ** 2))))
+        if errs and float(np.mean(errs)) < best:
+            best = float(np.mean(errs))
+            best_h = float(h)
+    return best_h
 
 
 def _row_metrics(sl, C_hat, q, s, ho):
@@ -280,9 +309,10 @@ def _chain_scores(sl):
     )
     h_pca = pca_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
     C_pca, q_pca, _, _, _ = pca_fit(sl.K, C, sl.r, sl.T, sl.F, h_pca, sl.K, s)
-    q_pc, _, _ = priestley_chao_cubic(sl.K, C, sl.S0, sl.r, sl.T, s, q=sl.q, h=h, return_call=True)
+    h_pc = _pc_cubic_cv(sl, sl.K, C)
+    q_pc, _, _ = priestley_chao_cubic(sl.K, C, sl.S0, sl.r, sl.T, s, q=sl.q, h=h_pc, return_call=True)
     _, _, C_pc = priestley_chao_cubic(
-        sl.K, C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h, return_call=True
+        sl.K, C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h_pc, return_call=True
     )
     calls = {
         "Ours": fit["C"],
@@ -306,7 +336,7 @@ def _chain_scores(sl):
     bundle = dict(
         C=C, fit=fit, h=h, s=s, q_pc=q_pc, q_asd=q_asd, q_pca=q_pca,
         C_yh=C_yh, C_pca=C_pca, C_pc=C_pc,
-        h_asd_d=h_asd_d, h_pca=h_pca, lam=lam,
+        h_asd_d=h_asd_d, h_pca=h_pca, lam=lam, h_pc=h_pc,
     )
     return metrics, bundle
 
@@ -387,7 +417,7 @@ def _plot_listed(scored):
         C_yh, C_pca, C_pc = bundle["C_yh"], bundle["C_pca"], bundle["C_pc"]
         print(
             f"  fig {title}: ASD h={bundle['h_asd_d']:.1f}  PCA h={bundle['h_pca']:.4f}  "
-            f"YH λ={bundle['lam']:.4g}  PC h={h:.1f}"
+            f"YH λ={bundle['lam']:.4g}  PC h={bundle['h_pc']:.1f}"
         )
         ax = axes[row, 0]
         h_ours, = ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.4, label="Ours")

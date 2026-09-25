@@ -49,7 +49,7 @@ risk-neutral density \sep option prices \sep kernel estimation \sep in-fill cons
 
 This paper estimates the density from a single-maturity strip by rescaling the calls to a complementary distribution function, interpolating that function with a cubic spline, and inverting a Gaussian damping of the associated characteristic function in closed form. Completing the unquoted tails and combining two kernel widths improves accuracy further. As the strike mesh fills a compact interval and the bandwidth tends to zero, the estimator converges to the true density on the interior of that interval. The same limit holds for noisy quotes when the bandwidth also satisfies \(nh^{5}\to\infty\).
 
-We compare our method to several extant methods.  \citeauthor{bondarenko2003}'s method is a sieve of fixed dimension: it does not become finer as more strikes arrive, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by the nearest decreasing convex list; the second differences of that list are a discrete nonnegative measure, not a curve. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. The estimator of this paper returns a closed-form smooth estimate of \(f_{\Q}\) and, from the same smoothing, a call interpolant. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) sits next to the projection of \citet{yatchew2006} and the mixture of \citeauthor{bondarenko2003}. The cubic of \citet{priestley1972} uses the same bandwidth, \eqref{eq:h-d2}. The interpolant can lie below the \citeauthor{yatchew2006} floor because it is not required to be convex. 
+We compare our method to several extant methods.  \citeauthor{bondarenko2003}'s method is a sieve of fixed dimension: it does not become finer as more strikes arrive, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by the nearest decreasing convex list; the second differences of that list are a discrete nonnegative measure, not a curve. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. The estimator of this paper returns a closed-form smooth estimate of \(f_{\Q}\) and, from the same smoothing, a call interpolant. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) sits next to the projection of \citet{yatchew2006} and the mixture of \citeauthor{bondarenko2003}. The cubic of \citet{priestley1972} chooses its bandwidth by even/odd pricing error. The interpolant can lie below the \citeauthor{yatchew2006} floor because it is not required to be convex. 
 
 The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} derives the characteristic function of the normalized call and the closed-form estimator, and compares it to kernel smoothing of the call. Section~\ref{sec:refine} records two refinements: completing the tails and twicing. Section~\ref{sec:ifc} proves in-fill consistency for exact quotes and for noisy quotes. Section~\ref{sec:h} chooses bandwidths that meet those conditions and compares them on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration that evaluates our estimator against four alternative methods on four listed chains. Section~\ref{sec:conc} concludes.
 
@@ -374,7 +374,7 @@ h
 \;=\;
 c\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/9},
 \end{equation}
-with \(n\) the number of quoted strikes and \(c=0.34\). On chains of one to several hundred strikes this bandwidth is the one used for the listed prices below. Section~\ref{sec:emp} uses it for our estimator and for \citeauthor{priestley1972}. Section~\ref{sec:heston} reports both rules.
+with \(n\) the number of quoted strikes and \(c=0.34\). On chains of one to several hundred strikes this is the bandwidth used for the listed prices of our estimator. Section~\ref{sec:heston} reports both rules. \citeauthor{priestley1972} is not given this bandwidth: its listed fit chooses \(h\) by even/odd pricing error.
 
 \subsection{Numerical Illustration}
 \label{sec:heston}
@@ -569,13 +569,13 @@ Start from the projected calls of Section~\ref{sec:data}. The call used for pric
 Start from the projected calls of Section~\ref{sec:data}. The density is a mixture of \(41\) lognormals with a common log-width \(h\) and nonnegative weights. The centers are equally spaced in log strike from the first quoted strike to the last. Each component prices a call in closed form, Black--Scholes with forward \(e^{z_j+h^2/2}\). The weights minimise the sum of squared errors in those projected calls, plus two penalties, one for \(\sum_j a_j=1\) and one for \(\sum_j a_j e^{z_j+h^2/2}=F\). Nonnegative least squares returns the weights. They are not divided by their sum afterwards; a weight above one is clipped to one. The width \(h\) is chosen by even/odd pricing error on a grid of multiples of the center spacing. Prices in Table~\ref{tab:listed} are those closed-form calls, floored, with puts by parity.
 
 \paragraph{\citeauthor{priestley1972}}
-Start from the projected calls of Section~\ref{sec:data}. Section~\ref{sec:naive} records why \eqref{eq:pc} is a poor estimator of a call: the level \(C_i\) is large deep in the money, where \(C''\) is nearly zero, and the spacing weight does not remove that level. The listed estimator is the cubic that section substitutes, \eqref{eq:pc-cubic}: a clamped cubic spline through the projected calls, extended by linear wings of slope in \([-e^{-rT},0]\), then convolved with a Gaussian kernel. The bandwidth is \eqref{eq:h-d2}, the same number our estimator uses on that fit. A bandwidth chosen by even/odd pricing error on these chains is a fraction of the median strike gap, and the second derivative at that width is not a smooth density. Prices in the table are the smoothed call at the quoted strikes, floored, with puts by parity. The density in Figure~\ref{fig:listed} is \eqref{eq:pc-cubic} at \eqref{eq:h-d2}.
+Start from the projected calls of Section~\ref{sec:data}. Section~\ref{sec:naive} records why \eqref{eq:pc} is a poor estimator of a call: the level \(C_i\) is large deep in the money, where \(C''\) is nearly zero, and the spacing weight does not remove that level. The listed estimator is the cubic that section substitutes, \eqref{eq:pc-cubic}: a clamped cubic spline through the projected calls, extended by linear wings of slope in \([-e^{-rT},0]\), then convolved with a Gaussian kernel. The bandwidth minimizes even/odd pricing error on a grid that starts at the median strike gap. On each of the four chains the minimum is that lower endpoint, \(h=10\), \(25\), \(100\), and \(10\). The second derivative at that width is not a smooth density: the curves in Figure~\ref{fig:listed} have \(36\), \(18\), \(16\), and \(17\) peaks. Prices in the table are the smoothed call at the quoted strikes, floored, with puts by parity.
 
 Hold-out refits the projection and every tuned method on the training strikes only, including the choice of its tuning constant, and scores the other half against the quoted mids. The two directions are averaged. 
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=88.3\), \(148.5\), \(542.2\), \(52.8\)). \citeauthor{yatchew2006} is that projection plus its cross-validated penalty. \citeauthor{aitsahalia2003} is priced from the local linear at its cross-validated bandwidth. PCA is priced from the lognormal mixture. \citeauthor{priestley1972} is the cubic \eqref{eq:pc-cubic} at the same bandwidth. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Weighed av.\ weights chain \(i\) by \(1/F_i\), normalized to sum to one.}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=88.3\), \(148.5\), \(542.2\), \(52.8\)). \citeauthor{yatchew2006} is that projection plus its cross-validated penalty. \citeauthor{aitsahalia2003} is priced from the local linear at its cross-validated bandwidth. PCA is priced from the lognormal mixture. \citeauthor{priestley1972} is the cubic \eqref{eq:pc-cubic} at the even/odd pricing bandwidth. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Weighed av.\ weights chain \(i\) by \(1/F_i\), normalized to sum to one.}
 \label{tab:listed}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=1.2]}
@@ -592,7 +592,7 @@ SPX Dec & \citeauthor{aitsahalia2003}
 SPX Dec & PCA
   & 0.038 & 0.035 & 0.046 & 0.040 & 1.00 \\
 SPX Dec & \citeauthor{priestley1972}
-  & 1.848 & 1.362 & 2.865 & 2.153 & 1.00 \\
+  & 0.037 & 0.033 & 0.048 & 0.066 & 1.00 \\
 \midrule
 SPX Mar & Ours
   & 0.098 & 0.074 & 0.147 & 0.124 & 1.00 \\
@@ -603,7 +603,7 @@ SPX Mar & \citeauthor{aitsahalia2003}
 SPX Mar & PCA
   & 0.079 & 0.063 & 0.115 & 0.079 & 1.00 \\
 SPX Mar & \citeauthor{priestley1972}
-  & 2.874 & 1.902 & 4.684 & 3.346 & 1.00 \\
+  & 0.086 & 0.061 & 0.134 & 0.331 & 1.00 \\
 \midrule
 NDX Dec & Ours
   & 1.077 & 1.143 & 0.671 & 1.150 & 1.00 \\
@@ -614,7 +614,7 @@ NDX Dec & \citeauthor{aitsahalia2003}
 NDX Dec & PCA
   & 1.147 & 1.131 & 1.221 & 1.187 & 1.00 \\
 NDX Dec & \citeauthor{priestley1972}
-  & 12.583 & 11.228 & 17.779 & 14.652 & 1.00 \\
+  & 0.954 & 0.998 & 0.700 & 1.992 & 1.00 \\
 \midrule
 RUT Dec & Ours
   & 0.042 & 0.039 & 0.045 & 0.053 & 1.00 \\
@@ -625,7 +625,7 @@ RUT Dec & \citeauthor{aitsahalia2003}
 RUT Dec & PCA
   & 0.034 & 0.030 & 0.039 & 0.038 & 1.00 \\
 RUT Dec & \citeauthor{priestley1972}
-  & 1.439 & 1.230 & 1.690 & 1.675 & 1.00 \\
+  & 0.055 & 0.048 & 0.063 & 0.210 & 1.00 \\
 \midrule
 Average & Ours
   & 0.318 & 0.325 & 0.236 & 0.349 & 1.00 \\
@@ -636,7 +636,7 @@ Average & \citeauthor{aitsahalia2003}
 Average & PCA
   & 0.325 & 0.315 & 0.355 & 0.336 & 1.00 \\
 Average & \citeauthor{priestley1972}
-  & 4.686 & 3.931 & 6.754 & 5.457 & 1.00 \\
+  & 0.283 & 0.285 & 0.236 & 0.650 & 1.00 \\
 \midrule
 Weighed av. & Ours
   & 0.109 & 0.104 & 0.105 & 0.127 & 1.00 \\
@@ -647,28 +647,28 @@ Weighed av. & \citeauthor{aitsahalia2003}
 Weighed av. & PCA
   & 0.101 & 0.094 & 0.116 & 0.105 & 1.00 \\
 Weighed av. & \citeauthor{priestley1972}
-  & 2.380 & 1.904 & 3.352 & 2.772 & 1.00 \\
+  & 0.103 & 0.096 & 0.107 & 0.296 & 1.00 \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-The solved \citeauthor{yatchew2006} projection is the nearest decreasing convex call. Its out-of-the-money error is \(0.022\) on SPX December, \(0.024\) on SPX March, \(0.785\) on NDX December, and \(0.026\) on RUT December. On SPX December the cross-validated penalty is zero, so \(0.022\) is the distance from the quotes to the cone. Any smoother that stays inside the cone, including \citeauthor{aitsahalia2003}, lies at or above it. Their cross-validated local linear is \(0.337\), \(0.596\), \(2.499\), and \(0.339\). With centers on the quoted log-strike range and a width chosen by pricing error, PCA out-of-the-money error is \(0.038\) on SPX December, \(0.079\) on SPX March, \(1.147\) on NDX December, and \(0.034\) on RUT December. The \citeauthor{priestley1972} smoother has out-of-the-money error \(1.848\), \(2.874\), \(12.583\), and \(1.439\).
+The solved \citeauthor{yatchew2006} projection is the nearest decreasing convex call. Its out-of-the-money error is \(0.022\) on SPX December, \(0.024\) on SPX March, \(0.785\) on NDX December, and \(0.026\) on RUT December. On SPX December the cross-validated penalty is zero, so \(0.022\) is the distance from the quotes to the cone. Any smoother that stays inside the cone, including \citeauthor{aitsahalia2003}, lies at or above it. Their cross-validated local linear is \(0.337\), \(0.596\), \(2.499\), and \(0.339\). With centers on the quoted log-strike range and a width chosen by pricing error, PCA out-of-the-money error is \(0.038\) on SPX December, \(0.079\) on SPX March, \(1.147\) on NDX December, and \(0.034\) on RUT December. The \citeauthor{priestley1972} smoother, at its cross-validated bandwidth, has out-of-the-money error \(0.037\), \(0.086\), \(0.954\), and \(0.055\). The hold-out error is \(0.066\), \(0.331\), \(1.992\), and \(0.210\).
 The estimator of this paper is the Gaussian inversion of the cubic spline of \(P\), with tails and twicing, at \eqref{eq:h-d2}. The pricing error is \(0.055\), \(0.098\), \(1.077\), and \(0.042\). The hold-out error is \(0.070\), \(0.124\), \(1.150\), and \(0.053\).
 
-Averaging the out-of-the-money hold-out error across the four chains, one obtains \(0.349\) for the estimator of this paper, \(0.409\) for \citeauthor{yatchew2006}, \(1.245\) for \citeauthor{aitsahalia2003}, \(0.336\) for PCA, and \(5.457\) for \citeauthor{priestley1972}. Weighting the average with the inverse forward, normalized to sum to one, one has \(0.127\), \(0.189\), \(0.671\), \(0.105\), and \(2.772\), in the same order.
+Averaging the out-of-the-money hold-out error across the four chains, one obtains \(0.349\) for the estimator of this paper, \(0.409\) for \citeauthor{yatchew2006}, \(1.245\) for \citeauthor{aitsahalia2003}, \(0.336\) for PCA, and \(0.650\) for \citeauthor{priestley1972}. Weighting the average with the inverse forward, normalized to sum to one, one has \(0.127\), \(0.189\), \(0.671\), \(0.105\), and \(0.296\), in the same order.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/ccdf_listed.pdf}
-\caption{SPX, NDX, and RUT, 18 December 2026, snapshot 23~September 2026. Each curve is fit to the projected call of Section~\ref{sec:data}. Left: \(\max(\hat f_{\Q},0)\). The cubic-spline estimator is at \eqref{eq:h-d2}. \citeauthor{aitsahalia2003} is the local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). PCA is the fitted lognormal mixture. \citeauthor{priestley1972} is \eqref{eq:pc-cubic} at \eqref{eq:h-d2}. Right: out-of-the-money implied volatility from the same fits' prices, with \citeauthor{yatchew2006} in place of the local cubic. The dashed line is the forward.}
+\caption{SPX, NDX, and RUT, 18 December 2026, snapshot 23~September 2026. Each curve is fit to the projected call of Section~\ref{sec:data}. Left: \(\max(\hat f_{\Q},0)\). The cubic-spline estimator is at \eqref{eq:h-d2}. \citeauthor{aitsahalia2003} is the local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). PCA is the fitted lognormal mixture. \citeauthor{priestley1972} is \eqref{eq:pc-cubic} at its pricing cross-validation bandwidth. Right: out-of-the-money implied volatility from the same fits' prices, with \citeauthor{yatchew2006} in place of the local cubic. The dashed line is the forward.}
 \label{fig:listed}
 \end{figure}
 
 \section{Conclusion}
 \label{sec:conc}
 
-The construction in the paper produces both an in-fill consistent estimate of the RND and a pricing interpolant. In terms of repricing accuracy, it improves upon a naive kernel smoother by a large margin and is competitive with other established methods. The \citeauthor{yatchew2006} projection remains slightly closer in sample (but cannot produce a density), and PCA is marginally closer on the weighted hold-out (but is not consistent without modifications).
+The construction in the paper produces both an in-fill consistent estimate of the RND and a pricing interpolant. In sample it is competitive with the other established methods. The cross-validated \citeauthor{priestley1972} bandwidth reprices slightly more closely, and the density has many peaks; its hold-out error is larger. The \citeauthor{yatchew2006} projection remains slightly closer in sample (but cannot produce a density), and PCA is marginally closer on the weighted hold-out (but is not consistent without modifications).
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:twice} and a replication script are available at \url{https://github.com/s-broda/RND}.
