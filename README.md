@@ -4,7 +4,7 @@ Replication code for
 
 > Simon A. Broda, *Identifying Risk-Neutral Densities from an Empirical Measure of Listed Quotes*.
 
-The headline estimator is `python/rnd.py` (`estimate_rnd`). It rescales European calls to a complementary cdf, completes the unquoted tails, places masses at cell centers, and applies a Gaussian kernel with Schucany–Sommers twicing.
+The headline estimator is `python/cubic.py` (`estimate_cubic`). It rescales European calls to a complementary cdf, interpolates that function with a natural cubic spline, completes the unquoted tails, and applies a Gaussian convolution with Schucany–Sommers twicing. The convolution is closed form.
 
 ## Run
 
@@ -15,7 +15,7 @@ python3 python/replicate.py
 
 This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, and `figures/ccdf_listed.pdf`.
 
-Every listed fit starts from the same unpenalized decreasing-convex projection of the quoted calls, the step shared by Yatchew–Härdle and Aït-Sahalia–Duarte, and is scored against the quoted mids. The listed comparison then chooses the Yatchew–Härdle penalty, the Aït-Sahalia–Duarte pricing bandwidth, and the positive-convolution width by even/odd out-of-the-money error. The kernel prices from the interpolant at the density-scale bandwidth, Silverman's rule. Priestley–Chao is the cubic convolved at that same bandwidth. Exact Heston and variance-gamma quotes are scored only for the kernel. The four working slices are one Cboe session, 23 September 2026.
+Every listed fit starts from the same unpenalized decreasing-convex projection of the quoted calls, the step shared by Yatchew–Härdle and Aït-Sahalia–Duarte, and is scored against the quoted mids. The listed comparison then chooses the Yatchew–Härdle penalty, the Aït-Sahalia–Duarte pricing bandwidth, and the positive-convolution width by even/odd out-of-the-money error. The spline prices from the interpolant at 0.55 times Silverman's density-scale rule. Priestley–Chao is the call cubic convolved at that same bandwidth. Exact Heston and variance-gamma quotes are scored only for the spline, on a dense grid and on a 32-strike grid. The four working slices are one Cboe session, 23 September 2026.
 
 ## Data
 

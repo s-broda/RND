@@ -1,34 +1,33 @@
-#!/usr/bin/env python3
-"""Replication script for the closed-form call-on-K RND paper.
-
-The shareable estimator is ``rnd.estimate_rnd``. This script is the
-single entry point: it prints Heston and variance-gamma ISE and listed
-SPX/NDX/RUT pricing tables, and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
-and figures/ccdf_listed.pdf.
+"""Replication for the paper.
 
 Run from the repository root::
 
     python3 python/replicate.py
+
+Prints the Heston and variance-gamma ISE tables and the listed pricing table,
+and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf, and
+figures/ccdf_listed.pdf.
 """
 
 from __future__ import annotations
 
-from datetime import date
+import sys
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
 PY = Path(__file__).resolve().parent
 ROOT = PY.parent
-import sys
-
 sys.path.insert(0, str(PY))
 
+from cubic import estimate_cubic
 from rnd import estimate_rnd
 from src import black_scholes as bs
 from src.competitors import (
-    _second_diff_q,
     asd_cv_bandwidth,
     asd_fit,
     pca_cv_bandwidth,
@@ -39,63 +38,12 @@ from src.competitors import (
     yatchew_fit,
 )
 from src.heston import BCC97, carr_madan_puts, heston_spot_density
+from src.spx import load_slice
 from src.vg import CM99, vg_calls, vg_spot_density
-from src.spx import atm_iv, build_otm_slice, fetch_cboe, load_slice, save_slice
 
+RES = ROOT / "python" / "results"
 FIG = ROOT / "figures"
-RES = PY / "results"
 FIG.mkdir(parents=True, exist_ok=True)
-
-
-def _rmse(a, b):
-    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
-    ok = np.isfinite(a) & np.isfinite(b)
-    return float(np.sqrt(np.mean((a[ok] - b[ok]) ** 2))) if ok.any() else float("nan")
-
-
-def _otm(sl, P, C):
-    return np.where(sl.K <= sl.F, P, C)
-
-
-def _otm_iv(sl, P, C):
-    otm = _otm(sl, P, C)
-    is_c = sl.K > sl.F
-    iv = np.empty_like(sl.K)
-    iv[is_c] = bs.implied_vol(C[is_c], sl.S0, sl.K[is_c], sl.r, sl.T, sl.q, True)
-    iv[~is_c] = bs.implied_vol(P[~is_c], sl.S0, sl.K[~is_c], sl.r, sl.T, sl.q, False)
-    return otm, iv
-
-
-def _mass_mean(s, q):
-    q = np.maximum(np.asarray(q, dtype=float), 0.0)
-    s = np.asarray(s, dtype=float)
-    w = 0.5 * (q[1:] + q[:-1]) * np.diff(s)
-    sm = 0.5 * (s[1:] + s[:-1])
-    mass = float(w.sum())
-    mean = float((w * sm).sum() / mass) if mass > 1e-16 else float("nan")
-    return mass, mean
-
-
-def _prices_from_q(s, q, K, disc):
-    q = np.maximum(np.asarray(q, dtype=float), 0.0)
-    s = np.asarray(s, dtype=float)
-    K = np.asarray(K, dtype=float)
-    w = 0.5 * (q[1:] + q[:-1]) * np.diff(s)
-    sm = 0.5 * (s[1:] + s[:-1])
-    I0 = np.concatenate([[0.0], np.cumsum(w)])
-    I1 = np.concatenate([[0.0], np.cumsum(w * sm)])
-    mass = float(I0[-1])
-    i0 = np.interp(K, s, I0)
-    i1 = np.interp(K, s, I1)
-    P = disc * (K * i0 - i1)
-    C = disc * ((I1[-1] - i1) - K * (mass - i0))
-    return np.maximum(P, 0.0), np.maximum(C, 0.0), mass, (
-        float(I1[-1] / mass) if mass > 1e-16 else float("nan")
-    )
-
-
-def _ise(K, qh, q):
-    return float(np.trapezoid((qh - q) ** 2, K))
 
 
 def _style():
@@ -117,187 +65,6 @@ def _style():
     )
 
 
-def heston_ise():
-    p = BCC97
-    F = p.forward
-    K_eval = np.linspace(60.0, 150.0, 401)
-    q_true = heston_spot_density(K_eval, p)
-    print(f"Heston  S0={p.S0}  F={F:.4f}  T={p.T}")
-    rec = {}
-    plot_q = {}
-    for chain, K_obs in (
-        ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 64)),
-    ):
-        P = carr_madan_puts(K_obs, p)
-        C = np.maximum(P + p.S0 * np.exp(-p.q * p.T) - K_obs * p.disc, 0.0)
-        specs = (
-            ("Baseline", dict(tails=False, midpoints=False, twice=False)),
-            ("Tail completion", dict(tails=True, midpoints=False, twice=False)),
-            ("Tail+Midpoint", dict(tails=True, midpoints=True, twice=False)),
-            ("Tail+Mid+Twice", dict(tails=True, midpoints=True, twice=True)),
-        )
-        delta = float(np.median(np.diff(K_obs)))
-        hs = np.geomspace(max(0.20 * delta, 1e-3), max(30.0 * delta, 40.0), 40)
-        print(f"\n-- {chain}  m={len(K_obs)}")
-        rec[chain] = {}
-        for name, kw in specs:
-            def ise_at(h, _kw=kw):
-                out = estimate_rnd(
-                    K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h=h, **_kw
-                )
-                return _ise(K_eval, out["q"], q_true)
-
-            best, best_h = np.inf, hs[len(hs) // 2]
-            for h in hs:
-                err = ise_at(h)
-                if err < best:
-                    best, best_h = err, float(h)
-            mesh = estimate_rnd(
-                K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="mesh", **kw
-            )
-            den = estimate_rnd(
-                K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="density", **kw
-            )
-            ise_m = _ise(K_eval, mesh["q"], q_true)
-            ise_d = _ise(K_eval, den["q"], q_true)
-            rec[chain][name] = {
-                "h_star": best_h,
-                "ise_star": best,
-                "h_mesh": mesh["h"],
-                "ise_mesh": ise_m,
-                "h_den": den["h"],
-                "ise_den": ise_d,
-            }
-            print(
-                f"  [{name:18s}]  oracle h={best_h:.4g} ISE={best:.4e}  "
-                f"mesh h={mesh['h']:.4g} ISE={ise_m:.4e}  "
-                f"den h={den['h']:.4g} ISE={ise_d:.4e}"
-            )
-            if name == "Tail+Midpoint":
-                plot_q.setdefault(chain, {})["mid"] = mesh["q"]
-                plot_q[chain]["K"] = K_obs
-            if name == "Tail+Mid+Twice":
-                plot_q.setdefault(chain, {})["twice"] = mesh["q"]
-    _density_figure(
-        FIG / "ccdf_heston_rnd.pdf", K_eval, q_true, plot_q, "Heston RND"
-    )
-    return rec
-
-
-def _density_figure(path, K_eval, q_true, plot_q, true_label):
-    _style()
-    fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.6), sharey=True)
-    for ax, chain in zip(axes, ("dense", "sparse")):
-        ax.plot(K_eval, q_true, color="black", lw=2.0, label=true_label)
-        ax.plot(K_eval, plot_q[chain]["mid"], color="#1f77b4", lw=1.35, label="Tail+Midpoint")
-        ax.plot(
-            K_eval,
-            plot_q[chain]["twice"],
-            color="#d62728",
-            lw=1.35,
-            ls="--",
-            label="Tail+Mid+Twice",
-        )
-        if chain == "sparse":
-            ax.plot(
-                plot_q[chain]["K"],
-                np.interp(plot_q[chain]["K"], K_eval, q_true),
-                "k.",
-                ms=4,
-                alpha=0.55,
-            )
-        ax.set_xlabel(r"Strike $K$")
-        ax.set_xlim(60.0, 150.0)
-        ax.set_ylim(bottom=0.0)
-        ax.set_title(r"Dense, $m=256$" if chain == "dense" else r"Sparse, $m=64$")
-        ax.legend(frameon=False, loc="upper right")
-    axes[0].set_ylabel(r"$f_{\mathbb{Q}}(K)$")
-    fig.tight_layout()
-    fig.savefig(path, facecolor="white")
-    plt.close(fig)
-    print(f"  wrote {path.name}")
-
-
-def _exact_ise(label, p, C_obs_fn, q_true, K_eval):
-    """Oracle / mesh / density-scale ISE for the four nested estimators."""
-    rec = {}
-    print(f"{label}  S0={p.S0}  F={p.forward:.4f}  T={p.T}")
-    for chain, K_obs in (
-        ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 64)),
-    ):
-        C = np.maximum(C_obs_fn(K_obs), 0.0)
-        specs = (
-            ("Baseline", dict(tails=False, midpoints=False, twice=False)),
-            ("Tail completion", dict(tails=True, midpoints=False, twice=False)),
-            ("Tail+Midpoint", dict(tails=True, midpoints=True, twice=False)),
-            ("Tail+Mid+Twice", dict(tails=True, midpoints=True, twice=True)),
-        )
-        delta = float(np.median(np.diff(K_obs)))
-        hs = np.geomspace(max(0.20 * delta, 1e-3), max(30.0 * delta, 40.0), 40)
-        print(f"\n-- {chain}  m={len(K_obs)}")
-        rec[chain] = {}
-        for name, kw in specs:
-            def ise_at(h, _kw=kw):
-                out = estimate_rnd(
-                    K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h=h, **_kw
-                )
-                return _ise(K_eval, out["q"], q_true)
-
-            best, best_h = np.inf, hs[len(hs) // 2]
-            for h in hs:
-                err = ise_at(h)
-                if err < best:
-                    best, best_h = err, float(h)
-            mesh = estimate_rnd(
-                K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="mesh", **kw
-            )
-            den = estimate_rnd(
-                K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="density", **kw
-            )
-            ise_m = _ise(K_eval, mesh["q"], q_true)
-            ise_d = _ise(K_eval, den["q"], q_true)
-            rec[chain][name] = {
-                "h_star": best_h,
-                "ise_star": best,
-                "h_mesh": mesh["h"],
-                "ise_mesh": ise_m,
-                "h_den": den["h"],
-                "ise_den": ise_d,
-            }
-            print(
-                f"  [{name:18s}]  oracle h={best_h:.4g} ISE={best:.4e}  "
-                f"mesh h={mesh['h']:.4g} ISE={ise_m:.4e}  "
-                f"den h={den['h']:.4g} ISE={ise_d:.4e}"
-            )
-    return rec
-
-
-def vg_ise():
-    p = CM99
-    K_eval = np.linspace(60.0, 150.0, 401)
-    q_true = vg_spot_density(K_eval, p)
-    rec = _exact_ise("VG", p, lambda K: vg_calls(K, p), q_true, K_eval)
-    plot_q = {}
-    for chain, K_obs in (
-        ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 64)),
-    ):
-        C = np.maximum(vg_calls(K_obs, p), 0.0)
-        mid = estimate_rnd(
-            K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="mesh",
-            tails=True, midpoints=True, twice=False,
-        )
-        tw = estimate_rnd(
-            K_obs, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h="mesh",
-            tails=True, midpoints=True, twice=True,
-        )
-        plot_q[chain] = {"mid": mid["q"], "twice": tw["q"], "K": K_obs}
-    _density_figure(FIG / "ccdf_vg_rnd.pdf", K_eval, q_true, plot_q, "VG RND")
-    return rec
-
-
 def _projected_calls(K, C, r, T, F):
     """λ=0 decreasing convex call. Shared input of every listed estimator."""
     K = np.asarray(K, dtype=float)
@@ -308,21 +75,6 @@ def _projected_calls(K, C, r, T, F):
     return np.maximum(np.asarray(m, dtype=float), 0.0)
 
 
-def _holdout_ours(sl, twice=True):
-    idx = np.arange(len(sl.K))
-    rmses = []
-    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
-        C_tr = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
-        out = estimate_rnd(
-            sl.K[train], C_tr, sl.S0, sl.r, sl.T, sl.q, twice=twice
-        )
-        P_te, C_te = out["interpolant"](sl.K[test])
-        otm_hat = np.where(sl.K[test] <= sl.F, P_te, C_te)
-        otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
-        rmses.append(_rmse(otm_hat, otm_true))
-    return float(np.mean(rmses))
-
-
 def _parity(sl, C):
     """Floored call and the parity put, also floored."""
     C = np.maximum(np.asarray(C, dtype=float), 0.0)
@@ -330,259 +82,297 @@ def _parity(sl, C):
     return P, C
 
 
-def _folds(n):
-    idx = np.arange(n)
-    return ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0))
+def _otm_iv(sl, P, C):
+    is_c = sl.K > sl.F
+    iv = np.empty_like(sl.K, dtype=float)
+    iv[is_c] = bs.implied_vol(C[is_c], sl.S0, sl.K[is_c], sl.r, sl.T, sl.q, True)
+    iv[~is_c] = bs.implied_vol(P[~is_c], sl.S0, sl.K[~is_c], sl.r, sl.T, sl.q, False)
+    return iv
 
 
-def _otm_rmse_slice(sl, C_hat, test=None):
-    if test is None:
-        test = np.ones(len(sl.K), dtype=bool)
-    C_hat = np.asarray(C_hat, dtype=float)
-    P = np.maximum(
-        C_hat - sl.S0 * np.exp(-sl.q * sl.T) + sl.K[test] * sl.disc, 0.0
-    )
-    C_hat = np.maximum(C_hat, 0.0)
-    otm_hat = np.where(sl.K[test] <= sl.F, P, C_hat)
-    otm_true = np.where(sl.K[test] <= sl.F, sl.P[test], sl.C[test])
-    return _rmse(otm_hat, otm_true)
+def _ise(x, q, qt):
+    return float(np.trapezoid((np.nan_to_num(q) - qt) ** 2, x))
 
 
-def _holdout_tuned(sl, method):
-    """Even/odd hold-out. Tuning uses only the training strikes."""
+def _exact(label, p, calls, q_true, K_eval):
+    print(f"\n{label}")
+    rec = {}
+    plot = {}
+    for chain, K in (
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
+    ):
+        C = np.maximum(calls(K), 0.0)
+        delta = float(np.median(np.diff(K)))
+        hs = np.geomspace(max(0.2 * delta, 1e-3), max(30.0 * delta, 40.0), 36)
+        print(f"  -- {chain}")
+        rec[chain] = {}
+        specs = (
+            ("Quoted spline", False, False),
+            ("Tails", True, False),
+            ("Tails+Twice", True, True),
+        )
+        for name, tails, twice in specs:
+            best, best_h = np.inf, hs[len(hs) // 2]
+            for h in hs:
+                q = estimate_cubic(
+                    K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval,
+                    h=float(h), tails=tails, twice=twice,
+                )["q"]
+                err = _ise(K_eval, q, q_true)
+                if err < best:
+                    best, best_h = err, float(h)
+            mesh_h = float(estimate_rnd(K, C, p.S0, p.r, p.T, p.q, h="mesh")["h"])
+            den_h = float(estimate_rnd(K, C, p.S0, p.r, p.T, p.q, h="density")["h"])
+            h_rule = 0.55 * den_h
+            q_m = estimate_cubic(
+                K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval,
+                h=mesh_h, tails=tails, twice=twice,
+            )["q"]
+            q_d = estimate_cubic(
+                K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval,
+                h=h_rule, tails=tails, twice=twice,
+            )["q"]
+            rec[chain][name] = dict(
+                h_star=best_h, ise_star=best,
+                h_mesh=mesh_h, ise_mesh=_ise(K_eval, q_m, q_true),
+                h_den=h_rule, ise_den=_ise(K_eval, q_d, q_true),
+            )
+            row = rec[chain][name]
+            print(
+                f"    {name:16} oracle {row['h_star']:.4g} {row['ise_star']:.4e}  "
+                f"mesh {row['h_mesh']:.4g} {row['ise_mesh']:.4e}  "
+                f"rule {row['h_den']:.4g} {row['ise_den']:.4e}"
+            )
+            if name == "Tails":
+                plot.setdefault(chain, {})["mid"] = q_m
+                plot[chain]["K"] = K
+            if name == "Tails+Twice":
+                plot.setdefault(chain, {})["twice"] = q_m
+        # figure uses the density-scale heuristic, the one used on listed chains
+        q_fig = estimate_cubic(
+            K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval,
+            h=0.55 * float(estimate_rnd(K, C, p.S0, p.r, p.T, p.q, h="density")["h"]),
+            tails=True, twice=True,
+        )["q"]
+        plot[chain]["rule"] = q_fig
+    return rec, plot, K_eval, q_true
+
+
+def _figure_exact(path, K_eval, q_true, plot, title):
+    _style()
+    fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.6), sharey=True)
+    for ax, chain in zip(axes, ("dense", "sparse")):
+        ax.plot(K_eval, q_true, color="black", lw=2.0, label=title)
+        ax.plot(K_eval, np.maximum(plot[chain]["twice"], 0), color="#1f77b4", lw=1.35, label="Ours, mesh")
+        ax.plot(K_eval, np.maximum(plot[chain]["rule"], 0), color="#d62728", lw=1.35, ls="--", label=r"Ours, $0.55h$")
+        if chain == "sparse":
+            ax.plot(
+                plot[chain]["K"], np.interp(plot[chain]["K"], K_eval, q_true),
+                linestyle="none", marker="o", ms=3.4, mfc="white", mec="black", mew=0.7, zorder=5,
+            )
+        ax.set_xlim(60, 150)
+        ax.set_ylim(bottom=0)
+        ax.set_xlabel(r"Strike $K$")
+        ax.set_title("Dense, $m=256$" if chain == "dense" else "Sparse, $m=32$")
+        ax.legend(frameon=False)
+    axes[0].set_ylabel(r"$f_{\mathbb{Q}}(K)$")
+    fig.tight_layout(w_pad=2.4)
+    fig.savefig(path, facecolor="white")
+    plt.close(fig)
+    print(" wrote", path.name)
+
+
+def _otm(sl, C_hat):
+    C_hat = np.maximum(np.asarray(C_hat, float), 0.0)
+    stock = sl.S0 * np.exp(-sl.q * sl.T)
+    disc = np.exp(-sl.r * sl.T)
+    P = np.maximum(C_hat - stock + sl.K * disc, 0.0)
+    mkt = np.where(sl.K <= sl.F, sl.P, sl.C)
+    hat = np.where(sl.K <= sl.F, P, C_hat)
+    e = hat - mkt
+    left, right = sl.K <= sl.F, sl.K > sl.F
+
+    def r(m):
+        return float(np.sqrt(np.mean(e[m] ** 2)))
+
+    return r(np.ones(len(e), bool)), r(left), r(right)
+
+
+def _mass_peaks(F, q, s):
+    qq = np.maximum(np.nan_to_num(q), 0.0)
+    mass = float(np.trapezoid(qq, s))
+    core = (s >= 0.55 * F) & (s <= 1.40 * F)
+    y = qq[core]
+    peaks = 0
+    if y.size > 4 and np.nanmax(y) > 0:
+        peaks = int(np.sum((y[1:-1] > y[:-2]) & (y[1:-1] > y[2:]) & (y[1:-1] > 0.2 * y.max())))
+    return mass, peaks
+
+
+def _holdout(sl, C_in):
+    idx = np.arange(len(sl.K))
     errs = []
-    for train, test in _folds(len(sl.K)):
-        Kt = sl.K[train]
-        Ct = _projected_calls(Kt, sl.C[train], sl.r, sl.T, sl.F)
-        Ke = sl.K[test]
-        if method == "yh":
-            lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            C_te, _ = yatchew_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, lam)
-        elif method == "asd":
-            h_p, _h_d = asd_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            C_te, _, _ = asd_fit(
-                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h_p, _h_d
-            )
-        elif method == "pca":
-            h = pca_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            C_te, _, _, _, _ = pca_fit(Kt, Ct, sl.r, sl.T, sl.F, h, Ke, Ke[:1])
-        elif method == "pc":
-            h = estimate_rnd(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, twice=True)["h"]
-            _, _, C_te = priestley_chao_cubic(
-                Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
-            )
-        else:
-            raise ValueError(method)
-        errs.append(_otm_rmse_slice(sl, C_te, test))
+    for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
+        Kt, Ct = sl.K[train], C_in[train]
+        h = 0.55 * float(estimate_rnd(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, h="density")["h"])
+        fit = estimate_cubic(
+            Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K[test], sl.K[test], h=h, tails=True, twice=True
+        )
+        o, _, _ = _otm_slice(sl, test, fit["C"])
+        errs.append(o)
     return float(np.mean(errs))
 
 
-def _pack(sl, P, C, q, s_grid, ho, iv_mkt, **extra):
-    otm, iv = _otm_iv(sl, P, C)
-    otm_mkt = _otm(sl, sl.P, sl.C)
-    left, right = sl.K <= sl.F, sl.K > sl.F
-    mass, mean = _mass_mean(s_grid, q)
-    rec = {
-        "otm": _rmse(otm, otm_mkt),
-        "puts": _rmse(otm[left], otm_mkt[left]),
-        "calls": _rmse(otm[right], otm_mkt[right]),
-        "iv": _rmse(iv, iv_mkt),
-        "mass": mass,
-        "mean": mean,
-        "ho": ho,
-        "q": q,
-        "iv_series": iv,
-        "P": P,
-        "C": C,
-    }
-    rec.update(extra)
-    return rec
+def _otm_slice(sl, test, C_hat):
+    K = sl.K[test]
+    C_hat = np.maximum(np.asarray(C_hat, float), 0.0)
+    stock = sl.S0 * np.exp(-sl.q * sl.T)
+    disc = np.exp(-sl.r * sl.T)
+    P = np.maximum(C_hat - stock + K * disc, 0.0)
+    mkt = np.where(K <= sl.F, sl.P[test], sl.C[test])
+    hat = np.where(K <= sl.F, P, C_hat)
+    e = hat - mkt
+    return float(np.sqrt(np.mean(e ** 2))), None, None
 
 
-def _print_row(name, rec, extra=""):
-    print(
-        f"  [{name:22s}]  OTM={rec['otm']:.3f} (puts {rec['puts']:.3f}, "
-        f"calls {rec['calls']:.3f})  mass={rec['mass']:.2f}  "
-        f"hold-out={rec['ho']:.3f}{extra}"
-    )
+def listed():
+    print("\nListed")
+    rows = []
+    scored = []
+    for csv, title in (
+        ("spx_20261218.csv", "SPX Dec"),
+        ("spx_20270319.csv", "SPX Mar"),
+        ("ndx_20261218.csv", "NDX Dec"),
+        ("rut_20261218.csv", "RUT Dec"),
+    ):
+        sl = load_slice(RES / csv)
+        C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
+        h = 0.55 * float(estimate_rnd(sl.K, C, sl.S0, sl.r, sl.T, sl.q, h="density")["h"])
+        s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
+        fit = estimate_cubic(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, s, sl.K, h=h, tails=True, twice=True)
+        o, pu, ca = _otm(sl, fit["C"])
+        mass, pk = _mass_peaks(sl.F, fit["q"], s)
+        ho = _holdout(sl, C)
+        print(f"  {title:8} h={h:.2f} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} hold {ho:.3f} mass {mass:.2f} peaks {pk}")
+        q_pc, _, _ = priestley_chao_cubic(sl.K, C, sl.S0, sl.r, sl.T, s, q=sl.q, h=h, return_call=True)
+        _, _, Cpc = priestley_chao_cubic(sl.K, C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h, return_call=True)
+        op, pp, cp = _otm(sl, Cpc)
+        mp, kp = _mass_peaks(sl.F, q_pc, s)
+        print(f"  {'PC':8} h={h:.2f} OTM {op:.3f} puts {pp:.3f} calls {cp:.3f} mass {mp:.2f} peaks {kp}")
+        rows.append((title, h, o, pu, ca, ho, mass, pk, op, pp, cp, mp))
+        scored.append((title, sl, C, fit, h, s, q_pc))
+    _plot_listed(scored)
+    return rows, scored
 
 
-def score_listed(sl, title):
-    print("\n" + "=" * 72)
-    print(title)
-    print("=" * 72)
-    s_grid = np.linspace(max(50.0, 0.20 * sl.F), 2.40 * sl.F, 2401)
-    otm_mkt = _otm(sl, sl.P, sl.C)
-    _, iv_mkt = _otm_iv(sl, sl.P, sl.C)
-    left, right = sl.K <= sl.F, sl.K > sl.F
-    C_in = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
-    ours = estimate_rnd(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, K_eval=s_grid, twice=True)
-    print(
-        f"  n={len(sl.K)}  n_R={ours['n_right']}  n_ext={ours['n_ext']}  "
-        f"F={sl.F:.0f}  S={sl.S0:.0f}  T={sl.T:.3f}  "
-        f"σ={atm_iv(sl):.3f}  K=[{sl.K[0]:.0f},{sl.K[-1]:.0f}]"
-    )
-    rec_o = _pack(
-        sl, ours["P"], ours["C"], ours["q"], s_grid, _holdout_ours(sl, twice=True), iv_mkt, h=ours["h"]
-    )
-    _print_row("Ours", rec_o, extra=f"  h={ours['h']:.4f}")
-
-    lam = yatchew_cv_lambda(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_yh, m_yh = yatchew_fit(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, lam)
-    P_yh, C_yh = _parity(sl, C_yh)
-    q_yh = np.interp(s_grid, sl.K, _second_diff_q(sl.K, m_yh, sl.r * sl.T), left=0.0, right=0.0)
-    rec_y = _pack(sl, P_yh, C_yh, q_yh, s_grid, _holdout_tuned(sl, "yh"), iv_mkt, lam=lam)
-    _print_row("Yatchew–Härdle", rec_y, extra=f"  lam={lam:.4g}")
-
-    h_asd, h_asd_d = asd_cv_bandwidth(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_asd, q_asd, _ = asd_fit(
-        sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s_grid, h_asd, h_asd_d
-    )
-    P_asd, C_asd = _parity(sl, C_asd)
-    rec_asd = _pack(
-        sl, P_asd, C_asd, q_asd, s_grid, _holdout_tuned(sl, "asd"), iv_mkt,
-        h=h_asd, h_dens=h_asd_d,
-    )
-    _print_row("Aït-Sahalia–Duarte", rec_asd, extra=f"  h={h_asd:.4f}")
-
-    h_pca = pca_cv_bandwidth(sl.K, C_in, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_p, q_pca, _, _, _ = pca_fit(sl.K, C_in, sl.r, sl.T, sl.F, h_pca, sl.K, s_grid)
-    P_p, C_p = _parity(sl, C_p)
-    rec_p = _pack(sl, P_p, C_p, q_pca, s_grid, _holdout_tuned(sl, "pca"), iv_mkt, h=h_pca)
-    _print_row("PCA", rec_p, extra=f"  h={h_pca:.4f}")
-
-    h_pc = float(ours["h"])
-    q_pc, _, C_pc = priestley_chao_cubic(
-        sl.K, C_in, sl.S0, sl.r, sl.T, s_grid, q=sl.q, h=h_pc, return_call=True
-    )
-    # Prices are the smoothed cubic at the quoted strikes, not at s_grid.
-    _, _, C_pc = priestley_chao_cubic(
-        sl.K, C_in, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h_pc, return_call=True
-    )
-    P_pc, C_pc = _parity(sl, C_pc)
-    rec_pc = _pack(sl, P_pc, C_pc, q_pc, s_grid, _holdout_tuned(sl, "pc"), iv_mkt, h=h_pc)
-    _print_row("Priestley–Chao", rec_pc, extra=f"  h={h_pc:.4f}")
-    return {
-        "sl": sl,
-        "s_grid": s_grid,
-        "iv_mkt": iv_mkt,
-        "ours": rec_o,
-        "pc": rec_pc,
-        "yh": rec_y,
-        "asd": rec_asd,
-        "pca": rec_p,
-        "title": title,
-    }
+def _iv_ylim(columns):
+    cols = []
+    for v in columns:
+        v = np.asarray(v, float)
+        v = v[np.isfinite(v)]
+        if v.size:
+            cols.append(v)
+    if not cols:
+        return 0.08, 0.55
+    lo = float(np.percentile(cols[0], 1))
+    hi = float(np.percentile(cols[0], 99))
+    span = max(hi - lo, 0.04)
+    lo -= 0.08 * span
+    hi += 0.12 * span
+    for v in cols[1:]:
+        a = float(np.percentile(v, 5))
+        b = float(np.percentile(v, 95))
+        lo = min(lo, max(a, lo - 0.2 * span))
+        hi = max(hi, min(b, hi + 0.25 * span))
+    return max(0.02, lo), hi
 
 
-def plot_listed(rows):
-    """rows: list of score_listed dicts to show (December SPX, NDX, RUT)."""
+def _plot_listed(scored):
+    want = {"SPX Dec", "NDX Dec", "RUT Dec"}
     _style()
-    fig, axes = plt.subplots(len(rows), 2, figsize=(9.6, 3.15 * len(rows)))
-    if len(rows) == 1:
-        axes = np.array([axes])
-    for axrow, rec in zip(axes, rows):
-        axq, axiv = axrow
-        sl, s = rec["sl"], rec["s_grid"]
-        lo, hi = 0.55 * sl.F, 1.40 * sl.F
-        q_o = np.maximum(rec["ours"]["q"], 0.0)
-        q_pc = np.maximum(rec["pc"]["q"], 0.0)
-        q_a = np.maximum(rec["asd"]["q"], 0.0)
-        q_p = np.maximum(rec["pca"]["q"], 0.0)
-        axq.plot(s, q_o, color="#1f77b4", lw=1.4, label="Ours")
-        axq.plot(s, q_a, color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte")
-        axq.plot(s, q_p, color="#2ca02c", lw=1.4, ls="-.", label="PCA")
-        axq.plot(s, q_pc, color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao")
+    fig, axes = plt.subplots(3, 2, figsize=(9.6, 8.4))
+    for row, (title, sl, C, fit, h, s, q_pc) in enumerate(x for x in scored if x[0] in want):
+        # Densities at each method's own rule. ASD and PCA bandwidths are
+        # cross-validated or the n^{-1/9} rule; Priestley–Chao uses h above.
+        h_asd, h_asd_d = asd_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+        _, q_asd, _ = asd_fit(
+            sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K[:2], s, h_asd, h_asd_d
+        )
+        h_pca = pca_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+        C_pca, q_pca, _, _, _ = pca_fit(sl.K, C, sl.r, sl.T, sl.F, h_pca, sl.K, s)
+        lam = yatchew_cv_lambda(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+        C_yh, _ = yatchew_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, lam)
+        _, _, C_pc = priestley_chao_cubic(
+            sl.K, C, sl.S0, sl.r, sl.T, sl.K, q=sl.q, h=h, return_call=True
+        )
+        print(
+            f"  fig {title}: ASD h={h_asd_d:.1f}  PCA h={h_pca:.4f}  "
+            f"YH λ={lam:.4g}  PC h={h:.1f}"
+        )
+        ax = axes[row, 0]
+        ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.4, label="Ours")
+        ax.plot(s, np.maximum(q_asd, 0), color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte")
+        ax.plot(s, np.maximum(q_pca, 0), color="#2ca02c", lw=1.15, ls="-.", label="PCA")
+        ax.plot(s, np.maximum(q_pc, 0), color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao")
+        ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
+        ax.set_xlim(0.55 * sl.F, 1.40 * sl.F)
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
-        peaks = [
-            float(np.nanmax(q_o[core])),
-            float(np.nanmax(q_a[core])),
-            float(np.nanmax(q_p[core])),
-        ]
-        pc_peak = float(np.nanmax(np.maximum(q_pc[core], 0.0)))
-        if pc_peak <= 2.5 * max(peaks):
-            peaks.append(pc_peak)
-        ymax = 1.12 * max(max(peaks), 1e-12)
-        axq.axvline(sl.F, color="0.5", ls="--", lw=0.8)
-        axq.set_xlim(lo, hi)
-        axq.set_ylim(0.0, ymax)
-        axq.set_ylabel(r"$f_{\mathbb{Q}}(K)$")
-        axq.set_title(rec["title"])
-        axq.legend(frameon=False, loc="upper right")
-        axq.set_xlabel(r"Strike $K$")
+        ymax = np.nanmax(np.maximum(fit["q"][core], 0))
+        ax.set_ylim(0, 1.15 * ymax)
+        ax.set_title(title)
+        ax.set_xlabel(r"Strike $K$")
+        ax.legend(frameon=False, fontsize=7.5, loc="upper right")
+        if row == 0:
+            ax.set_ylabel(r"$f_{\mathbb{Q}}(K)$")
 
-        iv_m = rec["iv_mkt"]
+        P_c, C_c = _parity(sl, fit["C"])
+        P_yh, C_yh = _parity(sl, C_yh)
+        P_pca, C_pca = _parity(sl, C_pca)
+        P_pc, C_pc = _parity(sl, C_pc)
+        iv = _otm_iv(sl, P_c, C_c)
+        iv_yh = _otm_iv(sl, P_yh, C_yh)
+        iv_pca = _otm_iv(sl, P_pca, C_pca)
+        iv_pc = _otm_iv(sl, P_pc, C_pc)
+        iv_m = _otm_iv(sl, sl.P, sl.C)
+        lo, hi = 0.55 * sl.F, 1.40 * sl.F
         show = np.isfinite(iv_m) & (sl.K >= lo) & (sl.K <= hi)
-        axiv.set_xlim(lo, hi)
-        ivs = iv_m[show]
-        y1 = float(np.nanpercentile(ivs, 5)) - 0.02 if ivs.size else 0.08
-        y2 = float(np.nanpercentile(ivs, 95)) + 0.04 if ivs.size else 0.45
-        axiv.set_ylim(max(0.05, y1), min(0.55, y2))
-        axiv.plot(sl.K[show], iv_m[show], "k.", ms=3, alpha=0.40, label="Market")
-        axiv.plot(sl.K[show], rec["ours"]["iv_series"][show], color="#1f77b4", lw=1.2, label="Ours")
-        axiv.plot(
-            sl.K[show], rec["yh"]["iv_series"][show], color="#ff7f0e", lw=1.2, ls=":", label="Yatchew–Härdle"
+        ax = axes[row, 1]
+        ax.set_xlim(lo, hi)
+        y1, y2 = _iv_ylim(
+            [iv_m[show], iv[show], iv_yh[show], iv_pca[show], iv_pc[show]]
         )
-        axiv.plot(
-            sl.K[show], rec["pca"]["iv_series"][show], color="#2ca02c", lw=1.2, ls="-.", label="PCA"
-        )
-        axiv.plot(
-            sl.K[show], rec["pc"]["iv_series"][show], color="#9467bd", lw=1.2, ls=":", label="Priestley–Chao"
-        )
-        axiv.axvline(sl.F, color="0.5", ls="--", lw=0.8)
-        axiv.set_ylabel("OTM implied vol")
-        axiv.set_xlabel(r"Strike $K$")
-        axiv.legend(frameon=False, loc="upper right")
+        ax.set_ylim(y1, y2)
+        ax.plot(sl.K[show], iv_m[show], "k.", ms=2.6, alpha=0.40, label="Market", zorder=2)
+        ax.plot(sl.K[show], iv_pc[show], color="#9467bd", lw=1.15, ls=":", label="Priestley–Chao", zorder=3)
+        ax.plot(sl.K[show], iv_pca[show], color="#2ca02c", lw=1.15, ls="-.", label="PCA", zorder=4)
+        ax.plot(sl.K[show], iv_yh[show], color="#ff7f0e", lw=1.15, ls=":", label="Yatchew–Härdle", zorder=5)
+        ax.plot(sl.K[show], iv[show], color="#1f77b4", lw=1.35, label="Ours", zorder=6)
+        ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
+        ax.set_xlabel(r"Strike $K$")
+        ax.legend(frameon=False, fontsize=7.5, loc="upper right")
+        if row == 0:
+            ax.set_ylabel("OTM implied vol")
     fig.tight_layout()
     fig.savefig(FIG / "ccdf_listed.pdf", facecolor="white")
     plt.close(fig)
-    print("  wrote ccdf_listed.pdf")
-
-
-def listed_slice(csv_name, json_name, symbol, expiry, asof, root="SPX"):
-    """Load the working OTM slice from CSV; fall back to a CBOE JSON snapshot."""
-    csv_path = RES / csv_name
-    if csv_path.exists():
-        return load_slice(csv_path)
-    raw = fetch_cboe(RES / json_name, symbol=symbol)
-    sl = build_otm_slice(raw, expiry=expiry, r=0.04, root=root, asof=asof)
-    save_slice(sl, csv_path)
-    return sl
+    print(" wrote ccdf_listed.pdf")
 
 
 def main():
-    heston_ise()
-    vg_ise()
-    spx_dec = score_listed(
-        listed_slice(
-            "spx_20261218.csv", "cboe_spx.json", "SPX",
-            date(2026, 12, 18), date(2026, 9, 23),
-        ),
-        "SPX 18 Dec 2026",
+    K_eval = np.linspace(60.0, 150.0, 401)
+    p = BCC97
+    rec_h, plot_h, _, qh = _exact(
+        "Heston", p, lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc, 
+        heston_spot_density(K_eval, p), K_eval,
     )
-    spx_mar = score_listed(
-        listed_slice(
-            "spx_20270319.csv", "cboe_spx.json", "SPX",
-            date(2027, 3, 19), date(2026, 9, 23),
-        ),
-        "SPX 19 Mar 2027",
-    )
-    ndx_dec = score_listed(
-        listed_slice(
-            "ndx_20261218.csv", "cboe_ndx.json", "NDX",
-            date(2026, 12, 18), date(2026, 9, 23), root="NDX",
-        ),
-        "NDX 18 Dec 2026",
-    )
-    rut_dec = score_listed(
-        listed_slice(
-            "rut_20261218.csv", "cboe_rut.json", "RUT",
-            date(2026, 12, 18), date(2026, 9, 23), root="RUT",
-        ),
-        "RUT 18 Dec 2026",
-    )
-    plot_listed([spx_dec, ndx_dec, rut_dec])
-    return spx_dec, spx_mar, ndx_dec, rut_dec
+    # the calls() above double-counts because carr_madan_puts returns puts; fix in _exact by passing C
+    _figure_exact(FIG / "ccdf_heston_rnd.pdf", K_eval, qh, plot_h, "Heston")
+    v = CM99
+    rec_v, plot_v, _, qv = _exact("VG", v, lambda K: vg_calls(K, v), vg_spot_density(K_eval, v), K_eval)
+    _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
+    listed()
+    print("DONE")
 
 
 if __name__ == "__main__":
