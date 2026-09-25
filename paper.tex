@@ -51,7 +51,7 @@ This paper estimates the density from a single-maturity strip by rescaling the c
 
 The usual split in this literature is that interpolants of the call or of implied volatility reprice listed quotes well and do not yield a usable density, while methods that are densities by construction cannot interpolate a dense, slightly arbitrageable chain. \citeauthor{bondarenko2003}'s method is a sieve of fixed dimension: it does not become finer as more strikes arrive, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by the nearest decreasing convex list; the second differences of that list are a discrete nonnegative measure, not a curve. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. The estimator of this paper returns a closed-form smooth estimate of \(f_{\Q}\) and, from the same smoothing, a call interpolant. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) sits next to the projection of \citet{yatchew2006} and the mixture of \citeauthor{bondarenko2003}. The cubic of \citet{priestley1972} uses the same bandwidth, \eqref{eq:h-den}. The interpolant can lie below the \citeauthor{yatchew2006} floor because it is not required to be convex. 
 
-The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} derives the characteristic function of the normalized call and the closed-form estimator, and compares it to kernel smoothing of the call. Section~\ref{sec:refine} records three refinements: a cubic spline of \(P\), tails, and twicing. Section~\ref{sec:h} chooses the bandwidth. Section~\ref{sec:ifc} proves in-fill consistency and illustrates it on exact Heston and variance-gamma quotes. Section~\ref{sec:emp} presents an empirical illustration that evaluates our estimator against four alternative methods on four listed chains. Section~\ref{sec:conc} concludes.
+The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} derives the characteristic function of the normalized call and the closed-form estimator, and compares it to kernel smoothing of the call. Section~\ref{sec:refine} records two refinements: tails and twicing. Section~\ref{sec:h} chooses the bandwidth. Section~\ref{sec:ifc} proves in-fill consistency and illustrates it on exact Heston and variance-gamma quotes. Section~\ref{sec:emp} presents an empirical illustration that evaluates our estimator against four alternative methods on four listed chains. Section~\ref{sec:conc} concludes.
 
 \section{Related Work}
 \label{sec:lit}
@@ -62,7 +62,7 @@ A first family of methods specifies the density of \(S_T\) as a parametric curve
 
 A second, and in applied work the most common, family interpolates the Black--Scholes implied-volatility function of strike and converts the interpolant back to prices before differentiating twice. \citet{shimko1993} fitted a quadratic in strike; \citet{malz1997} used a cubic spline in delta; \citet{bliss2002} a smoothing spline. \citet{figlewski2010} completes the tails with a generalized extreme-value distribution. Because implied volatility is a much flatter function of strike than the call itself, a low-order interpolant often has small bias when quotes are accurate. The drawback is that implied volatility is a nonlinear transformation that inflates price noise where the derivative of price with respect to implied volatility is small, i.e.\ in the tails. An interpolating spline then treats those noisy tail quotes as exact, and the second derivative of the resulting call curve oscillates and can become negative. Shape-constrained smoothers of the implied-volatility surface \citep{fengler2005,fengler2009,gatheraljacquier2014,ludwig2015} address the sign problem at the cost of a more involved optimization.
 
-A third family estimates the call as a function of strike by kernel regression or local polynomials and obtains the second derivative from the fit. \citet{priestley1972} fitted a kernel to observed function values at the design points; the risk-neutral density is obtained by differentiating that fit twice. \citet{aitsahalia1998} estimated the call as a function of \((S,K,T,r,q)\) by kernel regression; \citet{aitsahalia2000} used the estimator to recover an implied risk-aversion function. The method is data intensive and, in the original application, pooled option prices across many trading dates. \citet{aitsahalia2003} developed a local polynomial estimator that imposes monotonicity and convexity of \(C\) in \(K\), hence nonnegativity of the density. Related constrained least-squares estimators are studied by \citet{yatchew2006} and \citet{birke2009}; \citet{grith2012} survey the kernel literature. \citet{fanmancini2009} combine a parametric guide with a nonparametric correction. In each case the density is the second strike derivative of a smoother of \(C\). The estimator of Section~\ref{sec:est} rescales the calls to a complementary cumulative distribution function (cdf) and applies the kernel to the empirical jump measure, so the formula is a first derivative of a Gaussian kernel density and is a finite sum. Section~\ref{sec:naive} records the comparison. Section~\ref{sec:emp} implements the cubic of Section~\ref{sec:naive} at the bandwidth \eqref{eq:h-den}, and the two-step procedure of \citeauthor{aitsahalia2003}: a least-squares projection of the quoted calls onto the decreasing convex cone, followed by a local polynomial of the constrained values whose pricing bandwidth is chosen the same way.
+A third family estimates the call as a function of strike by kernel regression or local polynomials and obtains the second derivative from the fit. \citet{priestley1972} fitted a kernel to observed function values at the design points; the risk-neutral density is obtained by differentiating that fit twice. \citet{aitsahalia1998} estimated the call as a function of \((S,K,T,r,q)\) by kernel regression; \citet{aitsahalia2000} used the estimator to recover an implied risk-aversion function. The method is data intensive and, in the original application, pooled option prices across many trading dates. \citet{aitsahalia2003} developed a local polynomial estimator that imposes monotonicity and convexity of \(C\) in \(K\), hence nonnegativity of the density. Related constrained least-squares estimators are studied by \citet{yatchew2006} and \citet{birke2009}; \citet{grith2012} survey the kernel literature. \citet{fanmancini2009} combine a parametric guide with a nonparametric correction. In each case the density is the second strike derivative of a smoother of \(C\). The estimator of Section~\ref{sec:est} rescales the calls to a complementary cumulative distribution function (cdf), interpolates that function by a cubic spline, and smooths the spline with a Gaussian kernel. The convolution is closed form. Section~\ref{sec:naive} records the comparison. Section~\ref{sec:emp} implements the cubic of Section~\ref{sec:naive} at the bandwidth \eqref{eq:h-den}, and the two-step procedure of \citeauthor{aitsahalia2003}: a least-squares projection of the quoted calls onto the decreasing convex cone, followed by a local polynomial of the constrained values whose pricing bandwidth is chosen the same way.
 
 \citet{bondarenko2003} proposed the positive convolution approximation (PCA). The density is required to lie in the set of functions obtained by convolving a discrete probability with a positive kernel, and the discrete probability is chosen to minimize the sum of squared pricing errors. The kernel enforces smoothness and, together with positive weights, guarantees that the result is a density. In \citeauthor{bondarenko2003}'s comparison, the method dominated mixtures of lognormals, Hermite expansions, and several regularization methods. Subsequent simulation evidence on affine jump-diffusions is consistent with this ranking \citep{lu2019}. Section~\ref{sec:emp} implements a log-price analog: forty-one lognormals of common width, centered on a uniform grid in log strike from the first quoted strike to the last, fitted by nonnegative least squares. Sum-to-one and forward-mean penalties stay penalties; the weights are not rescaled after the fit. The width is chosen by even/odd pricing error. The same section chooses the \citeauthor{yatchew2006} roughness penalty the same way.
 
@@ -170,59 +170,36 @@ f_{\Q}(K)
 \frac{F}{2\pi}\int_{-\infty}^{\infty}e^{-\mathrm{i}s K}\,(\mathrm{i}s)\,\varphi_P(s)\,\mathrm{d}s.
 \end{equation}
 
-Observed calls at strikes \(0<K_1<\cdots<K_m\) supply an empirical complementary cdf \(\tilde C_i=C_i/(S_0e^{-qT})\) and hence an empirical cdf \(P_i=1-\tilde C_i\). Write
-\begin{equation}
-\label{eq:nu}
-\nu_m
-\;=\;
-\sum_{i=1}^m\Delta P_i\,\delta_{K_i},
-\qquad
-\Delta P_i
-\;=\;
-P_i-P_{i-1},
-\quad
-P_0:=0.
-\end{equation}
-The c\`adl\`ag interpolant of these knots is a step function \(P_m\). Its Fourier--Stieltjes transform is the finite sum \(\int e^{\mathrm{i}s K}\,\mathrm{d}P_m(K)=\sum_i\Delta P_i e^{\mathrm{i}s K_i}\), which is also the c.f.\ of \(\nu_m\). Replace \(\varphi_P\) by the product of that sum with the Fourier transform of a Gaussian kernel of width \(h\),
+Observed calls at strikes \(0<K_1<\cdots<K_m\) supply values \(\tilde C_i=C_i/(S_0e^{-qT})\) and hence \(P_i=1-\tilde C_i\). The estimator interpolates these knots by a natural cubic spline \(P^{\mathrm{cs}}\). The spline matches value and first derivative at the knots. Its derivative is piecewise quadratic, so the increment of \(P\) on a cell is spread across that cell rather than placed at one strike. The c.f.\ of this absolutely continuous measure is \(\int e^{\mathrm{i}s K}\,P^{\mathrm{cs}\prime}(K)\,\mathrm{d}K\). Replace \(\varphi_P\) by the product of that integral with the Fourier transform of a Gaussian kernel of width \(h\),
 \begin{equation}
 \label{eq:phi-hat}
 \hat\varphi_P(s)
 \;=\;
-\Biggl(\sum_{i=1}^m\Delta P_i e^{\mathrm{i}s K_i}\Biggr)e^{-h^2 s^2/2}.
+\Biggl(\int_{(0,\infty)}e^{\mathrm{i}s K}\,P^{\mathrm{cs}\prime}(K)\,\mathrm{d}K\Biggr)e^{-h^2 s^2/2}.
 \end{equation}
-Formally, the estimator is \eqref{eq:f-Q-pos} with \(\varphi_P\) replaced by \(\hat\varphi_P\):
-\begin{equation}
-\label{eq:fhat-Q-ft}
-\hat f_{\Q}(K)
-\;=\;
-\frac{F}{2\pi}\int_{-\infty}^{\infty}e^{-\mathrm{i}s K}\,(\mathrm{i}s)\Biggl(\sum_{i=1}^m\Delta P_i e^{\mathrm{i}s K_i}\Biggr)e^{-h^2 s^2/2}\,\mathrm{d}s.
-\end{equation}
-The integrand is a finite sum. The Fourier transform of \(e^{\mathrm{i}s K_i}e^{-h^2 s^2/2}\) is the \(N(K_i,h^2)\) density
+The Gaussian density and its distribution function are
 \begin{equation}
 \label{eq:kappa}
 \kappa_h(u)
 \;=\;
 \frac{1}{h\sqrt{2\pi}}\,\exp\Bigl(-\frac{u^2}{2h^2}\Bigr),
+\qquad
+\mathcal{K}_h(u)
+\;=\;
+\int_{-\infty}^{u}\kappa_h.
 \end{equation}
-and multiplication by \(\mathrm{i}s\) is differentiation up to sign: if \(\varphi(s)=\int e^{\mathrm{i}s u}\kappa_h(u-K_i)\,\mathrm{d}u\), then the transform of \(\kappa_h'(\,\cdot\,-K_i)\) is \(-\mathrm{i}s\,\varphi(s)\), so the transform of \(\mathrm{i}s\,\varphi(s)\) is \(-\kappa_h'(\,\cdot\,-K_i)\). Therefore
+The factor \(e^{-h^2 s^2/2}\) is convolution against \(\kappa_h\), and multiplication by \(\mathrm{i}s\) is differentiation up to sign. Substituting \eqref{eq:phi-hat} into \eqref{eq:f-Q-pos} therefore gives
 \begin{equation}
-\label{eq:fhat-Q}
+\label{eq:cubic}
 \hat f_{\Q}(K)
 \;=\;
--F\sum_{i=1}^m\Delta P_i\,\kappa_h'(K-K_i)
-\;=\;
-F\sum_{i=1}^m\Delta P_i\,\frac{K-K_i}{h^2}\,\kappa_h(K-K_i),
-\end{equation}
-where \(\kappa_h'(u)=-(u/h^2)\kappa_h(u)\). Equation \eqref{eq:fhat-Q} is a closed-form sum. 
-%It is also \(-F\) times the first derivative of a Gaussian kernel density of \(\nu_m\). 
-The interpolant of the complementary-call cdf is the kernel cdf of the same measure: no derivative of the kernel is required. Let \(\mathcal{K}\) denote the standard Gaussian cdf. Then
-\begin{equation}
-\label{eq:P-hat}
+-F\,(P^{\mathrm{cs}\prime}\ast\kappa_h)'(K),
+\qquad
 \hat P(K)
 \;=\;
-\sum_{i=1}^m\Delta P_i\,\mathcal{K}\bigl((K-K_i)/h\bigr),
+(P^{\mathrm{cs}\prime}\ast\mathcal{K}_h)(K).
 \end{equation}
-and calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). Differentiating \(\hat P\) twice and multiplying by \(-F\) recovers \eqref{eq:fhat-Q}.
+On each cell the integrand is a quadratic times a Gaussian. The integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary, so \eqref{eq:cubic} is closed form. Calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). These knots are the quoted strikes. Section~\ref{sec:tails} adds the endpoints that complete the distribution.
 \label{sec:closed}
 
 \subsection{Comparison to Naive Kernel Smoothing}
@@ -261,35 +238,17 @@ e^{rT}\,(C^{\mathrm{cs}}\ast\kappa_h)''(K).
 \end{equation}
 A cubic is the lowest-degree interpolant whose second derivative is not identically zero on each cell; the same degree appears in local-polynomial estimation of a second derivative \citep{aitsahalia2003}. Without the interpolant, \eqref{eq:pc} places a large weight on \(\kappa''\) wherever \(C\) is large, including deep in the money where \(C\) is nearly linear and \(C''\) is nearly zero.
 
-Section~\ref{sec:cubic} replaces those point masses by a cubic spline of \(P\). The inversion remains closed form.
+Equation \eqref{eq:cubic} is the same convolution applied to the derivative of a cubic spline of \(P\).
 
-On an equal grid with already monotone \(C\), \(\Delta C_i\approx C'(K_i)\delta\), so \eqref{eq:pc} and \eqref{eq:fhat-Q} are close. They are not close when \(C\) is large and locally linear, as a deep in-the-money call is. Section~\ref{sec:emp} implements the cubic interpolant \eqref{eq:pc-cubic} on listed chains.
+On an equal grid with already monotone \(C\), \(\Delta C_i\approx C'(K_i)\delta\), so \eqref{eq:pc} and \eqref{eq:cubic} are close when the spline of \(P\) is nearly linear on each cell. They are not close when \(C\) is large and locally linear, as a deep in-the-money call is. Section~\ref{sec:emp} implements the cubic interpolant \eqref{eq:pc-cubic} on listed chains.
 
-\section{Three Refinements}
+\section{Two Refinements}
 \label{sec:refine}
-
-\subsection{Cubic Spline of \(P\)}
-\label{sec:cubic}
-
-The point-mass measure of Section~\ref{sec:est} puts each increment of \(P\) at one strike. Between knots the distribution function is a step. The estimator interpolates \(P\) by a natural cubic spline through the quoted knots \((K_i,P_i)\). The spline matches value and first derivative at the knots. Its derivative is piecewise quadratic, so the increment of \(P\) is spread across the cell.
-
-Convolution of that derivative with \(\kappa_h\) is closed form. On each piece the integrand is a quadratic times a Gaussian, and the integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary. Write \(P^{\mathrm{cs}}\) for the spline. The density and the interpolant are
-\begin{equation}
-\label{eq:cubic}
-\hat f_{\Q}(K)
-\;=\;
--F\,(P^{\mathrm{cs}\prime}\ast\kappa_h)'(K),
-\qquad
-\hat P(K)
-\;=\;
-(P^{\mathrm{cs}\prime}\ast\mathcal{K}_h)(K),
-\end{equation}
-where \(\mathcal{K}_h\) is the Gaussian distribution function of width \(h\). The point-mass sum \eqref{eq:fhat-Q} is the limit of \eqref{eq:cubic} as every cell width tends to zero. These knots are the quoted strikes. Section~\ref{sec:tails} adds the endpoints that complete the distribution.
 
 \subsection{Completing the Tails}
 \label{sec:tails}
 
-The spline of Section~\ref{sec:cubic} stops at the first and last quotes. The empirical measure \eqref{eq:nu} puts mass \(P(K_1)\) at the first quoted strike and mass \(1-P(K_m)\) nowhere. Both ends are wrong as a cdf on \((0,\infty)\).
+The spline of Section~\ref{sec:construct} stops at the first and last quotes. On \((0,K_1)\) it does not yet specify \(P\), and if \(C_m>0\) the residual mass \(1-P(K_m)\) is unplaced. Both ends are wrong as a cdf on \((0,\infty)\).
 
 On \((0,K_1]\) a deep in-the-money call is intrinsic, \(C(K)=e^{-rT}(F-K)\), hence \(\tilde C(K)=1-K/F\) and \(P(K)=K/F\). That is a straight line through the origin. The estimator matches the observed \(P(K_1)\) rather than \(K_1/F\),
 \begin{equation}
@@ -366,7 +325,7 @@ Write \(P\) for the complementary-call cdf of Section~\ref{sec:est}, so that \(f
 
 \begin{theorem}
 \label{thm:ifc}
-Let \(\E^{\Q}[S_T]<\infty\), and let \(f_{\Q}\) be four times continuously differentiable on \((0,\infty)\). Let \(C\) be the corresponding call curve. Fix a compact interval \([A,B]\subset(0,\infty)\). Consider a sequence of exact quote grids \(0<K_1^{(m)}<\cdots<K_m^{(m)}\) with mesh \(\delta_m=\max_i(K_i^{(m)}-K_{i-1}^{(m)})\to 0\), \(K_1^{(m)}\le A\) and \(K_m^{(m)}\ge B\). Complete the tails as in Section~\ref{sec:tails} and form the cubic spline of Section~\ref{sec:cubic}. Let \(h_m\to 0\). Then both \eqref{eq:cubic} and its twiced version \eqref{eq:twice} converge to \(f_{\Q}\) uniformly on every compact subset of \((A,B)\).
+Let \(\E^{\Q}[S_T]<\infty\), and let \(f_{\Q}\) be four times continuously differentiable on \((0,\infty)\). Let \(C\) be the corresponding call curve. Fix a compact interval \([A,B]\subset(0,\infty)\). Consider a sequence of exact quote grids \(0<K_1^{(m)}<\cdots<K_m^{(m)}\) with mesh \(\delta_m=\max_i(K_i^{(m)}-K_{i-1}^{(m)})\to 0\), \(K_1^{(m)}\le A\) and \(K_m^{(m)}\ge B\). Form the cubic spline of Section~\ref{sec:construct} and complete the tails as in Section~\ref{sec:tails}. Let \(h_m\to 0\). Then both \eqref{eq:cubic} and its twiced version \eqref{eq:twice} converge to \(f_{\Q}\) uniformly on every compact subset of \((A,B)\).
 \end{theorem}
 
 \begin{proof}
@@ -645,7 +604,7 @@ The estimator of this paper is the Gaussian inversion of the cubic spline of \(P
 \section{Conclusion}
 \label{sec:conc}
 
-The second strike derivative of a European call is the risk-neutral density of the underlying at expiry. On a finite strike list that derivative is not an estimator. This paper rescales the calls to a complementary distribution function and inverts a Gaussian smoothing of that function in closed form. Three refinements build the estimator that is reported: a natural cubic spline of \(P\), linear tails, and twicing. The spline's derivative is piecewise quadratic, and the Gaussian convolution of each piece is elementary. On a dense exact Heston chain the spline with tails and twicing, at the mesh bandwidth, attains an integrated squared error of \(6.32\times 10^{-10}\). The same ordering holds on a variance-gamma chain. On the listed chains the bandwidth is \(0.55\) times Silverman's rule, the shortest multiple at which every plotted density is a single hump. Out-of-the-money error is \(0.051\), \(0.105\), \(1.073\), and \(0.050\), with positive mass \(1.00\). The projection of \citeauthor{yatchew2006} remains closer. The spline sits next to \citeauthor{bondarenko2003}'s mixture on S\&P~500 and beats it on Nasdaq-100.
+The second strike derivative of a European call is the risk-neutral density of the underlying at expiry. On a finite strike list that derivative is not an estimator. This paper rescales the calls to a complementary distribution function and inverts a Gaussian smoothing of that function in closed form. The derivation builds that estimator from a natural cubic spline of \(P\). Two refinements remain: linear tails and twicing. The spline's derivative is piecewise quadratic, and the Gaussian convolution of each piece is elementary. On a dense exact Heston chain the spline with tails and twicing, at the mesh bandwidth, attains an integrated squared error of \(6.32\times 10^{-10}\). The same ordering holds on a variance-gamma chain. On the listed chains the bandwidth is \(0.55\) times Silverman's rule, the shortest multiple at which every plotted density is a single hump. Out-of-the-money error is \(0.051\), \(0.105\), \(1.073\), and \(0.050\), with positive mass \(1.00\). The projection of \citeauthor{yatchew2006} remains closer. The spline sits next to \citeauthor{bondarenko2003}'s mixture on S\&P~500 and beats it on Nasdaq-100.
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:twice} and a replication script are available at \url{https://github.com/s-broda/RND}.
