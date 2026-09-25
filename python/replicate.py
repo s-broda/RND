@@ -114,25 +114,25 @@ def _exact(label, p, calls, q_true, K_eval):
         specs = (
             ("Quoted spline", False, False),
             ("Tails", True, False),
-            ("Tails+Twice", True, True),
+            ("Tails+Thrice", True, True),
         )
-        for name, tails, twice in specs:
+        for name, tails, higher in specs:
             best, best_h = np.inf, hs[len(hs) // 2]
             for h in hs:
                 q = estimate_rnd(
                     K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                    h=float(h), tails=tails, twice=twice,
+                    h=float(h), tails=tails, higher=higher,
                 )["q"]
                 err = _ise(K_eval, q, q_true)
                 if err < best:
                     best, best_h = err, float(h)
             fit_m = estimate_rnd(
                 K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                h="mesh", tails=tails, twice=twice,
+                h="mesh", tails=tails, higher=higher,
             )
             fit_9 = estimate_rnd(
                 K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                h="deriv", tails=tails, twice=twice,
+                h="deriv", tails=tails, higher=higher,
             )
             q_m, q_9 = fit_m["q"], fit_9["q"]
             rec[chain][name] = dict(
@@ -146,7 +146,7 @@ def _exact(label, p, calls, q_true, K_eval):
                 f"mesh {row['h_mesh']:.4g} {row['ise_mesh']:.4e}  "
                 f"n^-1/9 {row['h_9']:.4g} {row['ise_9']:.4e}"
             )
-            plot.setdefault(chain, {})[{"Quoted spline": "quoted", "Tails": "tails", "Tails+Twice": "twice"}[name]] = q_m
+            plot.setdefault(chain, {})[{"Quoted spline": "quoted", "Tails": "tails", "Tails+Thrice": "higher"}[name]] = q_m
             plot[chain]["K"] = K
     return rec, plot, K_eval, q_true
 
@@ -158,7 +158,7 @@ def _figure_exact(path, K_eval, q_true, plot, title):
         ax.plot(K_eval, q_true, color="black", lw=1.8, label=title, zorder=2)
         ax.plot(K_eval, np.maximum(plot[chain]["quoted"], 0), color="#7f7f7f", lw=1.15, ls=":", label="Quoted spline", zorder=3)
         ax.plot(K_eval, np.maximum(plot[chain]["tails"], 0), color="#d62728", lw=1.15, ls="--", label="Tails", zorder=4)
-        ax.plot(K_eval, np.maximum(plot[chain]["twice"], 0), color="#1f77b4", lw=1.35, label="Tails+Twice", zorder=5)
+        ax.plot(K_eval, np.maximum(plot[chain]["higher"], 0), color="#1f77b4", lw=1.35, label="Tails+Thrice", zorder=5)
         if chain == "sparse":
             ax.plot(
                 plot[chain]["K"], np.interp(plot[chain]["K"], K_eval, q_true),
@@ -239,7 +239,7 @@ def _holdout_method(sl, method):
         if method == "ours":
             C_te = estimate_rnd(
                 Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=Ke, h="deriv",
-                tails=True, twice=True,
+                tails=True, higher=True,
             )["C"]
         elif method == "yh":
             lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
@@ -325,7 +325,7 @@ def _chain_scores(sl):
     s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
     fit = estimate_rnd(
         sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, h="deriv",
-        tails=True, twice=True,
+        tails=True, higher=True,
     )
     h = fit["h"]
     h_asd, h_asd_d = asd_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
@@ -587,7 +587,7 @@ def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
     specs = (
         ("Quoted spline", False, False),
         ("Tails", True, False),
-        ("Tails+Twice", True, True),
+        ("Tails+Thrice", True, True),
     )
     rules = ("mesh", "deriv")
     for chain, K in (
@@ -600,11 +600,11 @@ def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
         for _rep in range(n_reps):
             C_obs = _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd)
             C_proj = _projected_calls(K, C_obs, p.r, p.T, p.forward)
-            for name, tails, twice in specs:
+            for name, tails, higher in specs:
                 for rule in rules:
                     fit = estimate_rnd(
                         K, C_proj, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                        h=rule, tails=tails, twice=twice,
+                        h=rule, tails=tails, higher=higher,
                     )
                     acc[name][rule].append(_ise(K_eval, fit["q"], q_true))
                     hs[name][rule].append(fit["h"])
@@ -686,7 +686,7 @@ def literature():
         )
         for rule in ("mesh", "deriv"):
             fit = estimate_rnd(
-                K, C, S0, r, T, q, K_eval=K_eval, K_price=K, h=rule, tails=True, twice=True,
+                K, C, S0, r, T, q, K_eval=K_eval, K_price=K, h=rule, tails=True, higher=True,
             )
             otm_o = _otm_rmse(K, fit["C"], C, S0, r, T, q, F)
             neg_o, pk_o = _kernel_stats(K_eval, fit["q"])
@@ -744,7 +744,7 @@ def literature():
             acc["ASD"].append(_ise(K_eval, q_asd, q_true))
             for rule, key in (("mesh", "Ours mesh"), ("deriv", "Ours deriv")):
                 fit_o = estimate_rnd(
-                    K, C_proj, p.S0, p.r, p.T, p.q, K_eval=K_eval, h=rule, tails=True, twice=True,
+                    K, C_proj, p.S0, p.r, p.T, p.q, K_eval=K_eval, h=rule, tails=True, higher=True,
                 )
                 acc[key].append(_ise(K_eval, fit_o["q"], q_true))
             print(f"  {chain} rep {rep+1}/30", flush=True)
@@ -795,7 +795,7 @@ def literature():
         )
         fit_o = estimate_rnd(
             sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, h="deriv",
-            tails=True, twice=True,
+            tails=True, higher=True,
         )
         o, pu, ca = _otm(sl, fit_o["C"])
         mass, peaks = _mass_peaks(sl.F, fit_o["q"], s)

@@ -4,8 +4,8 @@ The public entry point is ``estimate_rnd``. Copy this file: it is self-contained
 apart from NumPy and SciPy. The estimator rescales calls to a complementary
 cdf, interpolates that function with a natural cubic spline, completes the
 unquoted tails with two endpoints, and convolves the spline with a Gaussian.
-Twicing is on by default. The default bandwidth is
-``0.40 F σ_ATM √T n^{-1/9}``.
+Thricing is on by default. The default bandwidth is
+``0.36 F σ_ATM √T n^{-1/9}``.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from scipy.interpolate import CubicSpline
 from scipy.special import erf
 from scipy.stats import norm
 
-DERIV_C = 0.40
+DERIV_C = 0.36
 
 
 def estimate_rnd(
@@ -29,7 +29,7 @@ def estimate_rnd(
     K_price=None,
     h=None,
     tails=True,
-    twice=True,
+    higher=True,
 ):
     """Risk-neutral density of ``S_T`` from the cubic spline of the normalized call.
 
@@ -47,14 +47,15 @@ def estimate_rnd(
         Strikes at which to return the call interpolant. Omitted if None.
     h : float or {"deriv", "mesh"}, optional
         Bandwidth. The default ``"deriv"`` rule is
-        ``0.40 F σ_ATM √T n^{-1/9}``, with ``n`` the number of quoted
+        ``0.36 F σ_ATM √T n^{-1/9}``, with ``n`` the number of quoted
         strikes. ``"mesh"`` is ``min(1.2 δ, 0.30(K_m − K_1))``.
         A number is used as given.
     tails : bool
         Add the knots ``(0, 0)`` and, when the call has not died,
         ``(K_end, 1)``.
-    twice : bool
-        If True (default), return ``2 f_h − f_{h√2}`` and the same combination
+    higher : bool
+        If True (default), return
+        ``(8/3) f_h − 2 f_{h√2} + (1/3) f_{2h}`` and the same combination
         of the interpolant.
 
     Returns
@@ -83,18 +84,16 @@ def estimate_rnd(
 
     Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
     spl = CubicSpline(Ks, Ps, bc_type="natural")
-    q1, _ = _smooth(K_eval, Ks, spl, h_use, F)
-    G1 = None if K_price is None else _smooth(np.asarray(K_price, dtype=float), Ks, spl, h_use, F)[1]
-    if twice:
-        q2, _ = _smooth(K_eval, Ks, spl, h_use * np.sqrt(2.0), F)
-        qhat = 2.0 * q1 - q2
-        if G1 is None:
-            G = None
-        else:
-            G2 = _smooth(np.asarray(K_price, dtype=float), Ks, spl, h_use * np.sqrt(2.0), F)[1]
-            G = 2.0 * G1 - G2
-    else:
-        qhat, G = q1, G1
+    # Thricing cancels the h^2 and h^4 bias of a Gaussian convolution.
+    weights = ((1.0, 8.0 / 3.0), (np.sqrt(2.0), -2.0), (2.0, 1.0 / 3.0)) if higher else ((1.0, 1.0),)
+    qhat = np.zeros(len(np.atleast_1d(K_eval)), dtype=float)
+    G = None if K_price is None else np.zeros(len(np.asarray(K_price, dtype=float)), dtype=float)
+    price = None if K_price is None else np.asarray(K_price, dtype=float)
+    for fac, w in weights:
+        qq, _ = _smooth(K_eval, Ks, spl, h_use * fac, F)
+        qhat += w * qq
+        if price is not None:
+            G += w * _smooth(price, Ks, spl, h_use * fac, F)[1]
     C_hat = None
     if G is not None:
         G = np.clip(G, 0.0, 1.0)
@@ -180,7 +179,7 @@ def _atm_sigma(K, C, S0, r, T, q, F):
 
 
 def _bandwidth(K, C, S0, r, T, q, F, rule):
-    """``mesh`` or ``deriv`` (``0.40 F σ √T n^{-1/9}``)."""
+    """``mesh`` or ``deriv`` (``0.36 F σ √T n^{-1/9}``)."""
     if rule == "mesh":
         return _mesh_h(K)
     n = max(len(K), 8)
