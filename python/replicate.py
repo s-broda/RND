@@ -141,12 +141,8 @@ def _exact(label, p, calls, q_true, K_eval):
                 f"mesh {row['h_mesh']:.4g} {row['ise_mesh']:.4e}  "
                 f"rule {row['h_den']:.4g} {row['ise_den']:.4e}"
             )
-            if name == "Tails":
-                plot.setdefault(chain, {})["mid"] = q_m
-                plot[chain]["K"] = K
-            if name == "Tails+Twice":
-                plot.setdefault(chain, {})["twice"] = q_m
-                plot[chain]["rule"] = q_d
+            plot.setdefault(chain, {})[{"Quoted spline": "quoted", "Tails": "tails", "Tails+Twice": "twice"}[name]] = q_m
+            plot[chain]["K"] = K
     return rec, plot, K_eval, q_true
 
 
@@ -154,16 +150,17 @@ def _figure_exact(path, K_eval, q_true, plot, title):
     _style()
     fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.6), sharey=True)
     for ax, chain in zip(axes, ("dense", "sparse")):
-        ax.plot(K_eval, q_true, color="black", lw=2.0, label=title)
-        ax.plot(K_eval, np.maximum(plot[chain]["twice"], 0), color="#1f77b4", lw=1.35, label="Ours, mesh")
-        ax.plot(K_eval, np.maximum(plot[chain]["rule"], 0), color="#d62728", lw=1.35, ls="--", label=r"Ours, $0.55h$")
+        ax.plot(K_eval, q_true, color="black", lw=1.8, label=title, zorder=2)
+        ax.plot(K_eval, np.maximum(plot[chain]["quoted"], 0), color="#7f7f7f", lw=1.15, ls=":", label="Quoted spline", zorder=3)
+        ax.plot(K_eval, np.maximum(plot[chain]["tails"], 0), color="#d62728", lw=1.15, ls="--", label="Tails", zorder=4)
+        ax.plot(K_eval, np.maximum(plot[chain]["twice"], 0), color="#1f77b4", lw=1.35, label="Tails+Twice", zorder=5)
         if chain == "sparse":
             ax.plot(
                 plot[chain]["K"], np.interp(plot[chain]["K"], K_eval, q_true),
-                linestyle="none", marker="o", ms=3.4, mfc="white", mec="black", mew=0.7, zorder=5,
+                linestyle="none", marker="o", ms=3.4, mfc="white", mec="black", mew=0.7, zorder=6,
             )
         ax.set_xlim(60, 150)
-        ax.set_ylim(bottom=0)
+        ax.set_ylim(0.0, 1.18 * float(np.nanmax(q_true)))
         ax.set_xlabel(r"Strike $K$")
         ax.set_title("Dense, $m=256$" if chain == "dense" else "Sparse, $m=32$")
         ax.legend(frameon=False)
