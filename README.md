@@ -1,8 +1,8 @@
-# Identifying Risk-Neutral Densities from an Empirical Measure of Listed Quotes
+# Twicing Is All You Need
 
 Replication code for
 
-> Simon A. Broda, *Identifying Risk-Neutral Densities from an Empirical Measure of Listed Quotes*.
+> Simon A. Broda, *Twicing Is All You Need*. Well, and a proper bandwidth: risk neutral densities and accurate prices from the same kernel.
 
 The headline estimator is `python/rnd.py` (`estimate_rnd`). It rescales European calls to a complementary cdf, interpolates that function with a natural cubic spline, completes the unquoted tails, and applies a Gaussian convolution with Schucany–Sommers twicing. The convolution is closed form. `estimate_rnd` chooses the bandwidth internally. The default is \(0.40 F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\). Passing `h="mesh"` uses 1.2 times the median strike gap.
 
@@ -13,9 +13,9 @@ python3 -m pip install -r requirements.txt
 python3 python/replicate.py
 ```
 
-This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, and `figures/ccdf_listed.pdf`.
+This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, `figures/ccdf_listed.pdf`, and `figures/ccdf_listed_kern.pdf`.
 
-Every listed fit starts from the same unpenalized decreasing-convex projection of the quoted calls and is scored against the quoted mids. The listed comparison then chooses the Aït-Sahalia–Duarte pricing bandwidth and the positive-convolution width by even/odd out-of-the-money error. The spline prices from the interpolant at \(0.40 F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\). Exact Heston and variance-gamma quotes are scored for the spline at the mesh rule and at the \(n^{-1/9}\) rule, on a dense grid and on a 32-strike grid. The four working slices are one Cboe session, 23 September 2026.
+Every listed fit starts from the same unpenalized decreasing-convex projection of the quoted calls and is scored against the quoted mids. The listed comparison chooses the Aït-Sahalia–Duarte, Aït-Sahalia–Lo, and Grith–Härdle–Schienle bandwidths, and the lognormal-mixture width, by even/odd out-of-the-money error. The spline prices from the interpolant at \(0.40 F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\). Exact Heston and variance-gamma quotes are scored for the spline at the mesh rule and at the \(n^{-1/9}\) rule, on a dense grid and on a 32-strike grid. The four working slices are one Cboe session, 23 September 2026.
 
 ## Data
 

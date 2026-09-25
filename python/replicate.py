@@ -5,8 +5,8 @@ Run from the repository root::
     python3 python/replicate.py
 
 Prints the Heston and variance-gamma ISE tables and the listed pricing table,
-and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf, and
-figures/ccdf_listed.pdf.
+and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
+figures/ccdf_listed.pdf, and figures/ccdf_listed_kern.pdf.
 """
 
 from __future__ import annotations
@@ -828,16 +828,15 @@ def _holdout_kernel(sl, kind, which):
 def main():
     K_eval = np.linspace(60.0, 150.0, 401)
     p = BCC97
+    # carr_madan_puts returns puts; put-call parity recovers the calls.
     rec_h, plot_h, _, qh = _exact(
-        "Heston", p, lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc, 
+        "Heston", p, lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc,
         heston_spot_density(K_eval, p), K_eval,
     )
-    # the calls() above double-counts because carr_madan_puts returns puts; fix in _exact by passing C
     _figure_exact(FIG / "ccdf_heston_rnd.pdf", K_eval, qh, plot_h, "Heston")
     v = CM99
     rec_v, plot_v, _, qv = _exact("VG", v, lambda K: vg_calls(K, v), vg_spot_density(K_eval, v), K_eval)
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
-    noisy_heston()
     listed()
     print("DONE")
 
