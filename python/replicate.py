@@ -341,10 +341,10 @@ def listed():
         scored.append((title, sl, bundle))
     raw, inv, w = _average_rows(chain_metrics, np.asarray(forwards, float))
     print("  weights 1/F " + " ".join(f"{t} {wi:.3f}" for t, wi in zip(titles, w)))
-    print("  Equal weight")
+    print("  Average")
     for name in _METHODS:
         _print_metrics(name, raw[name])
-    print("  Inverse forward")
+    print("  Weighed av.")
     for name in _METHODS:
         _print_metrics(name, inv[name])
     _plot_listed(scored)
