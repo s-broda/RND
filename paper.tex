@@ -19,7 +19,8 @@
 
 \begin{frontmatter}
 
-\title{Identifying Risk-Neutral Densities from an Empirical Measure of Listed Quotes}
+\title{\texorpdfstring{Twicing Is All You Need\\[0.35em]
+{\small Well, and a proper bandwidth: risk neutral densities and accurate prices from the same kernel}}{Twicing Is All You Need}}
 
 \author[ifz]{Simon A.\ Broda\corref{cor1}}
 \ead{simon.broda@hslu.ch}
@@ -31,7 +32,7 @@
 \cortext[cor1]{Corresponding author.}
 
 \begin{abstract}
-European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is to recover the density ill-posed on a finite strike list. The present manuscript rescales the calls to a complementary distribution function and interpolates it with a natural cubic spline. A Gaussian damping of the associated characteristic function inverts in closed form and supplies both the density and a call price. The resulting estimator is in-fill consistent and its repricing accuracy on four listed chains is competitive vis-\`a-vis existing estimators.
+Kernel estimators of the risk-neutral density differentiate a smooth of the call twice. The bandwidth that prices the quotes leaves many peaks. The bandwidth that removes the peaks moves the price. This paper uses one Gaussian kernel, at the second-derivative rate, on a cubic spline of the complementary distribution of a single maturity, and twices that kernel. The same fit is a unimodal density of unit mass and a call interpolant. The convolution has a closed form, and the estimator is in-fill consistent. On four listed chains the out-of-the-money error sits with the best of the competing methods.
 \end{abstract}
 
 \begin{keyword}
@@ -47,11 +48,13 @@ risk-neutral density \sep option prices \sep kernel estimation \sep in-fill cons
 
 \citet{breeden1978} identified the risk-neutral density of the underlying at a fixed expiry with the second strike derivative of the corresponding European call, scaled by a discount factor. The identity assumes a twice differentiable price curve. A market supplies a finite ordered list of strikes and a quote at each knot. Numerical second differentiation of that list is ill-posed: interpolants oscillate, change sign, and depend on the interpolating scheme. The literature responds with parametric mixtures and Gram--Charlier expansions, implied-volatility interpolants, local polynomials of the call, and \citet{bondarenko2003}'s positive convolution approximation, which forces the density to be a mixture of a positive kernel with a discrete probability fitted to prices. Section~\ref{sec:lit} reviews these approaches.
 
-This paper estimates the density from a single-maturity strip by rescaling the calls to a complementary distribution function, interpolating that function with a cubic spline, and inverting a Gaussian damping of the associated characteristic function in closed form. Completing the unquoted tails and combining two kernel widths improves accuracy further. As the strike mesh fills a compact interval and the bandwidth tends to zero, the estimator converges to the true density on the interior of that interval. The same limit holds for noisy quotes when the bandwidth also satisfies \(nh^{5}\to\infty\).
+Kernel smoothers of the call are usually run at two bandwidths. The width that minimises a pricing error tracks the quotes, and the second derivative has many peaks. The width that balances the variance of a second derivative, of order \(n^{-1/9}\), is the one the surveys widen further, and the price moves with it \citep{aitsahalia1998,aitsahalia2003,grith2012,jackwerth2004,figlewski2018}.
 
-We compare our method to several extant methods.  \citeauthor{bondarenko2003}'s method is a sieve of fixed dimension: it does not become finer as more strikes arrive, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by the nearest decreasing convex list; the second differences of that list are a discrete nonnegative measure, not a curve. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. The estimator of this paper returns a closed-form smooth estimate of \(f_{\Q}\) and, from the same smoothing, a call interpolant. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) sits next to the projection of \citet{yatchew2006} and the mixture of \citeauthor{bondarenko2003}. The cubic of \citet{priestley1972} chooses its bandwidth by even/odd pricing error. The interpolant can lie below the \citeauthor{yatchew2006} floor because it is not required to be convex. 
+This paper uses one bandwidth for both objects, that rate with a short constant, on a single maturity. The calls are rescaled to a complementary distribution, a cubic spline interpolates that function, and a Gaussian kernel smooths the spline. Twicing replaces the kernel by a higher-order kernel. The same smoothing is the density and, after one integration, the call. A Gaussian damping of the characteristic function of the spline makes the convolution closed form. With the unquoted tails filled in, the estimator converges to the true density on the interior of a compact interval as the strike mesh fills that interval and the bandwidth tends to zero, and the same limit holds for noisy quotes when \(nh^{5}\to\infty\).
 
-The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} derives the characteristic function of the normalized call and the closed-form estimator, and compares it to kernel smoothing of the call. Section~\ref{sec:refine} records two refinements: completing the tails and twicing. Section~\ref{sec:ifc} proves in-fill consistency for exact quotes and for noisy quotes. Section~\ref{sec:h} chooses bandwidths that meet those conditions and compares them on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration that evaluates our estimator against four alternative methods on four listed chains. Section~\ref{sec:conc} concludes.
+We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method is a sieve of fixed dimension: it does not become finer as more strikes arrive, and it is a density by construction. \citet{yatchew2006} replace the quoted calls by the nearest decreasing convex list; the second differences of that list are a discrete nonnegative measure, not a curve, so that projection is not in the comparison below. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) sits with the mixture of \citeauthor{bondarenko2003} and the pricing-bandwidth kernels of \citet{aitsahalia1998} and \citet{grith2012}. The interpolant can lie below the \citeauthor{yatchew2006} floor because it is not required to be convex. 
+
+The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and twicing. Section~\ref{sec:ifc} proves in-fill consistency for exact quotes and for noisy quotes. Section~\ref{sec:h} chooses bandwidths that meet those conditions and compares them on exact Heston and variance-gamma quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
 
 \section{Related Work}
 \label{sec:lit}
@@ -62,13 +65,17 @@ A first family of methods specifies the density of \(S_T\) as a parametric curve
 
 A second, and in applied work the most common, family interpolates the Black--Scholes implied-volatility function of strike and converts the interpolant back to prices before differentiating twice. \citet{shimko1993} fitted a quadratic in strike; \citet{malz1997} used a cubic spline in delta; \citet{bliss2002} a smoothing spline. \citet{figlewski2010} completes the tails with a generalized extreme-value distribution. Because implied volatility is a much flatter function of strike than the call itself, a low-order interpolant often has small bias when quotes are accurate. The drawback is that implied volatility is a nonlinear transformation that inflates price noise where the derivative of price with respect to implied volatility is small, i.e.\ in the tails. An interpolating spline then treats those noisy tail quotes as exact, and the second derivative of the resulting call curve oscillates and can become negative. Shape-constrained smoothers of the implied-volatility surface \citep{fengler2005,fengler2009,gatheraljacquier2014,ludwig2015} address the sign problem at the cost of a more involved optimization.
 
-A third family estimates the call as a function of strike by kernel regression or local polynomials and obtains the second derivative from the fit. \citet{priestley1972} fitted a kernel to observed function values at the design points; the risk-neutral density is obtained by differentiating that fit twice. \citet{aitsahalia1998} estimated the call as a function of \((S,K,T,r,q)\) by kernel regression; \citet{aitsahalia2000} used the estimator to recover an implied risk-aversion function. The method is data intensive and, in the original application, pooled option prices across many trading dates. \citet{aitsahalia2003} developed a local polynomial estimator that imposes monotonicity and convexity of \(C\) in \(K\), hence nonnegativity of the density. Related constrained least-squares estimators are studied by \citet{yatchew2006} and \citet{birke2009}; \citet{grith2012} survey the kernel literature. \citet{fanmancini2009} combine a parametric guide with a nonparametric correction. In each case the density is the second strike derivative of a smoother of \(C\). The estimator of Section~\ref{sec:est} rescales the calls to a complementary cumulative distribution function (cdf), interpolates that function by a cubic spline, and smooths the spline with a Gaussian kernel. The convolution is closed form. Section~\ref{sec:naive} records the comparison. Section~\ref{sec:emp} implements the cubic of Section~\ref{sec:naive} at the bandwidth \eqref{eq:h-d2}, and the two-step procedure of \citeauthor{aitsahalia2003}: a least-squares projection of the quoted calls onto the decreasing convex cone, followed by a local polynomial of the constrained values whose pricing bandwidth is chosen the same way.
+A third family estimates the call, or its Black--Scholes implied volatility, by kernel regression or local polynomials and reads the density off a second strike derivative. \citet{aitsahalia1998} use a Nadaraya--Watson kernel. The state-price densities in that paper are estimated from \(14{,}431\) S\&P~500 options pooled across every trading day of 1993, because a single expiry was treated as too short a list on which to differentiate twice. They emphasise that the bandwidth dominates the choice of kernel: too small a neighborhood reproduces the noise in the quotes, and too large a neighborhood removes the curvature of the smile. \citet{aitsahalia2000} used the same estimator to recover an implied risk-aversion function. \citet{aitsahalia2003} work one day at a time, on the twenty to fifty strikes of a single expiry, and impose monotonicity and convexity of \(C\) in \(K\). The local polynomial that the asymptotics recommend for a second derivative is a local cubic \citep{fangijbels1996}. On \(242\) days in 1999, with the \(25\) most active strikes, unconstrained Nadaraya--Watson, local linear, local quadratic, and local cubic estimates of the density took a negative value on \(242\), \(130\), \(205\), and \(241\) days. The shape-constrained local linear never did. Stopping the violations in the unconstrained fits required substantial oversmoothing and a large bias. The raw quotes themselves broke convexity on \(24\%\) of the high-frequency prints that year.
 
-\citet{bondarenko2003} proposed the positive convolution approximation (PCA). The density is required to lie in the set of functions obtained by convolving a discrete probability with a positive kernel, and the discrete probability is chosen to minimize the sum of squared pricing errors. The kernel enforces smoothness and, together with positive weights, guarantees that the result is a density. In \citeauthor{bondarenko2003}'s comparison, the method dominated mixtures of lognormals, Hermite expansions, and several regularization methods. Subsequent simulation evidence on affine jump-diffusions is consistent with this ranking \citep{lu2019}. Section~\ref{sec:emp} implements a log-price analog: forty-one lognormals of common width, centered on a uniform grid in log strike from the first quoted strike to the last, fitted by nonnegative least squares. Sum-to-one and forward-mean penalties stay penalties; the weights are not rescaled after the fit. The width is chosen by even/odd pricing error. The same section chooses the \citeauthor{yatchew2006} roughness penalty the same way.
+\citet{grith2012} survey this literature and estimate a local cubic of the rescaled call with a quartic kernel. For a second derivative the optimal bandwidth is of order \(n^{-1/9}\). On their one-month DAX chain, least-squares cross-validation selects \(h=114\), which they describe as wiggly, so the densities they plot use \(h=228\) and \(h=434\). The implied-volatility smoother they display is widened further, to \(h=372\). Smoothing the call is more sensitive to that choice than smoothing implied volatility, and the tails oscillate unless the bandwidth is increased at a cost in bias. Twice differentiating a Nadaraya--Watson or \citet{gassermuller1979} level fit is set aside as the statistically worse route to the same derivative. \citet{jackwerth2004} starts a kernel regression of implied volatility from Silverman's rule, of order \(n^{-1/5}\). He warns that the bandwidth which prices overfits noise from one day to the next, that a kernel does not continue across gaps in the strike list, and that a spline has to be of degree higher than three if the recovered distribution is to be smooth. \citet{figlewski2018} finds that filling the implied-volatility curve with a cubic spline puts spikes in the density, because the second derivative of a cubic is continuous but not differentiable, and recommends a spline of degree four or higher. \citet{fanmancini2009} combine a parametric guide with a nonparametric correction. Related shape-constrained least squares are studied by \citet{yatchew2006} and \citet{birke2009}.
+
+The estimator of Section~\ref{sec:est} is exposed to these objections. It is a kernel smooth of a single maturity. The pilot is a cubic spline of the complementary distribution function, the kernel is Gaussian, and the listed bandwidth is a fixed multiple of \(n^{-1/9}\), shorter than the constants used above to calm a local polynomial. Twicing raises the order of the kernel and puts negative sidelobes in the equivalent kernel for \(f_{\Q}\). The convolution is closed form. Without that second kernel, the smooth of the call is the fixed-design estimator of \citet{priestley1972} applied to a cubic interpolant, so that object is not entered as a separate method. Section~\ref{sec:emp} asks whether the listed fit still has to split the bandwidth, one width for the price and a wider one for a unimodal density. That section implements, at a pricing cross-validation bandwidth, the Nadaraya--Watson implied-volatility regression of \citeauthor{aitsahalia1998} and the local cubics of \citeauthor{grith2012}, together with the two-step procedure of \citeauthor{aitsahalia2003}: a least-squares projection of the quoted calls onto the decreasing convex cone, followed by a local polynomial of the constrained values whose pricing bandwidth is chosen the same way. The density drawn for \citeauthor{aitsahalia2003} uses the wider rule \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\).
+
+\citet{bondarenko2003} proposed the positive convolution approximation (PCA). The density is required to lie in the set of functions obtained by convolving a discrete probability with a positive kernel, and the discrete probability is chosen to minimize the sum of squared pricing errors. The kernel enforces smoothness and, together with positive weights, guarantees that the result is a density. In \citeauthor{bondarenko2003}'s comparison, the method dominated mixtures of lognormals, Hermite expansions, and several regularization methods. Subsequent simulation evidence on affine jump-diffusions is consistent with this ranking \citep{lu2019}. Section~\ref{sec:emp} implements a log-price analog: forty-one lognormals of common width, centered on a uniform grid in log strike from the first quoted strike to the last, fitted by nonnegative least squares. Sum-to-one and forward-mean penalties stay penalties; the weights are not rescaled after the fit. The width is chosen by even/odd pricing error.
 
 \citet{rubinstein1994} and \citet{jackwerth1996} recovered probabilities on a binomial tree by minimizing a distance to a prior subject to pricing constraints. \citet{stutzer1996} and \citet{buchen1996} maximized entropy. These methods produce a valid density by construction, but the finite-support discretization and the choice of prior affect the tails. Viewing the problem as a linear inverse problem, \citet{cont2004} calibrated jump-diffusion models under a relative-entropy penalty; \citet{monnier2014} used the singular value decomposition of a restricted put operator.
 
-A number of papers compare methods on market data, where the true density is unknown, so that the criterion is typically pricing error or stability over time \citep{cooper1999,jondeau2000,coutant2001,anagnou2005,bliss2002,liu2007}. Studies that generate options from a known process are less common. \citet{bondarenko2003} finds that his method outperforms mixtures, expansions, and several regularization methods on integrated squared error. \citet{lai2014} finds that kernel regression outperforms spline interpolation and neural nets on pricing error. \citet{santos2015} compare mixtures, Edgeworth expansions, hypergeometric functions, and a \citeauthor{bliss2002} smoothing spline against Heston and other targets. \citet{lu2019} compares methods on affine jump-diffusions and again finds \citeauthor{bondarenko2003}'s method accurate. The typical ranking is that implied-volatility interpolants price well when quotes are clean, that mixtures are unstable once more than two components are admitted, and that \citeauthor{bondarenko2003}'s method is the most accurate among methods that do not use a parametric density of \(S_T\), when the true density is known. Section~\ref{sec:ifc} is in this vein: the targets are Heston and variance-gamma, and the true density is known. Section~\ref{sec:emp} scores listed index chains, where the criterion is pricing error, against \citeauthor{bondarenko2003}, \citeauthor{yatchew2006}, \citeauthor{aitsahalia2003}, and \citeauthor{priestley1972}.
+A number of papers compare methods on market data, where the true density is unknown, so that the criterion is typically pricing error or stability over time \citep{cooper1999,jondeau2000,coutant2001,anagnou2005,bliss2002,liu2007}. Studies that generate options from a known process are less common. \citet{bondarenko2003} finds that his method outperforms mixtures, expansions, and several regularization methods on integrated squared error. \citet{lai2014} finds that kernel regression outperforms spline interpolation and neural nets on pricing error. \citet{santos2015} compare mixtures, Edgeworth expansions, hypergeometric functions, and a \citeauthor{bliss2002} smoothing spline against Heston and other targets. \citet{lu2019} compares methods on affine jump-diffusions and again finds \citeauthor{bondarenko2003}'s method accurate. The typical ranking is that implied-volatility interpolants price well when quotes are clean, that mixtures are unstable once more than two components are admitted, and that \citeauthor{bondarenko2003}'s method is the most accurate among methods that do not use a parametric density of \(S_T\), when the true density is known. Section~\ref{sec:ifc} is in this vein: the targets are Heston and variance-gamma, and the true density is known. Section~\ref{sec:emp} scores listed index chains, where the criterion is pricing error, against \citeauthor{bondarenko2003}, \citeauthor{aitsahalia2003}, \citeauthor{aitsahalia1998}, and \citeauthor{grith2012}.
 
 \section{Construction of the Estimator}
 \label{sec:est}
@@ -202,46 +209,6 @@ The factor \(e^{-h^2 s^2/2}\) is convolution against \(\kappa_h\), and multiplic
 On each cell the integrand is a quadratic times a Gaussian. The integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary, so \eqref{eq:cubic} is closed form. Calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). These knots are the quoted strikes. Section~\ref{sec:tails} adds the endpoints that complete the distribution.
 \label{sec:closed}
 
-\subsection{Comparison to Naive Kernel Smoothing}
-\label{sec:naive}
-
-In the continuum, \citeauthor{breeden1978} plus a kernel is unambiguous. If \(C\) is the true call curve,
-\begin{equation}
-\label{eq:smooth-C}
-(C\ast\kappa_h)''
-\;=\;
-C''\ast\kappa_h
-\;=\;
-e^{-rT}\,(f_{\Q}\ast\kappa_h).
-\end{equation}
-Smoothing \(C\) and differentiating twice is a kernel smooth of \(f_{\Q}\). On a strike list the discretization matters.
-
-A \citeauthor{priestley1972} estimator treats the observations as levels \(C_i\) and weights them by the design spacing \(\Delta K_i=K_i-K_{i-1}\) (\(K_0:=K_1-(K_2-K_1)\)):
-\begin{equation}
-\label{eq:pc}
-\hat C^{\mathrm{PC}}(K)
-\;=\;
-\sum_{i=1}^m\Delta K_i\,C_i\,\kappa_h(K-K_i),
-\qquad
-\hat f_{\Q}^{\mathrm{PC}}(K)
-\;=\;
-e^{rT}\sum_{i=1}^m\Delta K_i\,C_i\,\kappa_h''(K-K_i),
-\end{equation}
-where \(\kappa_h''(u)=(u^2/h^2-1)h^{-2}\kappa_h(u)\). The equivalent kernel for the density is \(\kappa''\). The interpolant is a weighted sum of the observed prices.
-
-That sum is a Riemann approximation to \eqref{eq:smooth-C}. It treats the observed levels as atoms of a measure. They are not: \(C\) is a smooth function of \(K\), observed at the knots. Convolution requires a function on the line. A linear interpolant of \(C\) has second derivative zero almost everywhere and Dirac masses at the kinks, so it cannot recover \(f_{\Q}\). The usual construction is a cubic spline \(C^{\mathrm{cs}}\) through the quotes, extended by linear wings of slope in \([-e^{-rT},0]\):
-\begin{equation}
-\label{eq:pc-cubic}
-\hat f_{\Q}^{\mathrm{cs}}(K)
-\;=\;
-e^{rT}\,(C^{\mathrm{cs}}\ast\kappa_h)''(K).
-\end{equation}
-A cubic is the lowest-degree interpolant whose second derivative is not identically zero on each cell; the same degree appears in local-polynomial estimation of a second derivative \citep{aitsahalia2003}. Without the interpolant, \eqref{eq:pc} places a large weight on \(\kappa''\) wherever \(C\) is large, including deep in the money where \(C\) is nearly linear and \(C''\) is nearly zero.
-
-Equation \eqref{eq:cubic} is the same convolution applied to the derivative of a cubic spline of \(P\).
-
-On an equal grid with already monotone \(C\), \(\Delta C_i\approx C'(K_i)\delta\), so \eqref{eq:pc} and \eqref{eq:cubic} are close when the spline of \(P\) is nearly linear on each cell. They are not close when \(C\) is large and locally linear, as a deep in-the-money call is. Section~\ref{sec:emp} implements the cubic interpolant \eqref{eq:pc-cubic} on listed chains.
-
 \section{Two Refinements}
 \label{sec:refine}
 
@@ -374,7 +341,9 @@ h
 \;=\;
 c\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/9},
 \end{equation}
-with \(n\) the number of quoted strikes and \(c=0.34\). On chains of one to several hundred strikes this is the bandwidth used for the listed prices of our estimator. Section~\ref{sec:heston} reports both rules. \citeauthor{priestley1972} is not given this bandwidth: its listed fit chooses \(h\) by even/odd pricing error.
+with \(n\) the number of quoted strikes and \(c=0.40\). On chains of one to several hundred strikes this is the bandwidth used for the listed prices of our estimator. Section~\ref{sec:heston} reports both rules.
+
+The exponent is the one \citet{grith2012} derive for a local cubic of a second derivative and the order \citet{aitsahalia2003} take from \citet{fangijbels1996}. The bandwidths those papers plot are wider. \citeauthor{grith2012} double and quadruple a cross-validated width because the cross-validated density is wiggly, and \citeauthor{aitsahalia2003} report that an unconstrained local polynomial stops taking negative values only after substantial oversmoothing. \citet{jackwerth2004} starts from a multiple of \(n^{-1/5}\). That exponent leaves \(nh^{5}\) bounded, which is why it is not used. Any fixed \(c>0\) sends \(nh^{5}\) to infinity. The constant \(c=0.40\) is the short end of that family. On the four listed chains it is just under half of the factor \(0.9\) used for the \citeauthor{aitsahalia2003} density in Section~\ref{sec:emp}.
 
 \subsection{Numerical Illustration}
 \label{sec:heston}
@@ -406,18 +375,18 @@ where \(\varphi(u)=\E^{\Q}[e^{\mathrm{i}u\log S_T}]\). Two chains are used: a de
   {\(h^{\ast}\)} & {Oracle ISE} & {Mesh \(h\)} & {Mesh ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.79 & 1.11e-5 \\
+  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 2.11 & 2.07e-5 \\
 Dense & Tails
-  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.79 & 1.11e-5 \\
+  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 2.11 & 2.07e-5 \\
 Dense & Tails+Twice
-  & 0.39 & 2.68e-12 & 0.89 & 6.32e-10 & 1.79 & 1.14e-7 \\
+  & 0.39 & 2.68e-12 & 0.89 & 6.32e-10 & 2.11 & 3.57e-7 \\
 \midrule
 Sparse & Quoted spline
-  & 16.19 & 1.80e-2 & 2.71 & 1.04e-1 & 2.24 & 1.25e-1 \\
+  & 16.19 & 1.80e-2 & 2.71 & 1.04e-1 & 2.64 & 1.06e-1 \\
 Sparse & Tails
-  & 0.45 & 1.13e-6 & 2.71 & 5.29e-5 & 2.24 & 2.64e-5 \\
+  & 0.45 & 1.13e-6 & 2.71 & 5.29e-5 & 2.64 & 4.80e-5 \\
 Sparse & Tails+Twice
-  & 1.64 & 9.67e-7 & 2.71 & 2.66e-6 & 2.24 & 1.35e-6 \\
+  & 1.64 & 9.67e-7 & 2.71 & 2.66e-6 & 2.64 & 2.36e-6 \\
 \bottomrule
 \end{tabular}%
 }
@@ -430,7 +399,7 @@ Sparse & Tails+Twice
 \label{fig:heston-rnd}
 \end{figure}
 
-On the dense grid the first strike lies left of the window and the last call is already zero, so the wings do not move the error. The spline without twicing has mesh integrated squared error \(7.36\times 10^{-7}\). Twicing cuts that to \(6.32\times 10^{-10}\), against an oracle \(2.68\times 10^{-12}\). Equation \eqref{eq:h-d2} is wider (\(h=1.79\)) and the twiced error is \(1.14\times 10^{-7}\). On the sparse grid the quoted spline without tails is useless: mesh integrated squared error \(0.104\). The left line \eqref{eq:left} brings the untwiced mesh error to \(5.29\times 10^{-5}\). Twicing then reaches \(2.66\times 10^{-6}\) at the mesh and \(1.35\times 10^{-6}\) at \eqref{eq:h-d2} (\(h=2.24\)), against an oracle \(9.67\times 10^{-7}\). Figure~\ref{fig:heston-rnd} plots the three estimators at the mesh bandwidth.
+On the dense grid the first strike lies left of the window and the last call is already zero, so the wings do not move the error. The spline without twicing has mesh integrated squared error \(7.36\times 10^{-7}\). Twicing cuts that to \(6.32\times 10^{-10}\), against an oracle \(2.68\times 10^{-12}\). Equation \eqref{eq:h-d2} is wider (\(h=2.11\)) and the twiced error is \(3.57\times 10^{-7}\). On the sparse grid the quoted spline without tails is useless: mesh integrated squared error \(0.104\). The left line \eqref{eq:left} brings the untwiced mesh error to \(5.29\times 10^{-5}\). Twicing then reaches \(2.66\times 10^{-6}\) at the mesh and \(2.36\times 10^{-6}\) at \eqref{eq:h-d2} (\(h=2.64\)), against an oracle \(9.67\times 10^{-7}\). Figure~\ref{fig:heston-rnd} plots the three estimators at the mesh bandwidth.
 
 Table~\ref{tab:vg-tail} repeats the design for the variance-gamma process of \citet{madan1998}. The process parameters are those of \citet{carrmadan1999}: \(\sigma=0.12\), \(\nu=0.2\), \(\theta=-0.14\). Spot, rate, dividend yield, and maturity are as above, as are the two strike grids and the ISE window. Variance gamma is a pure-jump L\'evy process. The true density of \(\log S_T\) is a modified Bessel function \citep{madan1998}; the density of \(S_T\) is that formula times \(1/K\). Calls are the discounted payoff of that density, evaluated by the trapezoidal rule.
 
@@ -451,18 +420,18 @@ Table~\ref{tab:vg-tail} repeats the design for the variance-gamma process of \ci
   {\(h^{\ast}\)} & {Oracle ISE} & {Mesh \(h\)} & {Mesh ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.14 & 1.10e-4 \\
+  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.35 & 1.80e-4 \\
 Dense & Tails
-  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.14 & 1.10e-4 \\
+  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.35 & 1.80e-4 \\
 Dense & Tails+Twice
-  & 0.33 & 3.93e-7 & 0.89 & 8.34e-6 & 1.14 & 2.13e-5 \\
+  & 0.33 & 3.93e-7 & 0.89 & 8.34e-6 & 1.35 & 3.89e-5 \\
 \midrule
 Sparse & Quoted spline
-  & 14.03 & 3.27e-2 & 2.71 & 1.05e-1 & 1.42 & 1.99e-1 \\
+  & 14.03 & 3.27e-2 & 2.71 & 1.05e-1 & 1.67 & 1.69e-1 \\
 Sparse & Tails
-  & 0.45 & 3.97e-5 & 2.71 & 1.25e-3 & 1.42 & 2.25e-4 \\
+  & 0.45 & 3.97e-5 & 2.71 & 1.25e-3 & 1.67 & 3.50e-4 \\
 Sparse & Tails+Twice
-  & 0.80 & 3.31e-5 & 2.71 & 4.39e-4 & 1.42 & 6.18e-5 \\
+  & 0.80 & 3.31e-5 & 2.71 & 4.39e-4 & 1.67 & 9.63e-5 \\
 \bottomrule
 \end{tabular}%
 }
@@ -475,46 +444,7 @@ Sparse & Tails+Twice
 \label{fig:vg-rnd}
 \end{figure}
 
-On the dense chain the wings again do not move the digits. Twicing cuts the mesh error from \(5.08\times 10^{-5}\) to \(8.34\times 10^{-6}\), against an oracle \(3.93\times 10^{-7}\). At \eqref{eq:h-d2} the twiced error is \(2.13\times 10^{-5}\) (\(h=1.14\)). The density of \(S_T\) is more peaked than under Heston, and the absolute errors are larger. On the sparse chain the quoted spline without tails has mesh error \(0.105\). Tails bring the untwiced mesh error to \(1.25\times 10^{-3}\), and twicing lowers it to \(4.39\times 10^{-4}\) at the mesh and \(6.18\times 10^{-5}\) at \eqref{eq:h-d2} (\(h=1.42\)), against an oracle \(3.31\times 10^{-5}\). Here the mesh bandwidth \(h=2.71\) is the wider of the two. Figure~\ref{fig:vg-rnd} plots the three estimators at the mesh bandwidth.
-
-\subsection{Noisy Heston Quotes}
-\label{sec:noise}
-
-The same Heston chain is observed with noise in the implied volatility. Each exact call is converted to a Black--Scholes implied volatility, an independent \(N(0,0.01^2)\) shock is added, the volatility is floored at \(0.02\), and the call is repriced. The decreasing-convex projection of Section~\ref{sec:data} is then applied, and the spline is fit to that projection. Thirty replications use the seed \(20260923\). Table~\ref{tab:heston-noise} reports the mean integrated squared error on \([60,150]\) at the two bandwidths of Section~\ref{sec:h}. The bandwidth in \eqref{eq:h-d2} moves slightly from one replication to the next, because \(\hat\sigma_{\mathrm{ATM}}\) is computed from the noisy projection; the table shows the mean.
-
-\begin{table}[H]
-\centering
-\caption{Mean integrated squared error on noisy Heston quotes, thirty replications. Columns are the two rules of Section~\ref{sec:h}.}
-\label{tab:heston-noise}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{ll
-  S[table-format=1.2]
-  S[table-format=1.2e-1, scientific-notation=true]
-  S[table-format=1.2]
-  S[table-format=1.2e-1, scientific-notation=true]}
-\toprule
-\multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Estimator} &
-  {Mesh \(h\)} & {Mesh ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
-\midrule
-Dense & Quoted spline
-  & 0.89 & 1.69e-2 & 1.79 & 2.62e-3 \\
-Dense & Tails
-  & 0.89 & 1.69e-2 & 1.79 & 2.62e-3 \\
-Dense & Tails+Twice
-  & 0.89 & 3.24e-2 & 1.79 & 6.09e-3 \\
-\midrule
-Sparse & Quoted spline
-  & 2.71 & 1.05e-1 & 2.24 & 1.28e-1 \\
-Sparse & Tails
-  & 2.71 & 1.21e-3 & 2.24 & 2.53e-3 \\
-Sparse & Tails+Twice
-  & 2.71 & 2.98e-3 & 2.24 & 6.09e-3 \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-On the dense grid the mesh bandwidth is too short for this noise. The twiced error is \(3.24\times 10^{-2}\), against \(6.09\times 10^{-3}\) at \eqref{eq:h-d2}. Twicing raises that mesh error: the negative sidelobes amplify the noise when \(h\) is only one gap wide. On the sparse grid the two bandwidths are \(2.71\) and \(2.24\), and the twiced errors are \(2.98\times 10^{-3}\) and \(6.09\times 10^{-3}\). Tails still matter. Without them the sparse error stays near \(0.1\).
+On the dense chain the wings again do not move the digits. Twicing cuts the mesh error from \(5.08\times 10^{-5}\) to \(8.34\times 10^{-6}\), against an oracle \(3.93\times 10^{-7}\). At \eqref{eq:h-d2} the twiced error is \(3.89\times 10^{-5}\) (\(h=1.35\)). The density of \(S_T\) is more peaked than under Heston, and the absolute errors are larger. On the sparse chain the quoted spline without tails has mesh error \(0.105\). Tails bring the untwiced mesh error to \(1.25\times 10^{-3}\), and twicing lowers it to \(4.39\times 10^{-4}\) at the mesh and \(9.63\times 10^{-5}\) at \eqref{eq:h-d2} (\(h=1.67\)), against an oracle \(3.31\times 10^{-5}\). Here the mesh bandwidth \(h=2.71\) is the wider of the two. Figure~\ref{fig:vg-rnd} plots the three estimators at the mesh bandwidth.
 
 \section{Empirical Applications}
 \label{sec:emp}
@@ -526,11 +456,11 @@ The listed comparison uses European, AM-settled index options from Cboe's delaye
 
 A quote is retained if the bid is positive, the ask is at least the bid, the mid is at least \(0.25\), and the spread is at most \(\max(15,\,0.002 S_0,\,0.5\times\mathrm{mid})\). The \(15\)-point term is the tolerance on the S\&P~500. On the Nasdaq-100 a fixed \(15\)-point cap deletes puts whose spreads are a dollar or two wider and leaves a gap of several thousand points in the strike list. Among remaining put--call pairs, the forward is the median of \(K+e^{rT}(C-P)\) over strikes with \(|K-K_{\mathrm{atm}}|\le 50\) on SPX, where \(K_{\mathrm{atm}}\) is the pair closest to the cash index; on NDX and RUT the band is \(0.65\%\) of the spot. Dividend yield is \(q=r-\log(F/S_0)/T\). The working slice is out of the money (OTM): the put mid if \(K\le F\), the call mid if \(K\ge F\), the missing side filled by parity. Puts with \(K<0.7F\) and mid below \(0.50\) are then dropped; out-of-the-money calls with mid at least \(0.25\) are kept. Table~\ref{tab:data} records the filter counts. In \eqref{eq:cubic} and \eqref{eq:twice}, \(\tilde C=C/(S_0e^{-qT})\) and \(F=S_0e^{(r-q)T}\).
 
-The December 2026 S\&P~500 AM quarterly (\(T=0.235\), \(S_0=7764.64\), \(F=7836\), \(q=0.11\%\)) appears in Figure~\ref{fig:listed}. After the screens it has \(n=444\) strikes on \([0.36F,1.30F]\), of which \(75\%\) are puts. Near the money the strike mesh is \(5\) (\(0.06\%\) of \(F\)); it is \(5\)--\(25\) on the put wing and up to \(200\) beyond \(1.2F\). Median out-of-the-money mids are \(39\) for puts and \(62\) for calls. Implied volatility \(\hat\sigma_{\mathrm{ATM}}=0.134\) is the median Black--Scholes implied volatility of contracts with \(|K-F|\le 0.03F\). The linear call tail of Section~\ref{sec:tails} is appended (\(C_m=0.25\) by the mid floor of the filter, \(n_R=80\) from \eqref{eq:nR}). The bandwidth \eqref{eq:h-d2} uses the \(444\) quoted strikes and equals \(h=88.3\). The March 2027 AM quarterly (\(T=0.485\), \(F=7918\), \(q=-0.04\%\), \(\hat\sigma_{\mathrm{ATM}}=0.144\)) filters to \(n=221\) strikes on \([0.20F,1.49F]\), with a \(25\)-point mesh at the money; \eqref{eq:nR} gives \(n_R=41\), and \eqref{eq:h-d2} gives \(h=148.5\).
+The December 2026 S\&P~500 AM quarterly (\(T=0.235\), \(S_0=7764.64\), \(F=7836\), \(q=0.11\%\)) appears in Figure~\ref{fig:listed}. After the screens it has \(n=444\) strikes on \([0.36F,1.30F]\), of which \(75\%\) are puts. Near the money the strike mesh is \(5\) (\(0.06\%\) of \(F\)); it is \(5\)--\(25\) on the put wing and up to \(200\) beyond \(1.2F\). Median out-of-the-money mids are \(39\) for puts and \(62\) for calls. Implied volatility \(\hat\sigma_{\mathrm{ATM}}=0.134\) is the median Black--Scholes implied volatility of contracts with \(|K-F|\le 0.03F\). The linear call tail of Section~\ref{sec:tails} is appended (\(C_m=0.25\) by the mid floor of the filter, \(n_R=80\) from \eqref{eq:nR}). The bandwidth \eqref{eq:h-d2} uses the \(444\) quoted strikes and equals \(h=103.8\). The March 2027 AM quarterly (\(T=0.485\), \(F=7918\), \(q=-0.04\%\), \(\hat\sigma_{\mathrm{ATM}}=0.144\)) filters to \(n=221\) strikes on \([0.20F,1.49F]\), with a \(25\)-point mesh at the money; \eqref{eq:nR} gives \(n_R=41\), and \eqref{eq:h-d2} gives \(h=174.7\).
 
-The Nasdaq-100 December 2026 AM quarterly (\(T=0.235\), \(S_0=30732\), \(F=31025\), \(q=-0.03\%\), \(\hat\sigma_{\mathrm{ATM}}=0.201\)) is built with the same screens. It filters to \(n=312\) strikes on \([0.29F,1.39F]\), \(83\%\) puts; the at-the-money mesh is \(25\), and gaps of \(1000\) appear beyond \(1.2F\). The bandwidth \eqref{eq:h-d2} is \(h=542.2\) (\(n=312\); the right wing has \(n_R=72\)).
+The Nasdaq-100 December 2026 AM quarterly (\(T=0.235\), \(S_0=30732\), \(F=31025\), \(q=-0.03\%\), \(\hat\sigma_{\mathrm{ATM}}=0.201\)) is built with the same screens. It filters to \(n=312\) strikes on \([0.29F,1.39F]\), \(83\%\) puts; the at-the-money mesh is \(25\), and gaps of \(1000\) appear beyond \(1.2F\). The bandwidth \eqref{eq:h-d2} is \(h=637.9\) (\(n=312\); the right wing has \(n_R=72\)).
 
-The Russell~2000 December 2026 AM quarterly (\(T=0.235\), \(S_0=2889.92\), \(F=2912\), \(q=0.80\%\), \(\hat\sigma_{\mathrm{ATM}}=0.183\)) filters to \(n=99\) strikes on \([0.45F,1.32F]\), \(59\%\) puts; the at-the-money mesh is \(10\). The last two calls are both \(0.25\), so the wing slope is the previous negative step. Equation \eqref{eq:nR} gives \(n_R=40\). The bandwidth \eqref{eq:h-d2} is \(h=52.8\).
+The Russell~2000 December 2026 AM quarterly (\(T=0.235\), \(S_0=2889.92\), \(F=2912\), \(q=0.80\%\), \(\hat\sigma_{\mathrm{ATM}}=0.183\)) filters to \(n=99\) strikes on \([0.45F,1.32F]\), \(59\%\) puts; the at-the-money mesh is \(10\). The last two calls are both \(0.25\), so the wing slope is the previous negative step. Equation \eqref{eq:nR} gives \(n_R=40\). The bandwidth \eqref{eq:h-d2} is \(h=62.1\).
 
 The quoted calls are replaced by the nearest vector in Euclidean distance that is decreasing and convex in strike. Consecutive slopes lie in \([-e^{-rT},0]\), and each coordinate is at least the intrinsic value \(e^{-rT}\max(F-K_i,0)\).  This is the unpenalized projection of \citeauthor{yatchew2006} and also the first step of \citeauthor{aitsahalia2003}. Puts of the projected call follow by parity, and both premiums are floored at zero.
 
@@ -559,116 +489,130 @@ RUT 18 Dec 2026 & 218 & 218 & 115 & 99 & 58 \\
 \paragraph{Ours}
 Start from the projected calls of Section~\ref{sec:data}. Set \(P_i=1-C_i/(S_0e^{-qT})\). Pass a natural cubic spline through those values, with the tail knots of Section~\ref{sec:tails}, and invert at \eqref{eq:h-d2} with twicing. The listed prices are that interpolant, floored at zero, with puts by parity.
 
-\paragraph{\citeauthor{yatchew2006}}
-Start from the projected calls of Section~\ref{sec:data}. A roughness penalty is then added. The objective is \(\tfrac12\|m-C\|^2\) plus \(\lambda\) times a squared second-difference penalty on the slope, scaled by the fourth power of the median gap so that \(\lambda\) is dimensionless. \(\lambda\) is chosen from \(\{0\}\cup\{10^{-2},\ldots,10^{4}\}\) (seven logarithmically spaced positive values) by even/odd pricing error, and the program is solved by sequential least squares. When the selected penalty is zero, the fitted call is the projection itself. Prices in Table~\ref{tab:listed} are the fitted calls at the quoted strikes, with puts by parity, floored at zero. The mass column is \(e^{rT}\) times the second difference of the fitted call, integrated as \(\int\max(\hat q,0)\) on the window used for every row.
-
 \paragraph{\citeauthor{aitsahalia2003}}
 Start from the projected calls of Section~\ref{sec:data}. The call used for pricing is a local linear regression of those values, with Gaussian weights. Its bandwidth is chosen by even/odd pricing error from the grid \(0.25,0.5,1,2,4\) times \(F\hat\sigma\sqrt{T}\,n^{-1/5}\). The density drawn in Figure~\ref{fig:listed} is \(e^{rT}\) times twice the quadratic coefficient of a local cubic of the same list, at the fixed second-derivative bandwidth \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). Prices in the table are the local-linear calls, floored, with puts by parity. 
 
 \paragraph{\citeauthor{bondarenko2003} PCA}
 Start from the projected calls of Section~\ref{sec:data}. The density is a mixture of \(41\) lognormals with a common log-width \(h\) and nonnegative weights. The centers are equally spaced in log strike from the first quoted strike to the last. Each component prices a call in closed form, Black--Scholes with forward \(e^{z_j+h^2/2}\). The weights minimise the sum of squared errors in those projected calls, plus two penalties, one for \(\sum_j a_j=1\) and one for \(\sum_j a_j e^{z_j+h^2/2}=F\). Nonnegative least squares returns the weights. They are not divided by their sum afterwards; a weight above one is clipped to one. The width \(h\) is chosen by even/odd pricing error on a grid of multiples of the center spacing. Prices in Table~\ref{tab:listed} are those closed-form calls, floored, with puts by parity.
 
-\paragraph{\citeauthor{priestley1972}}
-Start from the projected calls of Section~\ref{sec:data}. Section~\ref{sec:naive} records why \eqref{eq:pc} is a poor estimator of a call: the level \(C_i\) is large deep in the money, where \(C''\) is nearly zero, and the spacing weight does not remove that level. The listed estimator is the cubic that section substitutes, \eqref{eq:pc-cubic}: a clamped cubic spline through the projected calls, extended by linear wings of slope in \([-e^{-rT},0]\), then convolved with a Gaussian kernel. The bandwidth minimizes even/odd pricing error on a grid that starts at the median strike gap. On each of the four chains the minimum is that lower endpoint, \(h=10\), \(25\), \(100\), and \(10\). The second derivative at that width is not a smooth density: the curves in Figure~\ref{fig:listed} have \(36\), \(18\), \(16\), and \(17\) peaks. Prices in the table are the smoothed call at the quoted strikes, floored, with puts by parity.
+\paragraph{\citeauthor{aitsahalia1998}}
+Start from the projected calls of Section~\ref{sec:data}. Regress Black--Scholes implied volatility on strike by Nadaraya--Watson with a Gaussian kernel. The bandwidth minimizes the same even/odd pricing error. Prices are the Black--Scholes calls at the smoothed volatility, floored, with puts by parity. The density is the strike derivative of that call, including the slope and curvature of the smoothed smile. The selected bandwidths are \(h=20\), \(50\), \(200\), and \(20\). The resulting curves have \(32\), \(14\), \(26\), and \(15\) peaks.
+
+\paragraph{\citeauthor{grith2012}}
+Start from the projected calls of Section~\ref{sec:data}. Both rows are a local cubic with a quartic kernel, and the bandwidth minimizes the same even/odd pricing error. The call row reads the density as \(e^{rT}\) times twice the quadratic coefficient of a local cubic of the call. Its bandwidths are \(h=37.8\), \(67.6\), \(239\), and \(40\), and the curves have \(3\), \(3\), \(13\), and \(1\) peaks. The implied-volatility row is the local polynomial of the smile used by \citeauthor{grith2012}: a local cubic of implied volatility, Black--Scholes prices at the local level, and a density that uses the local slope and curvature. Its bandwidths are \(h=20\), \(50\), \(200\), and \(52.8\), and the curves have \(22\), \(6\), \(12\), and \(2\) peaks. The call cubic is drawn on the left of Figure~\ref{fig:listed}. Figure~\ref{fig:listed-kern} draws the implied-volatility cubic together with \citeauthor{aitsahalia1998}. Prices in both rows are floored, with puts by parity.
 
 Hold-out refits the projection and every tuned method on the training strikes only, including the choice of its tuning constant, and scores the other half against the quoted mids. The two directions are averaged. 
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=88.3\), \(148.5\), \(542.2\), \(52.8\)). \citeauthor{yatchew2006} is that projection plus its cross-validated penalty. \citeauthor{aitsahalia2003} is priced from the local linear at its cross-validated bandwidth. PCA is priced from the lognormal mixture. \citeauthor{priestley1972} is the cubic \eqref{eq:pc-cubic} at the even/odd pricing bandwidth. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Weighed av.\ weights chain \(i\) by \(1/F_i\), normalized to sum to one.}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=103.8\), \(174.7\), \(637.9\), \(62.1\)). \citeauthor{aitsahalia2003} is priced from the local linear at its cross-validated bandwidth; the mass is the local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). \citeauthor{aitsahalia1998} and both \citeauthor{grith2012} rows use even/odd pricing bandwidths, and the mass is the density of that same fit. PCA is priced from the lognormal mixture. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores 1. Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Bold method names are the unimodal densities of unit mass: the spline, the lognormal mixture, and \citeauthor{aitsahalia2003}.}
 \label{tab:listed}
+{\small
+\setlength{\tabcolsep}{3pt}%
+\renewcommand{\arraystretch}{0.9}%
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=1.2]}
+\begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=2.2] S[table-format=2.2]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} &
-  {RMSE OTM} & {Puts} & {Calls} & {Hold-out} & {Mass} \\
+  {RMSE OTM} & {Puts} & {Calls} & {Hold-out} & {Mass} & {TV} \\
 \midrule
-SPX Dec & Ours
-  & 0.055 & 0.044 & 0.082 & 0.070 & 1.00 \\
-SPX Dec & \citeauthor{yatchew2006}
-  & 0.022 & 0.022 & 0.020 & 0.050 & 0.97 \\
-SPX Dec & \citeauthor{aitsahalia2003}
-  & 0.337 & 0.252 & 0.518 & 0.444 & 1.01 \\
-SPX Dec & PCA
-  & 0.038 & 0.035 & 0.046 & 0.040 & 1.00 \\
-SPX Dec & \citeauthor{priestley1972}
-  & 0.037 & 0.033 & 0.048 & 0.066 & 1.00 \\
+SPX Dec & \textbf{Ours}
+  & 0.088 & 0.061 & 0.142 & 0.114 & 1.00 & 1.00 \\
+SPX Dec & \textbf{PCA}
+  & 0.038 & 0.035 & 0.046 & 0.040 & 1.00 & 1.00 \\
+SPX Dec & \textbf{\citeauthor{aitsahalia2003}}
+  & 0.337 & 0.252 & 0.518 & 0.444 & 1.01 & 1.00 \\
+SPX Dec & \citeauthor{grith2012}, IV
+  & 0.030 & 0.029 & 0.032 & 0.037 & 4.32 & 3.19 \\
+SPX Dec & \citeauthor{grith2012}, call
+  & 0.031 & 0.030 & 0.036 & 0.039 & 1.01 & 1.17 \\
+SPX Dec & \citeauthor{aitsahalia1998}
+  & 0.064 & 0.061 & 0.073 & 0.113 & 1.56 & 10.94 \\
 \midrule
-SPX Mar & Ours
-  & 0.098 & 0.074 & 0.147 & 0.124 & 1.00 \\
-SPX Mar & \citeauthor{yatchew2006}
-  & 0.024 & 0.022 & 0.031 & 0.145 & 1.00 \\
-SPX Mar & \citeauthor{aitsahalia2003}
-  & 0.596 & 0.401 & 0.963 & 0.789 & 1.01 \\
-SPX Mar & PCA
-  & 0.079 & 0.063 & 0.115 & 0.079 & 1.00 \\
-SPX Mar & \citeauthor{priestley1972}
-  & 0.086 & 0.061 & 0.134 & 0.331 & 1.00 \\
+SPX Mar & \textbf{Ours}
+  & 0.163 & 0.109 & 0.265 & 0.212 & 1.00 & 1.00 \\
+SPX Mar & \textbf{PCA}
+  & 0.079 & 0.063 & 0.115 & 0.079 & 1.00 & 1.00 \\
+SPX Mar & \textbf{\citeauthor{aitsahalia2003}}
+  & 0.596 & 0.401 & 0.963 & 0.789 & 1.01 & 0.99 \\
+SPX Mar & \citeauthor{grith2012}, IV
+  & 0.027 & 0.024 & 0.034 & 0.042 & 1.14 & 1.36 \\
+SPX Mar & \citeauthor{grith2012}, call
+  & 0.031 & 0.029 & 0.038 & 0.061 & 1.00 & 1.10 \\
+SPX Mar & \citeauthor{aitsahalia1998}
+  & 0.073 & 0.064 & 0.094 & 0.158 & 1.20 & 5.03 \\
 \midrule
-NDX Dec & Ours
-  & 1.077 & 1.143 & 0.671 & 1.150 & 1.00 \\
-NDX Dec & \citeauthor{yatchew2006}
-  & 0.785 & 0.839 & 0.432 & 1.285 & 1.00 \\
-NDX Dec & \citeauthor{aitsahalia2003}
-  & 2.499 & 2.418 & 2.858 & 3.278 & 1.02 \\
-NDX Dec & PCA
-  & 1.147 & 1.131 & 1.221 & 1.187 & 1.00 \\
-NDX Dec & \citeauthor{priestley1972}
-  & 0.954 & 0.998 & 0.700 & 1.992 & 1.00 \\
+NDX Dec & \textbf{Ours}
+  & 1.170 & 1.239 & 0.742 & 1.280 & 1.00 & 1.00 \\
+NDX Dec & \textbf{PCA}
+  & 1.147 & 1.131 & 1.221 & 1.187 & 1.00 & 1.00 \\
+NDX Dec & \textbf{\citeauthor{aitsahalia2003}}
+  & 2.499 & 2.418 & 2.858 & 3.278 & 1.02 & 1.00 \\
+NDX Dec & \citeauthor{grith2012}, IV
+  & 0.874 & 0.927 & 0.548 & 1.018 & 1.02 & 2.65 \\
+NDX Dec & \citeauthor{grith2012}, call
+  & 0.892 & 0.943 & 0.579 & 1.087 & 1.00 & 2.11 \\
+NDX Dec & \citeauthor{aitsahalia1998}
+  & 1.734 & 1.648 & 2.104 & 2.623 & 1.34 & 10.99 \\
 \midrule
-RUT Dec & Ours
-  & 0.042 & 0.039 & 0.045 & 0.053 & 1.00 \\
-RUT Dec & \citeauthor{yatchew2006}
-  & 0.026 & 0.022 & 0.031 & 0.155 & 1.00 \\
-RUT Dec & \citeauthor{aitsahalia2003}
-  & 0.339 & 0.293 & 0.394 & 0.467 & 1.09 \\
-RUT Dec & PCA
-  & 0.034 & 0.030 & 0.039 & 0.038 & 1.00 \\
-RUT Dec & \citeauthor{priestley1972}
-  & 0.055 & 0.048 & 0.063 & 0.210 & 1.00 \\
+RUT Dec & \textbf{Ours}
+  & 0.067 & 0.059 & 0.078 & 0.088 & 1.00 & 1.00 \\
+RUT Dec & \textbf{PCA}
+  & 0.034 & 0.030 & 0.039 & 0.038 & 1.00 & 1.00 \\
+RUT Dec & \textbf{\citeauthor{aitsahalia2003}}
+  & 0.339 & 0.293 & 0.394 & 0.467 & 1.09 & 1.00 \\
+RUT Dec & \citeauthor{grith2012}, IV
+  & 0.023 & 0.023 & 0.024 & 0.031 & 3.53 & 1.66 \\
+RUT Dec & \citeauthor{grith2012}, call
+  & 0.022 & 0.022 & 0.022 & 0.061 & 1.07 & 1.20 \\
+RUT Dec & \citeauthor{aitsahalia1998}
+  & 0.098 & 0.124 & 0.035 & 0.201 & 1.57 & 7.63 \\
 \midrule
-Average & Ours
-  & 0.318 & 0.325 & 0.236 & 0.349 & 1.00 \\
-Average & \citeauthor{yatchew2006}
-  & 0.214 & 0.226 & 0.129 & 0.409 & 0.99 \\
-Average & \citeauthor{aitsahalia2003}
-  & 0.943 & 0.841 & 1.183 & 1.245 & 1.03 \\
-Average & PCA
-  & 0.325 & 0.315 & 0.355 & 0.336 & 1.00 \\
-Average & \citeauthor{priestley1972}
-  & 0.283 & 0.285 & 0.236 & 0.650 & 1.00 \\
-\midrule
-Weighed av. & Ours
-  & 0.109 & 0.104 & 0.105 & 0.127 & 1.00 \\
-Weighed av. & \citeauthor{yatchew2006}
-  & 0.064 & 0.064 & 0.049 & 0.189 & 0.99 \\
-Weighed av. & \citeauthor{aitsahalia2003}
-  & 0.501 & 0.415 & 0.660 & 0.671 & 1.05 \\
-Weighed av. & PCA
-  & 0.101 & 0.094 & 0.116 & 0.105 & 1.00 \\
-Weighed av. & \citeauthor{priestley1972}
-  & 0.103 & 0.096 & 0.107 & 0.296 & 1.00 \\
+Average & \textbf{Ours}
+  & 0.372 & 0.367 & 0.307 & 0.424 & 1.00 & 1.00 \\
+Average & \textbf{PCA}
+  & 0.325 & 0.315 & 0.355 & 0.336 & 1.00 & 1.00 \\
+Average & \textbf{\citeauthor{aitsahalia2003}}
+  & 0.943 & 0.841 & 1.183 & 1.245 & 1.03 & 1.00 \\
+Average & \citeauthor{grith2012}, IV
+  & 0.238 & 0.251 & 0.159 & 0.282 & 2.50 & 2.22 \\
+Average & \citeauthor{grith2012}, call
+  & 0.244 & 0.256 & 0.169 & 0.312 & 1.02 & 1.40 \\
+Average & \citeauthor{aitsahalia1998}
+  & 0.492 & 0.475 & 0.577 & 0.774 & 1.42 & 8.65 \\
 \bottomrule
-\end{tabular}%
+\end{tabular}}%
 }
 \end{table}
 
-The solved \citeauthor{yatchew2006} projection is the nearest decreasing convex call. Its out-of-the-money error is \(0.022\) on SPX December, \(0.024\) on SPX March, \(0.785\) on NDX December, and \(0.026\) on RUT December. On SPX December the cross-validated penalty is zero, so \(0.022\) is the distance from the quotes to the cone. Any smoother that stays inside the cone, including \citeauthor{aitsahalia2003}, lies at or above it. Their cross-validated local linear is \(0.337\), \(0.596\), \(2.499\), and \(0.339\). With centers on the quoted log-strike range and a width chosen by pricing error, PCA out-of-the-money error is \(0.038\) on SPX December, \(0.079\) on SPX March, \(1.147\) on NDX December, and \(0.034\) on RUT December. The \citeauthor{priestley1972} smoother, at its cross-validated bandwidth, has out-of-the-money error \(0.037\), \(0.086\), \(0.954\), and \(0.055\). The hold-out error is \(0.066\), \(0.331\), \(1.992\), and \(0.210\).
-The estimator of this paper is the Gaussian inversion of the cubic spline of \(P\), with tails and twicing, at \eqref{eq:h-d2}. The pricing error is \(0.055\), \(0.098\), \(1.077\), and \(0.042\). The hold-out error is \(0.070\), \(0.124\), \(1.150\), and \(0.053\).
+On SPX December the quoted calls sit \(0.022\) from the decreasing-convex cone, so a fit that stays inside the cone cannot undercut that error. The cross-validated local linear of \citeauthor{aitsahalia2003} is \(0.337\), \(0.596\), \(2.499\), and \(0.339\). With centers on the quoted log-strike range and a width chosen by pricing error, PCA out-of-the-money error is \(0.038\) on SPX December, \(0.079\) on SPX March, \(1.147\) on NDX December, and \(0.034\) on RUT December.
 
-Averaging the out-of-the-money hold-out error across the four chains, one obtains \(0.349\) for the estimator of this paper, \(0.409\) for \citeauthor{yatchew2006}, \(1.245\) for \citeauthor{aitsahalia2003}, \(0.336\) for PCA, and \(0.650\) for \citeauthor{priestley1972}. Weighting the average with the inverse forward, normalized to sum to one, one has \(0.127\), \(0.189\), \(0.671\), \(0.105\), and \(0.296\), in the same order.
+The estimator of this paper is the Gaussian inversion of the cubic spline of \(P\), with tails and twicing, at \eqref{eq:h-d2}. The pricing error is \(0.088\), \(0.163\), \(1.170\), and \(0.067\). The hold-out error is \(0.114\), \(0.212\), \(1.280\), and \(0.088\). Each of the four curves has one peak on \([0.55F,1.40F]\) and mass \(1.00\). The bandwidth in that row is the same number that prices the chain.
+
+\citeauthor{aitsahalia1998}, at a pricing cross-validation of the implied-volatility regression, has error \(0.064\), \(0.073\), \(1.734\), and \(0.098\), with \(32\), \(14\), \(26\), and \(15\) peaks and mass \(1.56\), \(1.20\), \(1.34\), and \(1.57\). The call cubic of \citeauthor{grith2012} is the smoothest of this group and the closest on price: \(0.031\), \(0.031\), \(0.892\), and \(0.022\), with \(3\), \(3\), \(13\), and \(1\) peaks. Their implied-volatility cubic prices at \(0.030\), \(0.027\), \(0.874\), and \(0.023\), and the integral of the positive part on the window is \(4.32\), \(1.14\), \(1.02\), and \(3.53\).
+
+A peak count treats a ripple and a spike as the same event, and the count depends on where the height cutoff is set. The TV column of Table~\ref{tab:listed} is the total variation of \(\max(\hat q,0)\) on the strike window of Figure~\ref{fig:listed}, divided by twice the highest value on that window. A unimodal curve climbs once and descends once, so the ratio equals one, apart from whatever mass remains at the two edges. An extra oscillation of height \(a\) adds \(2a\) to the numerator and so adds \(a\) divided by the height of the mode. The three bold rows score \(1.00\), apart from \(0.99\) for \citeauthor{aitsahalia2003} on SPX March. The call cubic scores \(1.17\), \(1.10\), \(2.11\), and \(1.20\): a small wiggle on three chains and a material one on NDX. \citeauthor{aitsahalia1998} scores \(10.94\), \(5.03\), \(10.99\), and \(7.63\). \citeauthor{aitsahalia2003} already separate the two widths. The local cubic in Figure~\ref{fig:listed} uses \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\), about two and a quarter times \eqref{eq:h-d2}. The call cubic is on the left of Figure~\ref{fig:listed}. Figure~\ref{fig:listed-kern} draws the other two pricing-bandwidth kernels on that same vertical scale.
+
+Averaging the out-of-the-money hold-out error across the four chains, one obtains \(0.424\) for the estimator of this paper, \(1.245\) for \citeauthor{aitsahalia2003}, \(0.774\) for \citeauthor{aitsahalia1998}, \(0.312\) for the call cubic of \citeauthor{grith2012}, \(0.282\) for their implied-volatility cubic, and \(0.336\) for PCA.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/ccdf_listed.pdf}
-\caption{SPX, NDX, and RUT, 18 December 2026, snapshot 23~September 2026. Each curve is fit to the projected call of Section~\ref{sec:data}. Left: \(\max(\hat f_{\Q},0)\). The cubic-spline estimator is at \eqref{eq:h-d2}. \citeauthor{aitsahalia2003} is the local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). PCA is the fitted lognormal mixture. \citeauthor{priestley1972} is \eqref{eq:pc-cubic} at its pricing cross-validation bandwidth. Right: out-of-the-money implied volatility from the same fits' prices, with \citeauthor{yatchew2006} in place of the local cubic. The dashed line is the forward.}
+\caption{SPX, NDX, and RUT, 18 December 2026, snapshot 23~September 2026. Each curve is fit to the projected call of Section~\ref{sec:data}. Left: \(\max(\hat f_{\Q},0)\) for the cubic-spline estimator at \eqref{eq:h-d2}, the lognormal mixture, the \citeauthor{aitsahalia2003} local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\), and the call cubic of \citeauthor{grith2012} at its pricing bandwidth. Right: out-of-the-money implied volatility for the spline, the mixture, the call cubic, and \citeauthor{aitsahalia1998}. The dashed line is the forward. The pricing-bandwidth kernels are in Figure~\ref{fig:listed-kern}.}
 \label{fig:listed}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\textwidth]{figures/ccdf_listed_kern.pdf}
+\caption{The pricing-bandwidth kernels on the chains of Figure~\ref{fig:listed}. \citeauthor{aitsahalia1998} and the implied-volatility cubic of \citeauthor{grith2012} use the even/odd pricing bandwidth. Left: \(\max(\hat f_{\Q},0)\), on the strike window and vertical scale of the left panel of Figure~\ref{fig:listed}, with curves truncated there. Right: out-of-the-money implied volatility of the same two fits. The dashed line is the forward.}
+\label{fig:listed-kern}
 \end{figure}
 
 \section{Conclusion}
 \label{sec:conc}
 
-The construction in the paper produces both an in-fill consistent estimate of the RND and a pricing interpolant. In sample it is competitive with the other established methods. The cross-validated \citeauthor{priestley1972} bandwidth reprices slightly more closely, and the density has many peaks; its hold-out error is larger. The \citeauthor{yatchew2006} projection remains slightly closer in sample (but cannot produce a density), and PCA is marginally closer on the weighted hold-out (but is not consistent without modifications).
+The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. That pricing criterion, applied to the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} and to both local cubics of \citeauthor{grith2012}, reprices as closely or more closely, and the densities have many peaks or an integral well above one on the window past the quotes. The call cubic is the nearest of that group, with \(3\), \(3\), \(13\), and \(1\) peaks. On the four listed chains the spline has one peak and mass \(1.00\), and its out-of-the-money error stays in that pack. PCA remains a sieve of fixed dimension.
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:twice} and a replication script are available at \url{https://github.com/s-broda/RND}.
