@@ -130,17 +130,23 @@ def _exact(label, p, calls, q_true, K_eval):
                 K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
                 tails=tails, twice=twice,
             )
-            q_m, q_d = fit_m["q"], fit_d["q"]
+            fit_9 = estimate_rnd(
+                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+                h="deriv", tails=tails, twice=twice,
+            )
+            q_m, q_d, q_9 = fit_m["q"], fit_d["q"], fit_9["q"]
             rec[chain][name] = dict(
                 h_star=best_h, ise_star=best,
                 h_mesh=fit_m["h"], ise_mesh=_ise(K_eval, q_m, q_true),
                 h_den=fit_d["h"], ise_den=_ise(K_eval, q_d, q_true),
+                h_9=fit_9["h"], ise_9=_ise(K_eval, q_9, q_true),
             )
             row = rec[chain][name]
             print(
                 f"    {name:16} oracle {row['h_star']:.4g} {row['ise_star']:.4e}  "
                 f"mesh {row['h_mesh']:.4g} {row['ise_mesh']:.4e}  "
-                f"rule {row['h_den']:.4g} {row['ise_den']:.4e}"
+                f"rule {row['h_den']:.4g} {row['ise_den']:.4e}  "
+                f"n^-1/9 {row['h_9']:.4g} {row['ise_9']:.4e}"
             )
             plot.setdefault(chain, {})[{"Quoted spline": "quoted", "Tails": "tails", "Tails+Twice": "twice"}[name]] = q_m
             plot[chain]["K"] = K
@@ -221,7 +227,8 @@ def _holdout_method(sl, method):
         Ke = sl.K[test]
         if method == "ours":
             C_te = estimate_rnd(
-                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=Ke, tails=True, twice=True,
+                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=Ke, h="deriv",
+                tails=True, twice=True,
             )["C"]
         elif method == "yh":
             lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
@@ -233,7 +240,9 @@ def _holdout_method(sl, method):
             h = pca_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
             C_te, _, _, _, _ = pca_fit(Kt, Ct, sl.r, sl.T, sl.F, h, Ke, Ke[:1])
         elif method == "pc":
-            h = estimate_rnd(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, tails=True, twice=True)["h"]
+            h = estimate_rnd(
+                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, h="deriv", tails=True, twice=True,
+            )["h"]
             _, _, C_te = priestley_chao_cubic(
                 Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
             )
@@ -264,7 +273,8 @@ def _chain_scores(sl):
     C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
     s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
     fit = estimate_rnd(
-        sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, tails=True, twice=True,
+        sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, h="deriv",
+        tails=True, twice=True,
     )
     h = fit["h"]
     lam = yatchew_cv_lambda(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
@@ -442,6 +452,57 @@ def _plot_listed(scored):
     print(" wrote ccdf_listed.pdf")
 
 
+def _iv_noise(K, C, S0, r, T, q, rng, sd=0.01):
+    iv = np.asarray(bs.implied_vol(C, S0, K, r, T, q, True), float)
+    med = np.nanmedian(iv[np.isfinite(iv)]) if np.any(np.isfinite(iv)) else 0.2
+    iv = np.where(np.isfinite(iv), iv, med)
+    iv = np.clip(iv + rng.normal(0.0, sd, size=iv.shape), 0.02, 2.5)
+    return bs.call_price(S0, K, r, T, iv, q)
+
+
+def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
+    """Mean ISE on Heston quotes with N(0, sd^2) noise in implied volatility."""
+    print(f"\nNoisy Heston  reps={n_reps}  iv sd={sd}  seed={seed}")
+    rng = np.random.default_rng(seed)
+    p = BCC97
+    K_eval = np.linspace(60.0, 150.0, 401)
+    q_true = heston_spot_density(K_eval, p)
+    calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
+    specs = (
+        ("Quoted spline", False, False),
+        ("Tails", True, False),
+        ("Tails+Twice", True, True),
+    )
+    rules = ("mesh", "cubic", "deriv")
+    for chain, K in (
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
+    ):
+        C_true = np.maximum(calls(K), 0.0)
+        acc = {name: {rule: [] for rule in rules} for name, _, _ in specs}
+        hs = {name: {rule: [] for rule in rules} for name, _, _ in specs}
+        for _rep in range(n_reps):
+            C_obs = _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd)
+            C_proj = _projected_calls(K, C_obs, p.r, p.T, p.forward)
+            for name, tails, twice in specs:
+                for rule in rules:
+                    fit = estimate_rnd(
+                        K, C_proj, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+                        h=rule, tails=tails, twice=twice,
+                    )
+                    acc[name][rule].append(_ise(K_eval, fit["q"], q_true))
+                    hs[name][rule].append(fit["h"])
+        print(f"  -- {chain}")
+        for name, _, _ in specs:
+            bits = []
+            for rule in rules:
+                bits.append(
+                    f"{rule} h={np.mean(hs[name][rule]):.3g} "
+                    f"ISE={np.mean(acc[name][rule]):.4e}"
+                )
+            print(f"    {name:16} " + "  ".join(bits))
+
+
 def main():
     K_eval = np.linspace(60.0, 150.0, 401)
     p = BCC97
@@ -454,6 +515,7 @@ def main():
     v = CM99
     rec_v, plot_v, _, qv = _exact("VG", v, lambda K: vg_calls(K, v), vg_spot_density(K_eval, v), K_eval)
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
+    noisy_heston()
     listed()
     print("DONE")
 

@@ -15,6 +15,7 @@ from scipy.special import erf
 from scipy.stats import norm
 
 FACTOR = 0.55
+DERIV_C = 0.34
 
 
 def estimate_rnd(
@@ -44,12 +45,14 @@ def estimate_rnd(
         Strikes at which to return the density. Defaults to ``K``.
     K_price : array_like, optional
         Strikes at which to return the call interpolant. Omitted if None.
-    h : float or {"cubic", "mesh", "density"}, optional
+    h : float or {"cubic", "mesh", "density", "deriv"}, optional
         Bandwidth. The default ``"cubic"`` rule is
         ``0.55 × 1.06 F σ_ATM √T n^{-1/5}``, with ``n`` the number of quoted
         strikes plus the notional right-wing count. ``"mesh"`` is
         ``min(1.2 δ, 0.30(K_m − K_1))``. ``"density"`` is the Silverman
-        rule without the factor 0.55. A number is used as given.
+        rule without the factor 0.55. ``"deriv"`` is
+        ``0.34 F σ_ATM √T n^{-1/9}`` with ``n`` the number of quoted strikes.
+        A number is used as given.
     tails : bool
         Add the knots ``(0, 0)`` and, when the call has not died,
         ``(K_end, 1)``.
@@ -76,7 +79,7 @@ def estimate_rnd(
         K_eval = np.asarray(K_eval, dtype=float)
     if h is None or h == "cubic":
         h_use = _bandwidth(K, C, S0, r, T, q, F, "cubic")
-    elif h in ("mesh", "density"):
+    elif h in ("mesh", "density", "deriv"):
         h_use = _bandwidth(K, C, S0, r, T, q, F, h)
     else:
         h_use = float(h)
@@ -169,10 +172,24 @@ def _phi(u):
     return np.exp(-0.5 * u * u) / np.sqrt(2.0 * np.pi)
 
 
+def _atm_sigma(K, C, S0, r, T, q, F):
+    iv = _implied_vol(C, S0, K, r, T, q)
+    iv = np.asarray(iv, dtype=float)
+    atm = np.nanmedian(iv[np.abs(K - F) <= 0.03 * F])
+    if not np.isfinite(atm):
+        med = np.nanmedian(iv)
+        atm = float(med) if np.isfinite(med) else 0.16
+    return float(atm)
+
+
 def _bandwidth(K, C, S0, r, T, q, F, rule):
-    """``mesh`` is 1.2 times the median gap. ``cubic`` is 0.55 times density-scale."""
+    """``mesh``, ``cubic`` (0.55 times density-scale), ``density``, or ``deriv``."""
     if rule == "mesh":
         return _mesh_h(K)
+    if rule == "deriv":
+        n = max(len(K), 8)
+        sig = _atm_sigma(K, C, S0, r, T, q, F)
+        return float(DERIV_C * F * sig * np.sqrt(T) * n ** (-1.0 / 9.0))
     disc = float(np.exp(-float(r) * float(T)))
     n_right = _n_right_from_gap(K, C, F, disc)
     n_ext = len(K) + int(n_right)
@@ -236,11 +253,7 @@ def _mesh_h(K):
 def _density_h(K, C, S0, r, T, q, F, n_ext):
     """Silverman's Gaussian rule on the scale of S_T."""
     n = max(int(n_ext), 8)
-    iv = _implied_vol(C, S0, K, r, T, q)
-    atm = np.nanmedian(iv[np.abs(K - F) <= 0.03 * F])
-    if not np.isfinite(atm):
-        med = np.nanmedian(iv)
-        atm = float(med) if np.isfinite(med) else 0.16
+    atm = _atm_sigma(K, C, S0, r, T, q, F)
     return float(1.06 * F * atm * np.sqrt(T) * n ** (-0.2))
 
 
