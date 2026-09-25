@@ -792,3 +792,241 @@ def priestley_chao_cv(K, C, S0, r, T, q, F):
             best = float(np.mean(errs))
             best_h = float(h)
     return best_h
+
+
+# --- Aït-Sahalia–Lo and Grith–Härdle–Schienle, single maturity ---
+#
+# Bandwidth ``h`` is the standard deviation of the weight function, in strike
+# units. The quartic kernel has sd 1/sqrt(7) on its native support, so its
+# support radius is h*sqrt(7) when it is asked to match a Gaussian of width h.
+
+
+def second_derivative_h(K, C, S0, r, T, q, F, c=0.9):
+    """h = c F σ_ATM √T n^{-1/9}. The constant 0.9 is the ASD density rule."""
+    K, C = _sorted(K, C)
+    n = max(len(K), 8)
+    sig = _atm_vol(C, S0, K, r, T, q, F)
+    return float(c * float(F) * sig * np.sqrt(T) * n ** (-1.0 / 9.0))
+
+
+def _iv_on_calls(K, C, S0, r, T, q):
+    iv = np.asarray(bs.implied_vol(C, S0, K, r, T, q, True), dtype=float)
+    iv = np.atleast_1d(iv).astype(float)
+    good = np.isfinite(iv) & (iv > 0.0)
+    if int(good.sum()) == 0:
+        return np.full(len(K), 0.2)
+    if not np.all(good):
+        iv = iv.copy()
+        iv[~good] = np.interp(K[~good], K[good], iv[good])
+    return iv
+
+
+def rnd_from_iv(K, sig, sig1, sig2, S0, r, T, q):
+    """Risk-neutral density of a Black–Scholes call with strike-dependent IV.
+
+    Constant IV reduces to the lognormal density. ``sig1`` and ``sig2`` are
+    dσ/dK and d²σ/dK².
+    """
+    K = np.asarray(K, dtype=float)
+    sig = np.maximum(np.asarray(sig, dtype=float), 1e-8)
+    sig1 = np.asarray(sig1, dtype=float)
+    sig2 = np.asarray(sig2, dtype=float)
+    F = float(S0) * np.exp((float(r) - float(q)) * float(T))
+    sqrtT = np.sqrt(float(T))
+    w = sig * sqrtT
+    wp = sig1 * sqrtT
+    wpp = sig2 * sqrtT
+    u = np.log(F / np.maximum(K, 1e-12))
+    d2 = u / w - 0.5 * w
+    d2p = -1.0 / (K * w) - wp * (u / (w * w) + 0.5)
+    psi = norm.pdf(d2)
+    return psi * wp - K * psi * d2 * d2p * wp + K * psi * wpp - psi * d2p
+
+
+def _nw_iv(K, sig, K_eval, h):
+    """Nadaraya–Watson level and the first two strike derivatives of IV."""
+    K = np.asarray(K, dtype=float)
+    sig = np.asarray(sig, dtype=float)
+    K_eval = np.asarray(K_eval, dtype=float)
+    h = max(float(h), 1e-6)
+    u = np.clip((K_eval[:, None] - K[None, :]) / h, -40.0, 40.0)
+    kap = np.exp(-0.5 * u * u)
+    kap1 = kap * (-u / h)
+    kap2 = kap * ((u * u - 1.0) / (h * h))
+    with np.errstate(all="ignore"):
+        s0 = kap.sum(axis=1)
+        s1 = kap @ sig
+        s0p = kap1.sum(axis=1)
+        s1p = kap1 @ sig
+        s0pp = kap2.sum(axis=1)
+        s1pp = kap2 @ sig
+    tiny = s0 < 1e-14
+    s0 = np.where(tiny, 1.0, s0)
+    level = s1 / s0
+    first = (s1p * s0 - s1 * s0p) / (s0 * s0)
+    second = (s1pp * s0 - s1 * s0pp) / (s0 * s0) - 2.0 * first * s0p / s0
+    level = np.where(tiny, sig[np.argmin(np.abs(K_eval[:, None] - K[None, :]), axis=1)], level)
+    first = np.where(tiny, 0.0, first)
+    second = np.where(tiny, 0.0, second)
+    return level, first, second
+
+
+def _kernel_weights(dx, h, kernel):
+    dx = np.asarray(dx, dtype=float)
+    h = max(float(h), 1e-6)
+    if kernel == "quartic":
+        u = dx / (h * np.sqrt(7.0))
+        w = np.zeros_like(u)
+        inside = np.abs(u) <= 1.0
+        uu = u[inside]
+        w[inside] = (1.0 - uu * uu) ** 2
+        return w
+    return np.exp(-0.5 * (dx / h) ** 2)
+
+
+def _local_beta(K, Y, x, h, degree, kernel):
+    K = np.asarray(K, dtype=float)
+    # A compact kernel can leave fewer than degree+2 strikes in the window.
+    # Widen that fit until the local polynomial is determined.
+    h_use = max(float(h), 1e-6)
+    dx_all = K - float(x)
+    w_all = _kernel_weights(dx_all, h_use, kernel)
+    need = degree + 2
+    while int(np.sum(w_all > 1e-14)) < need and h_use < 40.0 * float(h):
+        h_use *= 1.6
+        w_all = _kernel_weights(dx_all, h_use, kernel)
+    if kernel == "quartic":
+        sel = w_all > 1e-14
+    else:
+        sel = np.abs(dx_all) <= max(6.0 * h_use, 1e-8)
+    if int(sel.sum()) < degree + 1:
+        take = np.argsort(np.abs(dx_all))[: max(need, degree + 1)]
+        sel = np.zeros(dx_all.size, dtype=bool)
+        sel[take] = True
+        w_all = np.maximum(w_all, 0.0)
+        w_all[take] = np.maximum(w_all[take], 1e-6)
+    dx = dx_all[sel]
+    yy = np.asarray(Y, dtype=float)[sel]
+    w = w_all[sel]
+    if float(np.sum(w)) < 1e-14:
+        w = np.ones_like(dx)
+    sw = np.sqrt(np.maximum(w, 0.0))
+    cols = [np.ones_like(dx)]
+    pwr = np.ones_like(dx)
+    for _ in range(degree):
+        pwr = pwr * dx
+        cols.append(pwr)
+    X = np.column_stack(cols) * sw[:, None]
+    rhs = yy * sw
+    xtx = X.T @ X
+    try:
+        beta = np.linalg.solve(xtx, X.T @ rhs)
+    except np.linalg.LinAlgError:
+        beta = np.linalg.lstsq(X, rhs, rcond=None)[0]
+    return beta
+
+
+def _local_poly_eval(K, Y, K_eval, h, degree, kernel):
+    """Columns are β0, β1, ... at each evaluation strike."""
+    K_eval = np.atleast_1d(np.asarray(K_eval, dtype=float))
+    out = np.zeros((K_eval.size, degree + 1))
+    for j, x in enumerate(K_eval):
+        out[j] = _local_beta(K, Y, float(x), h, degree, kernel)
+    return out
+
+
+def asl_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
+    """Aït-Sahalia–Lo semiparametric estimator on one maturity.
+
+    Nadaraya–Watson of Black–Scholes implied volatility, Gaussian kernel.
+    Prices are the Black–Scholes calls at the smoothed volatility. The density
+    is the strike derivative of that call, including the slope and curvature
+    of the smoothed smile.
+    """
+    K, C = _sorted(K, C)
+    sig = _iv_on_calls(K, C, S0, r, T, q)
+    K_price = np.asarray(K_price, dtype=float)
+    K_dens = np.asarray(K_dens, dtype=float)
+    sig_p, sig_p1, _ = _nw_iv(K, sig, K_price, h)
+    call = np.maximum(bs.call_price(S0, K_price, r, T, sig_p, q), 0.0)
+    sig_d, sig_d1, sig_d2 = _nw_iv(K, sig, K_dens, h)
+    dens = rnd_from_iv(K_dens, sig_d, sig_d1, sig_d2, S0, r, T, q)
+    return call, dens
+
+
+def ghs_call_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
+    """Grith–Härdle–Schienle local cubic of the call. Quartic kernel.
+
+    The density is e^{rT} times twice the quadratic coefficient. The price is
+    the local level at the same bandwidth.
+    """
+    del S0, q, F
+    K, C = _sorted(K, C)
+    beta_p = _local_poly_eval(K, C, K_price, h, 3, "quartic")
+    beta_d = _local_poly_eval(K, C, K_dens, h, 3, "quartic")
+    call = np.maximum(beta_p[:, 0], 0.0)
+    dens = np.exp(float(r) * float(T)) * 2.0 * beta_d[:, 2]
+    return call, dens
+
+
+def ghs_iv_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
+    """Rookley estimator as used by Grith–Härdle–Schienle.
+
+    Local cubic of implied volatility, quartic kernel. Prices are Black–Scholes
+    at the local level. The density uses the local slope and curvature.
+    """
+    del F
+    K, C = _sorted(K, C)
+    sig = _iv_on_calls(K, C, S0, r, T, q)
+    beta_p = _local_poly_eval(K, sig, K_price, h, 3, "quartic")
+    beta_d = _local_poly_eval(K, sig, K_dens, h, 3, "quartic")
+    smile = np.clip(beta_p[:, 0], 1e-4, 4.0)
+    call = np.maximum(bs.call_price(S0, K_price, r, T, smile, q), 0.0)
+    dens = rnd_from_iv(
+        K_dens,
+        np.clip(beta_d[:, 0], 1e-4, 4.0),
+        beta_d[:, 1],
+        2.0 * beta_d[:, 2],
+        S0, r, T, q,
+    )
+    return call, dens
+
+
+def kernel_h_grid(K, C, S0, r, T, q, F):
+    """Pricing-CV grid: level rate, second-derivative rate, and a few gaps."""
+    K = np.asarray(K, dtype=float)
+    n = max(len(K), 8)
+    delta = float(np.median(np.diff(K))) if K.size > 1 else 1.0
+    sig = _atm_vol(C, S0, K, r, T, q, F)
+    s = float(F) * sig * np.sqrt(float(T))
+    raw = np.concatenate(
+        [
+            s * n ** (-0.2) * np.array([0.25, 0.5, 1.0, 2.0, 4.0]),
+            s * n ** (-1.0 / 9.0) * np.array([0.34, 0.9, 1.8]),
+            delta * np.array([2.0, 4.0, 8.0]),
+        ]
+    )
+    lo = max(delta, 1e-3)
+    hi = max(3.0 * s, 8.0 * delta)
+    return np.unique(np.clip(raw, lo, hi))
+
+
+def kernel_price_cv(kind, K, C, S0, r, T, q, F):
+    """Even/odd OTM bandwidth. ``kind`` is ``asl``, ``ghs_call``, or ``ghs_iv``."""
+    K, C = _sorted(K, C)
+    grid = kernel_h_grid(K, C, S0, r, T, q, F)
+    fit = {"asl": asl_fit, "ghs_call": ghs_call_fit, "ghs_iv": ghs_iv_fit}[kind]
+    best_h, best = float(grid[0]), np.inf
+    for h in grid:
+        errs = []
+        for train, test in _splits(len(K)):
+            if int(train.sum()) < 8 or int(test.sum()) < 2:
+                continue
+            C_te, _ = fit(
+                K[train], C[train], S0, r, T, q, F, K[test], K[test][:1], float(h)
+            )
+            errs.append(_otm_rmse(K[test], C_te, C[test], S0, r, T, q, F))
+        if errs and float(np.mean(errs)) < best:
+            best = float(np.mean(errs))
+            best_h = float(h)
+    return best_h
