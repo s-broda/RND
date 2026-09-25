@@ -24,7 +24,6 @@ PY = Path(__file__).resolve().parent
 ROOT = PY.parent
 sys.path.insert(0, str(PY))
 
-from cubic import estimate_cubic
 from rnd import estimate_rnd
 from src import black_scholes as bs
 from src.competitors import (
@@ -115,28 +114,26 @@ def _exact(label, p, calls, q_true, K_eval):
         for name, tails, twice in specs:
             best, best_h = np.inf, hs[len(hs) // 2]
             for h in hs:
-                q = estimate_cubic(
-                    K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval,
+                q = estimate_rnd(
+                    K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
                     h=float(h), tails=tails, twice=twice,
                 )["q"]
                 err = _ise(K_eval, q, q_true)
                 if err < best:
                     best, best_h = err, float(h)
-            mesh_h = float(estimate_rnd(K, C, p.S0, p.r, p.T, p.q, h="mesh")["h"])
-            den_h = float(estimate_rnd(K, C, p.S0, p.r, p.T, p.q, h="density")["h"])
-            h_rule = 0.55 * den_h
-            q_m = estimate_cubic(
-                K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval,
-                h=mesh_h, tails=tails, twice=twice,
-            )["q"]
-            q_d = estimate_cubic(
-                K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval,
-                h=h_rule, tails=tails, twice=twice,
-            )["q"]
+            fit_m = estimate_rnd(
+                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+                h="mesh", tails=tails, twice=twice,
+            )
+            fit_d = estimate_rnd(
+                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+                tails=tails, twice=twice,
+            )
+            q_m, q_d = fit_m["q"], fit_d["q"]
             rec[chain][name] = dict(
                 h_star=best_h, ise_star=best,
-                h_mesh=mesh_h, ise_mesh=_ise(K_eval, q_m, q_true),
-                h_den=h_rule, ise_den=_ise(K_eval, q_d, q_true),
+                h_mesh=fit_m["h"], ise_mesh=_ise(K_eval, q_m, q_true),
+                h_den=fit_d["h"], ise_den=_ise(K_eval, q_d, q_true),
             )
             row = rec[chain][name]
             print(
@@ -149,13 +146,7 @@ def _exact(label, p, calls, q_true, K_eval):
                 plot[chain]["K"] = K
             if name == "Tails+Twice":
                 plot.setdefault(chain, {})["twice"] = q_m
-        # figure uses the density-scale heuristic, the one used on listed chains
-        q_fig = estimate_cubic(
-            K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval,
-            h=0.55 * float(estimate_rnd(K, C, p.S0, p.r, p.T, p.q, h="density")["h"]),
-            tails=True, twice=True,
-        )["q"]
-        plot[chain]["rule"] = q_fig
+                plot[chain]["rule"] = q_d
     return rec, plot, K_eval, q_true
 
 
@@ -215,9 +206,9 @@ def _holdout(sl, C_in):
     errs = []
     for train, test in ((idx % 2 == 0, idx % 2 == 1), (idx % 2 == 1, idx % 2 == 0)):
         Kt, Ct = sl.K[train], C_in[train]
-        h = 0.55 * float(estimate_rnd(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, h="density")["h"])
-        fit = estimate_cubic(
-            Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K[test], sl.K[test], h=h, tails=True, twice=True
+        fit = estimate_rnd(
+            Kt, Ct, sl.S0, sl.r, sl.T, sl.q,
+            K_eval=sl.K[test], K_price=sl.K[test], tails=True, twice=True,
         )
         o, _, _ = _otm_slice(sl, test, fit["C"])
         errs.append(o)
@@ -248,9 +239,11 @@ def listed():
     ):
         sl = load_slice(RES / csv)
         C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
-        h = 0.55 * float(estimate_rnd(sl.K, C, sl.S0, sl.r, sl.T, sl.q, h="density")["h"])
         s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
-        fit = estimate_cubic(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, s, sl.K, h=h, tails=True, twice=True)
+        fit = estimate_rnd(
+            sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, tails=True, twice=True,
+        )
+        h = fit["h"]
         o, pu, ca = _otm(sl, fit["C"])
         mass, pk = _mass_peaks(sl.F, fit["q"], s)
         ho = _holdout(sl, C)

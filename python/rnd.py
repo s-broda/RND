@@ -2,15 +2,19 @@
 
 The public entry point is ``estimate_rnd``. Copy this file: it is self-contained
 apart from NumPy and SciPy. The estimator rescales calls to a complementary
-cdf, completes the unquoted tails, places masses at cell centers, convolves with a
-Gaussian kernel, and (by default) applies Schucany–Sommers twicing.
+cdf, interpolates that function with a natural cubic spline, completes the
+unquoted tails with two endpoints, and convolves the spline with a Gaussian.
+Twicing is on by default. The default bandwidth is 0.55 times Silverman's rule.
 """
 
 from __future__ import annotations
 
 import numpy as np
+from scipy.interpolate import CubicSpline
 from scipy.special import erf
 from scipy.stats import norm
+
+FACTOR = 0.55
 
 
 def estimate_rnd(
@@ -21,14 +25,12 @@ def estimate_rnd(
     T,
     q=0.0,
     K_eval=None,
+    K_price=None,
     h=None,
-    twice=True,
     tails=True,
-    midpoints=True,
-    n_left=None,
-    n_right=None,
+    twice=True,
 ):
-    """Headline estimator of the risk-neutral density of ``S_T``.
+    """Risk-neutral density of ``S_T`` from the cubic spline of the normalized call.
 
     Parameters
     ----------
@@ -40,115 +42,144 @@ def estimate_rnd(
         Continuous dividend yield.
     K_eval : array_like, optional
         Strikes at which to return the density. Defaults to ``K``.
-    h : float, optional
-        Gaussian bandwidth. Default is the density-scale rule
-        ``1.06 F σ_ATM √T n^{-1/5}`` with ``n`` the number of masses after
-        the right wing. Pass a number, or ``"mesh"`` for
-        ``h = 1.2 × median ΔK``.
+    K_price : array_like, optional
+        Strikes at which to return the call interpolant. Omitted if None.
+    h : float or {"cubic", "mesh", "density"}, optional
+        Bandwidth. The default ``"cubic"`` rule is
+        ``0.55 × 1.06 F σ_ATM √T n^{-1/5}``, with ``n`` the number of quoted
+        strikes plus the notional right-wing count. ``"mesh"`` is
+        ``min(1.2 δ, 0.30(K_m − K_1))``. ``"density"`` is the Silverman
+        rule without the factor 0.55. A number is used as given.
+    tails : bool
+        Add the knots ``(0, 0)`` and, when the call has not died,
+        ``(K_end, 1)``.
     twice : bool
         If True (default), return ``2 f_h − f_{h√2}`` and the same combination
         of the interpolant.
-    tails : bool
-        Linear left wing through the origin and linear call decay to zero.
-    midpoints : bool
-        Place each jump at the center of its cell rather than the right end.
-    n_left : int, optional
-        Number of filler knots on the left wing. Default is
-        ``round(K_1 / median ΔK)``, so the completed mesh continues the
-        quoted spacing through the splice at ``K_1``.
-    n_right : int, optional
-        Number of filler knots on the right wing. Default is
-        ``round(8 (K_end - K_m) / (K_m - K_{m-1}))``, eight knots per last
-        quoted gap along the linear call tail.
 
     Returns
     -------
     dict
-        ``q`` density on ``K_eval``; ``P``, ``C`` put and call interpolants on
-        the quoted ``K``; ``h`` the bandwidth used; ``K_mass``, ``dp`` the
-        completed midpoint support; ``n_ext`` mass count after the right wing;
-        ``n_left`` the left-wing count used; ``n_right`` the right-wing count
-        used; ``interpolant(K_pts) -> (P, C)``.
+        ``q`` density on ``K_eval``; ``C`` call interpolant on ``K_price``,
+        or None; ``h`` the bandwidth used.
     """
     K = np.asarray(K, dtype=float)
     C = np.asarray(C, dtype=float)
     order = np.argsort(K)
     K, C = K[order], C[order]
-    disc = float(np.exp(-r * T))
-    dfq = float(np.exp(-q * T))
-    stock = float(S0) * dfq
-    F = float(S0) * np.exp((r - q) * T)
+    disc = float(np.exp(-float(r) * float(T)))
+    stock = float(S0) * np.exp(-float(q) * float(T))
+    F = float(S0) * np.exp((float(r) - float(q)) * float(T))
     if K_eval is None:
         K_eval = K
     else:
         K_eval = np.asarray(K_eval, dtype=float)
-
-    if n_left is None:
-        n_left = _n_left_from_mesh(K)
-    else:
-        n_left = max(int(n_left), 2)
-    if n_right is None:
-        n_right = _n_right_from_gap(K, C, F, disc)
-    else:
-        n_right = max(int(n_right), 0)
-
-    K_work, C_work = K, C
-    n_ext = len(K)
-    if tails:
-        K_work, C_work = _complete_c_tail(K, C, F, disc, n_tail=n_right)
-        n_ext = len(K_work)
-    Ko, dG = _normalized_jumps(K_work, C_work, stock)
-    if tails:
-        Ko, dG = _complete_left(Ko, dG, n_left=n_left)
-    if midpoints:
-        Ko, dG = _midpoint_support(Ko, dG)
-
-    if h is None or h == "density":
-        h_use = _density_h(K, C, S0, r, T, q, F, n_ext)
-    elif h == "mesh":
-        h_use = _mesh_h(K)
+    if h is None or h == "cubic":
+        h_use = _bandwidth(K, C, S0, r, T, q, F, "cubic")
+    elif h in ("mesh", "density"):
+        h_use = _bandwidth(K, C, S0, r, T, q, F, h)
     else:
         h_use = float(h)
 
-    qhat = _qhat(K_eval, Ko, dG, h_use, F)
-
-    def interpolant(K_pts):
-        G = _Fhat(K_pts, Ko, dG, h_use)
-        if twice:
-            G = 2.0 * G - _Fhat(K_pts, Ko, dG, h_use * np.sqrt(2.0))
+    Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
+    spl = CubicSpline(Ks, Ps, bc_type="natural")
+    q1, _ = _smooth(K_eval, Ks, spl, h_use, F)
+    G1 = None if K_price is None else _smooth(np.asarray(K_price, dtype=float), Ks, spl, h_use, F)[1]
+    if twice:
+        q2, _ = _smooth(K_eval, Ks, spl, h_use * np.sqrt(2.0), F)
+        qhat = 2.0 * q1 - q2
+        if G1 is None:
+            G = None
+        else:
+            G2 = _smooth(np.asarray(K_price, dtype=float), Ks, spl, h_use * np.sqrt(2.0), F)[1]
+            G = 2.0 * G1 - G2
+    else:
+        qhat, G = q1, G1
+    C_hat = None
+    if G is not None:
         G = np.clip(G, 0.0, 1.0)
         C_hat = stock * np.clip(1.0 - G, 0.0, 1.0)
-        P_hat = np.maximum(C_hat - stock + np.asarray(K_pts, dtype=float) * disc, 0.0)
-        return P_hat, C_hat
-
-    if twice:
-        qhat = 2.0 * qhat - _qhat(K_eval, Ko, dG, h_use * np.sqrt(2.0), F)
-    P_hat, C_hat = interpolant(K)
-    return {
-        "q": qhat,
-        "P": P_hat,
-        "C": C_hat,
-        "h": float(h_use),
-        "K_mass": Ko,
-        "dp": dG,
-        "n_ext": int(n_ext),
-        "n_left": int(n_left),
-        "n_right": int(n_right),
-        "F": F,
-        "interpolant": interpolant,
-    }
+    return {"q": qhat, "C": C_hat, "h": float(h_use)}
 
 
-def _normalized_jumps(K, C, stock):
-    """Jumps of \(P=1-C/(S_0 e^{-qT})\).
+def _knots(K, C, stock, F, disc, tails=True):
+    K = np.asarray(K, dtype=float)
+    C = np.asarray(C, dtype=float)
+    P = 1.0 - C / max(float(stock), 1e-16)
+    if tails:
+        Ks = np.concatenate([[0.0], K])
+        Ps = np.concatenate([[0.0], P])
+        spec = _right_wing(K, C, F, disc)
+        if spec is not None and spec[3] > Ks[-1] + 1e-6:
+            Ks = np.concatenate([Ks, [float(spec[3])]])
+            Ps = np.concatenate([Ps, [1.0]])
+    else:
+        Ks, Ps = K.copy(), P.copy()
+    keep = np.concatenate([[True], np.diff(Ks) > 1e-8])
+    return Ks[keep], Ps[keep]
 
-    The call is already decreasing and lies in \([0, S_0 e^{-qT}]\), so the
-    normalized call needs no clip and no running minimum.
-    """
-    c = np.asarray(C, dtype=float) / max(float(stock), 1e-16)
-    G = 1.0 - c
-    dG = np.diff(G, prepend=0.0)
-    return K, dG
+
+def _smooth(x, Ks, spl, h, F):
+    x = np.atleast_1d(np.asarray(x, dtype=float))
+    h = max(float(h), 1e-6)
+    gprime = np.zeros_like(x)
+    G = np.zeros_like(x)
+    for L, R in zip(Ks[:-1], Ks[1:]):
+        alpha = float(spl(L, 1))
+        beta = float(spl(L, 2))
+        gamma = 0.5 * float(spl(L, 3))
+        uL = (x - L) / h
+        uR = (x - R) / h
+        A0 = alpha + beta * h * uL + gamma * (h * uL) ** 2
+        A1 = -beta * h - 2.0 * gamma * h * h * uL
+        A2 = gamma * h * h
+        I0 = _Phi(uL) - _Phi(uR)
+        I1 = -_phi(uL) + _phi(uR)
+        I2 = (-uL * _phi(uL) + _Phi(uL)) - (-uR * _phi(uR) + _Phi(uR))
+        dA0 = beta + 2.0 * gamma * h * uL
+        dA1 = -2.0 * gamma * h
+        dI0 = (_phi(uL) - _phi(uR)) / h
+        dI1 = (uL * _phi(uL) - uR * _phi(uR)) / h
+        dI2 = (uL * uL * _phi(uL) - uR * uR * _phi(uR)) / h
+        gprime += dA0 * I0 + A0 * dI0 + dA1 * I1 + A1 * dI1 + A2 * dI2
+
+        def J0(u):
+            return u * _Phi(u) + _phi(u)
+
+        def J1(u):
+            return 0.5 * u * u * _Phi(u) + 0.5 * u * _phi(u) - 0.5 * _Phi(u)
+
+        def J2(u):
+            return u ** 3 * _Phi(u) / 3.0 + u * u * _phi(u) / 3.0 + 2.0 * _phi(u) / 3.0
+
+        G += h * (
+            A0 * (J0(uL) - J0(uR))
+            + A1 * (J1(uL) - J1(uR))
+            + A2 * (J2(uL) - J2(uR))
+        )
+    return -float(F) * gprime, G
+
+
+def _Phi(u):
+    return 0.5 * (1.0 + erf(np.asarray(u, dtype=float) / np.sqrt(2.0)))
+
+
+def _phi(u):
+    u = np.asarray(u, dtype=float)
+    return np.exp(-0.5 * u * u) / np.sqrt(2.0 * np.pi)
+
+
+def _bandwidth(K, C, S0, r, T, q, F, rule):
+    """``mesh`` is 1.2 times the median gap. ``cubic`` is 0.55 times density-scale."""
+    if rule == "mesh":
+        return _mesh_h(K)
+    disc = float(np.exp(-float(r) * float(T)))
+    n_right = _n_right_from_gap(K, C, F, disc)
+    n_ext = len(K) + int(n_right)
+    h = _density_h(K, C, S0, r, T, q, F, n_ext)
+    if rule == "density":
+        return h
+    return FACTOR * h
 
 
 def _right_wing(K, C, F, disc, k_max=None):
@@ -195,90 +226,11 @@ def _n_right_from_gap(K, C, F, disc, k_max=None):
     return max(1, int(round(8.0 * (K_end - K_m) / last)))
 
 
-def _complete_c_tail(K, C, F, disc, n_tail=None, k_max=None):
-    """Linear no-arbitrage decay of leftover C_m to 0."""
-    K = np.asarray(K, dtype=float)
-    C = np.asarray(C, dtype=float)
-    spec = _right_wing(K, C, F, disc, k_max=k_max)
-    if spec is None:
-        return K, C
-    K_m, C_m, slp, K_end = spec
-    if n_tail is None:
-        n_tail = _n_right_from_gap(K, C, F, disc, k_max=k_max)
-    n_tail = int(n_tail)
-    if n_tail < 1:
-        return K, C
-    K_t = np.linspace(K_m, K_end, n_tail + 1)[1:]
-    C_t = np.maximum(C_m + slp * (K_t - K_m), 0.0)
-    return np.concatenate([K, K_t]), np.concatenate([C, C_t])
-
-
-def _n_left_from_mesh(K):
-    """Continue the quoted median spacing through (0, K_1]."""
-    K = np.asarray(K, dtype=float)
-    if K.size < 2 or K[0] <= 0.0:
-        return 2
-    delta = float(np.median(np.diff(K)))
-    if not np.isfinite(delta) or delta <= 0.0:
-        return 2
-    return max(2, int(round(float(K[0]) / delta)))
-
-
-def _complete_left(K, dG, n_left):
-    K = np.asarray(K, dtype=float)
-    dG = np.asarray(dG, dtype=float)
-    g1 = float(dG[0])
-    if g1 <= 1e-16 or K[0] <= 1e-8:
-        return K, dG
-    K_l = np.linspace(K[0] / n_left, K[0], n_left)
-    G_l = g1 * (K_l / K[0])
-    dG_l = np.maximum(np.diff(G_l, prepend=0.0), 0.0)
-    dG = dG.copy()
-    dG[0] = 0.0
-    return np.concatenate([K_l, K[1:]]), np.concatenate([dG_l, dG[1:]])
-
-
-def _midpoint_support(K, dp):
-    """Place each jump at the center of (K_{i-1}, K_i] with K_0 := 0."""
-    K = np.asarray(K, dtype=float)
-    dp = np.asarray(dp, dtype=float)
-    left = np.empty_like(K)
-    left[0] = 0.0
-    left[1:] = K[:-1]
-    return 0.5 * (left + K), dp
-
-
 def _mesh_h(K):
     K = np.sort(np.asarray(K, dtype=float))
     delta = float(np.median(np.diff(K)))
     span = float(K[-1] - K[0])
     return float(min(1.2 * delta, 0.30 * span))
-
-
-def _gauss_pdf(u):
-    kap = np.exp(-0.5 * u * u) / np.sqrt(2.0 * np.pi)
-    return kap, -u * kap
-
-
-def _gauss_cdf(u):
-    return 0.5 * (1.0 + erf(np.asarray(u, dtype=float) / np.sqrt(2.0)))
-
-
-def _Fhat(K_eval, K_obs, dp, h):
-    K_eval = np.atleast_1d(np.asarray(K_eval, dtype=float))
-    K_obs = np.asarray(K_obs, dtype=float)
-    dp = np.asarray(dp, dtype=float)
-    hv = max(float(h), 1e-16)
-    u = (K_eval[:, None] - K_obs[None, :]) / hv
-    return (dp[None, :] * _gauss_cdf(u)).sum(axis=1)
-
-
-def _qhat(K_eval, K_obs, dG, h, F):
-    hv = max(float(h), 1e-16)
-    u = (K_eval[:, None] - K_obs[None, :]) / hv
-    _kap, dkap = _gauss_pdf(u)
-    gp = (dG[None, :] * dkap / (hv * hv)).sum(axis=1)
-    return -float(F) * gp
 
 
 def _density_h(K, C, S0, r, T, q, F, n_ext):

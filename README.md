@@ -4,7 +4,7 @@ Replication code for
 
 > Simon A. Broda, *Identifying Risk-Neutral Densities from an Empirical Measure of Listed Quotes*.
 
-The headline estimator is `python/cubic.py` (`estimate_cubic`). It rescales European calls to a complementary cdf, interpolates that function with a natural cubic spline, completes the unquoted tails, and applies a Gaussian convolution with Schucany–Sommers twicing. The convolution is closed form.
+The headline estimator is `python/rnd.py` (`estimate_rnd`). It rescales European calls to a complementary cdf, interpolates that function with a natural cubic spline, completes the unquoted tails, and applies a Gaussian convolution with Schucany–Sommers twicing. The convolution is closed form. The default bandwidth, computed inside `estimate_rnd`, is 0.55 times Silverman's rule.
 
 ## Run
 
