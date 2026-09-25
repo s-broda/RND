@@ -315,7 +315,7 @@ _METHODS = (
 def _print_metrics(name, m):
     print(
         f"  {name:22} OTM {m[0]:.3f} puts {m[1]:.3f} calls {m[2]:.3f} "
-        f"hold {m[3]:.3f} mass {m[4]:.2f}"
+        f"hold {m[3]:.3f} mass {m[4]:.1f}"
     )
 
 
@@ -419,7 +419,7 @@ def listed():
             m = metrics[name]
             print(
                 f"  {name:22} OTM {m[0]:.3f} puts {m[1]:.3f} calls {m[2]:.3f} "
-                f"hold {m[3]:.3f} mass {m[4]:.2f} peaks {peaks} tv {tv:.2f}"
+                f"hold {m[3]:.3f} mass {m[4]:.1f} peaks {peaks} tv {tv:.1f}"
             )
         scored.append((title, sl, bundle))
     raw, inv, w = _average_rows(chain_metrics, np.asarray(forwards, float))

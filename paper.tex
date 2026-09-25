@@ -341,9 +341,9 @@ h
 \;=\;
 c\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/9},
 \end{equation}
-with \(n\) the number of quoted strikes and \(c=0.36\). On chains of one to several hundred strikes this is the bandwidth used for the listed prices of our estimator. Section~\ref{sec:heston} reports both rules.
+with \(n\) the number of quoted strikes and \(c=0.35\). On chains of one to several hundred strikes this is the bandwidth used for the listed prices of our estimator. Section~\ref{sec:heston} reports both rules.
 
-The exponent is the one \citet{grith2012} derive for a local cubic of a second derivative and the order \citet{aitsahalia2003} take from \citet{fangijbels1996}. The bandwidths those papers plot are wider. \citeauthor{grith2012} double and quadruple a cross-validated width because the cross-validated density is wiggly, and \citeauthor{aitsahalia2003} report that an unconstrained local polynomial stops taking negative values only after substantial oversmoothing. \citet{jackwerth2004} starts from a multiple of \(n^{-1/5}\). That exponent leaves \(nh^{5}\) bounded, which is why it is not used. Any fixed \(c>0\) sends \(nh^{5}\) to infinity. The constant \(c=0.36\) is the short end of that family. On the four listed chains it is two-fifths of the factor \(0.9\) used for the \citeauthor{aitsahalia2003} density in Section~\ref{sec:emp}.
+The exponent is the one \citet{grith2012} derive for a local cubic of a second derivative and the order \citet{aitsahalia2003} take from \citet{fangijbels1996}. The bandwidths those papers plot are wider. \citeauthor{grith2012} double and quadruple a cross-validated width because the cross-validated density is wiggly, and \citeauthor{aitsahalia2003} report that an unconstrained local polynomial stops taking negative values only after substantial oversmoothing. \citet{jackwerth2004} starts from a multiple of \(n^{-1/5}\). That exponent leaves \(nh^{5}\) bounded, which is why it is not used. Any fixed \(c>0\) sends \(nh^{5}\) to infinity. The constant \(c=0.35\) is the short end of that family. On the four listed chains it is just under two-fifths of the factor \(0.9\) used for the \citeauthor{aitsahalia2003} density in Section~\ref{sec:emp}.
 
 \subsection{Numerical Illustration}
 \label{sec:heston}
@@ -375,18 +375,18 @@ where \(\varphi(u)=\E^{\Q}[e^{\mathrm{i}u\log S_T}]\). Two chains are used: a de
   {\(h^{\ast}\)} & {Oracle ISE} & {Mesh \(h\)} & {Mesh ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.90 & 1.39e-5 \\
+  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.84 & 1.25e-5 \\
 Dense & Tails
-  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.90 & 1.39e-5 \\
+  & 0.15 & 9.76e-10 & 0.89 & 7.36e-7 & 1.84 & 1.25e-5 \\
 Dense & Tails+Thrice
-  & 0.63 & 1.16e-12 & 0.89 & 7.12e-12 & 1.90 & 1.51e-8 \\
+  & 0.63 & 1.16e-12 & 0.89 & 7.12e-12 & 1.84 & 1.16e-8 \\
 \midrule
 Sparse & Quoted spline
-  & 16.19 & 1.80e-2 & 2.71 & 1.04e-1 & 2.37 & 1.18e-1 \\
+  & 16.19 & 1.80e-2 & 2.71 & 1.04e-1 & 2.31 & 1.22e-1 \\
 Sparse & Tails
-  & 0.45 & 1.13e-6 & 2.71 & 5.29e-5 & 2.37 & 3.26e-5 \\
+  & 0.45 & 1.13e-6 & 2.71 & 5.29e-5 & 2.31 & 2.94e-5 \\
 Sparse & Tails+Thrice
-  & 2.18 & 9.19e-7 & 2.71 & 1.14e-6 & 2.37 & 9.50e-7 \\
+  & 2.18 & 9.19e-7 & 2.71 & 1.14e-6 & 2.31 & 9.35e-7 \\
 \bottomrule
 \end{tabular}%
 }
@@ -399,7 +399,7 @@ Sparse & Tails+Thrice
 \label{fig:heston-rnd}
 \end{figure}
 
-On the dense grid the first strike lies left of the window and the last call is already zero, so the wings do not move the error. The spline without thricing has mesh integrated squared error \(7.36\times 10^{-7}\). Thricing cuts that to \(7.12\times 10^{-12}\), against an oracle \(1.16\times 10^{-12}\). Equation \eqref{eq:h-d2} is wider (\(h=1.90\)) and the thriced error is \(1.51\times 10^{-8}\). On the sparse grid the quoted spline without tails is useless: mesh integrated squared error \(0.104\). The left line \eqref{eq:left} brings the plain mesh error to \(5.29\times 10^{-5}\). Thricing then reaches \(1.14\times 10^{-6}\) at the mesh and \(9.50\times 10^{-7}\) at \eqref{eq:h-d2} (\(h=2.37\)), against an oracle \(9.19\times 10^{-7}\). Figure~\ref{fig:heston-rnd} plots the three estimators at the mesh bandwidth.
+On the dense grid the first strike lies left of the window and the last call is already zero, so the wings do not move the error. The spline without thricing has mesh integrated squared error \(7.36\times 10^{-7}\). Thricing cuts that to \(7.12\times 10^{-12}\), against an oracle \(1.16\times 10^{-12}\). Equation \eqref{eq:h-d2} is wider (\(h=1.84\)) and the thriced error is \(1.16\times 10^{-8}\). On the sparse grid the quoted spline without tails is useless: mesh integrated squared error \(0.104\). The left line \eqref{eq:left} brings the plain mesh error to \(5.29\times 10^{-5}\). Thricing then reaches \(1.14\times 10^{-6}\) at the mesh and \(9.35\times 10^{-7}\) at \eqref{eq:h-d2} (\(h=2.31\)), against an oracle \(9.19\times 10^{-7}\). Figure~\ref{fig:heston-rnd} plots the three estimators at the mesh bandwidth.
 
 Table~\ref{tab:vg-tail} repeats the design for the variance-gamma process of \citet{madan1998}. The process parameters are those of \citet{carrmadan1999}: \(\sigma=0.12\), \(\nu=0.2\), \(\theta=-0.14\). Spot, rate, dividend yield, and maturity are as above, as are the two strike grids and the ISE window. Variance gamma is a pure-jump L\'evy process. The true density of \(\log S_T\) is a modified Bessel function \citep{madan1998}; the density of \(S_T\) is that formula times \(1/K\). Calls are the discounted payoff of that density, evaluated by the trapezoidal rule.
 
@@ -420,18 +420,18 @@ Table~\ref{tab:vg-tail} repeats the design for the variance-gamma process of \ci
   {\(h^{\ast}\)} & {Oracle ISE} & {Mesh \(h\)} & {Mesh ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.21 & 1.31e-4 \\
+  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.18 & 1.20e-4 \\
 Dense & Tails
-  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.21 & 1.31e-4 \\
+  & 0.17 & 5.12e-7 & 0.89 & 5.08e-5 & 1.18 & 1.20e-4 \\
 Dense & Tails+Thrice
-  & 0.46 & 4.04e-7 & 0.89 & 4.90e-6 & 1.21 & 1.59e-5 \\
+  & 0.46 & 4.04e-7 & 0.89 & 4.90e-6 & 1.18 & 1.43e-5 \\
 \midrule
 Sparse & Quoted spline
-  & 14.03 & 3.27e-2 & 2.71 & 1.05e-1 & 1.50 & 1.88e-1 \\
+  & 14.03 & 3.27e-2 & 2.71 & 1.05e-1 & 1.46 & 1.93e-1 \\
 Sparse & Tails
-  & 0.45 & 3.97e-5 & 2.71 & 1.25e-3 & 1.50 & 2.62e-4 \\
+  & 0.45 & 3.97e-5 & 2.71 & 1.25e-3 & 1.46 & 2.43e-4 \\
 Sparse & Tails+Thrice
-  & 0.92 & 3.13e-5 & 2.71 & 3.00e-4 & 1.50 & 4.98e-5 \\
+  & 0.92 & 3.13e-5 & 2.71 & 3.00e-4 & 1.46 & 4.67e-5 \\
 \bottomrule
 \end{tabular}%
 }
@@ -444,7 +444,7 @@ Sparse & Tails+Thrice
 \label{fig:vg-rnd}
 \end{figure}
 
-On the dense chain the wings again do not move the digits. Thricing cuts the mesh error from \(5.08\times 10^{-5}\) to \(4.90\times 10^{-6}\), against an oracle \(4.04\times 10^{-7}\). At \eqref{eq:h-d2} the thriced error is \(1.59\times 10^{-5}\) (\(h=1.21\)). The density of \(S_T\) is more peaked than under Heston, and the absolute errors are larger. On the sparse chain the quoted spline without tails has mesh error \(0.105\). Tails bring the plain mesh error to \(1.25\times 10^{-3}\), and thricing lowers it to \(3.00\times 10^{-4}\) at the mesh and \(4.98\times 10^{-5}\) at \eqref{eq:h-d2} (\(h=1.50\)), against an oracle \(3.13\times 10^{-5}\). Here the mesh bandwidth \(h=2.71\) is the wider of the two. Figure~\ref{fig:vg-rnd} plots the three estimators at the mesh bandwidth.
+On the dense chain the wings again do not move the digits. Thricing cuts the mesh error from \(5.08\times 10^{-5}\) to \(4.90\times 10^{-6}\), against an oracle \(4.04\times 10^{-7}\). At \eqref{eq:h-d2} the thriced error is \(1.43\times 10^{-5}\) (\(h=1.18\)). The density of \(S_T\) is more peaked than under Heston, and the absolute errors are larger. On the sparse chain the quoted spline without tails has mesh error \(0.105\). Tails bring the plain mesh error to \(1.25\times 10^{-3}\), and thricing lowers it to \(3.00\times 10^{-4}\) at the mesh and \(4.67\times 10^{-5}\) at \eqref{eq:h-d2} (\(h=1.46\)), against an oracle \(3.13\times 10^{-5}\). Here the mesh bandwidth \(h=2.71\) is the wider of the two. Figure~\ref{fig:vg-rnd} plots the three estimators at the mesh bandwidth.
 
 \section{Empirical Applications}
 \label{sec:emp}
@@ -456,11 +456,11 @@ The listed comparison uses European, AM-settled index options from Cboe's delaye
 
 A quote is retained if the bid is positive, the ask is at least the bid, the mid is at least \(0.25\), and the spread is at most \(\max(15,\,0.002 S_0,\,0.5\times\mathrm{mid})\). The \(15\)-point term is the tolerance on the S\&P~500. On the Nasdaq-100 a fixed \(15\)-point cap deletes puts whose spreads are a dollar or two wider and leaves a gap of several thousand points in the strike list. Among remaining put--call pairs, the forward is the median of \(K+e^{rT}(C-P)\) over strikes with \(|K-K_{\mathrm{atm}}|\le 50\) on SPX, where \(K_{\mathrm{atm}}\) is the pair closest to the cash index; on NDX and RUT the band is \(0.65\%\) of the spot. Dividend yield is \(q=r-\log(F/S_0)/T\). The working slice is out of the money (OTM): the put mid if \(K\le F\), the call mid if \(K\ge F\), the missing side filled by parity. Puts with \(K<0.7F\) and mid below \(0.50\) are then dropped; out-of-the-money calls with mid at least \(0.25\) are kept. Table~\ref{tab:data} records the filter counts. In \eqref{eq:cubic} and \eqref{eq:thrice}, \(\tilde C=C/(S_0e^{-qT})\) and \(F=S_0e^{(r-q)T}\).
 
-The December 2026 S\&P~500 AM quarterly (\(T=0.235\), \(S_0=7764.64\), \(F=7836\), \(q=0.11\%\)) appears in Figure~\ref{fig:listed}. After the screens it has \(n=444\) strikes on \([0.36F,1.30F]\), of which \(75\%\) are puts. Near the money the strike mesh is \(5\) (\(0.06\%\) of \(F\)); it is \(5\)--\(25\) on the put wing and up to \(200\) beyond \(1.2F\). Median out-of-the-money mids are \(39\) for puts and \(62\) for calls. Implied volatility \(\hat\sigma_{\mathrm{ATM}}=0.134\) is the median Black--Scholes implied volatility of contracts with \(|K-F|\le 0.03F\). The linear call tail of Section~\ref{sec:tails} is appended (\(C_m=0.25\) by the mid floor of the filter, \(n_R=80\) from \eqref{eq:nR}). The bandwidth \eqref{eq:h-d2} uses the \(444\) quoted strikes and equals \(h=93.4\). The March 2027 AM quarterly (\(T=0.485\), \(F=7918\), \(q=-0.04\%\), \(\hat\sigma_{\mathrm{ATM}}=0.144\)) filters to \(n=221\) strikes on \([0.20F,1.49F]\), with a \(25\)-point mesh at the money; \eqref{eq:nR} gives \(n_R=41\), and \eqref{eq:h-d2} gives \(h=157.2\).
+The December 2026 S\&P~500 AM quarterly (\(T=0.235\), \(S_0=7764.64\), \(F=7836\), \(q=0.11\%\)) appears in Figure~\ref{fig:listed}. After the screens it has \(n=444\) strikes on \([0.36F,1.30F]\), of which \(75\%\) are puts. Near the money the strike mesh is \(5\) (\(0.06\%\) of \(F\)); it is \(5\)--\(25\) on the put wing and up to \(200\) beyond \(1.2F\). Median out-of-the-money mids are \(39\) for puts and \(62\) for calls. Implied volatility \(\hat\sigma_{\mathrm{ATM}}=0.134\) is the median Black--Scholes implied volatility of contracts with \(|K-F|\le 0.03F\). The linear call tail of Section~\ref{sec:tails} is appended (\(C_m=0.25\) by the mid floor of the filter, \(n_R=80\) from \eqref{eq:nR}). The bandwidth \eqref{eq:h-d2} uses the \(444\) quoted strikes and equals \(h=90.9\). The March 2027 AM quarterly (\(T=0.485\), \(F=7918\), \(q=-0.04\%\), \(\hat\sigma_{\mathrm{ATM}}=0.144\)) filters to \(n=221\) strikes on \([0.20F,1.49F]\), with a \(25\)-point mesh at the money; \eqref{eq:nR} gives \(n_R=41\), and \eqref{eq:h-d2} gives \(h=152.8\).
 
-The Nasdaq-100 December 2026 AM quarterly (\(T=0.235\), \(S_0=30732\), \(F=31025\), \(q=-0.03\%\), \(\hat\sigma_{\mathrm{ATM}}=0.201\)) is built with the same screens. It filters to \(n=312\) strikes on \([0.29F,1.39F]\), \(83\%\) puts; the at-the-money mesh is \(25\), and gaps of \(1000\) appear beyond \(1.2F\). The bandwidth \eqref{eq:h-d2} is \(h=574.1\) (\(n=312\); the right wing has \(n_R=72\)).
+The Nasdaq-100 December 2026 AM quarterly (\(T=0.235\), \(S_0=30732\), \(F=31025\), \(q=-0.03\%\), \(\hat\sigma_{\mathrm{ATM}}=0.201\)) is built with the same screens. It filters to \(n=312\) strikes on \([0.29F,1.39F]\), \(83\%\) puts; the at-the-money mesh is \(25\), and gaps of \(1000\) appear beyond \(1.2F\). The bandwidth \eqref{eq:h-d2} is \(h=558.2\) (\(n=312\); the right wing has \(n_R=72\)).
 
-The Russell~2000 December 2026 AM quarterly (\(T=0.235\), \(S_0=2889.92\), \(F=2912\), \(q=0.80\%\), \(\hat\sigma_{\mathrm{ATM}}=0.183\)) filters to \(n=99\) strikes on \([0.45F,1.32F]\), \(59\%\) puts; the at-the-money mesh is \(10\). The last two calls are both \(0.25\), so the wing slope is the previous negative step. Equation \eqref{eq:nR} gives \(n_R=40\). The bandwidth \eqref{eq:h-d2} is \(h=55.9\).
+The Russell~2000 December 2026 AM quarterly (\(T=0.235\), \(S_0=2889.92\), \(F=2912\), \(q=0.80\%\), \(\hat\sigma_{\mathrm{ATM}}=0.183\)) filters to \(n=99\) strikes on \([0.45F,1.32F]\), \(59\%\) puts; the at-the-money mesh is \(10\). The last two calls are both \(0.25\), so the wing slope is the previous negative step. Equation \eqref{eq:nR} gives \(n_R=40\). The bandwidth \eqref{eq:h-d2} is \(h=54.4\).
 
 The quoted calls are replaced by the nearest vector in Euclidean distance that is decreasing and convex in strike. Consecutive slopes lie in \([-e^{-rT},0]\), and each coordinate is at least the intrinsic value \(e^{-rT}\max(F-K_i,0)\).  This is the unpenalized projection of \citeauthor{yatchew2006} and also the first step of \citeauthor{aitsahalia2003}. Puts of the projected call follow by parity, and both premiums are floored at zero.
 
@@ -505,81 +505,81 @@ Hold-out refits the projection and every tuned method on the training strikes on
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=93.4\), \(157.2\), \(574.1\), \(55.9\)). \citeauthor{aitsahalia2003} is priced from the local linear at its cross-validated bandwidth; the mass is the local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). \citeauthor{aitsahalia1998} and both \citeauthor{grith2012} rows use even/odd pricing bandwidths, and the mass is the density of that same fit. PCA is priced from the lognormal mixture. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores 1. Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Bold method names are the unimodal curves in Figure~\ref{fig:listed}: the spline, the lognormal mixture, and \citeauthor{aitsahalia2003}.}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=90.9\), \(152.8\), \(558.2\), \(54.4\)). \citeauthor{aitsahalia2003} is priced from the local linear at its cross-validated bandwidth; the mass is the local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). \citeauthor{aitsahalia1998} and both \citeauthor{grith2012} rows use even/odd pricing bandwidths, and the mass is the density of that same fit. PCA is priced from the lognormal mixture. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Bold method names are the unimodal curves in Figure~\ref{fig:listed}: the spline, the lognormal mixture, and \citeauthor{aitsahalia2003}.}
 \label{tab:listed}
 {\small
 \setlength{\tabcolsep}{3pt}%
 \renewcommand{\arraystretch}{0.9}%
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=2.2] S[table-format=2.2]}
+\begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=2.1] S[table-format=2.1]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} &
   {RMSE OTM} & {Puts} & {Calls} & {Hold-out} & {Mass} & {TV} \\
 \midrule
 SPX Dec & \textbf{Ours}
-  & 0.035 & 0.033 & 0.039 & 0.039 & 1.00 & 1.01 \\
+  & 0.035 & 0.033 & 0.039 & 0.039 & 1.0 & 1.0 \\
 SPX Dec & \textbf{PCA}
-  & 0.038 & 0.035 & 0.046 & 0.040 & 1.00 & 1.00 \\
+  & 0.038 & 0.035 & 0.046 & 0.040 & 1.0 & 1.0 \\
 SPX Dec & \textbf{\citeauthor{aitsahalia2003}}
-  & 0.337 & 0.252 & 0.518 & 0.444 & 1.01 & 1.00 \\
+  & 0.337 & 0.252 & 0.518 & 0.444 & 1.0 & 1.0 \\
 SPX Dec & \citeauthor{grith2012}, IV
-  & 0.030 & 0.029 & 0.032 & 0.037 & 4.32 & 3.19 \\
+  & 0.030 & 0.029 & 0.032 & 0.037 & 4.3 & 3.2 \\
 SPX Dec & \citeauthor{grith2012}, call
-  & 0.031 & 0.030 & 0.036 & 0.039 & 1.01 & 1.17 \\
+  & 0.031 & 0.030 & 0.036 & 0.039 & 1.0 & 1.2 \\
 SPX Dec & \citeauthor{aitsahalia1998}
-  & 0.064 & 0.061 & 0.073 & 0.113 & 1.56 & 10.94 \\
+  & 0.064 & 0.061 & 0.073 & 0.113 & 1.6 & 10.9 \\
 \midrule
 SPX Mar & \textbf{Ours}
-  & 0.052 & 0.048 & 0.062 & 0.060 & 1.00 & 1.00 \\
+  & 0.050 & 0.047 & 0.059 & 0.058 & 1.0 & 1.0 \\
 SPX Mar & \textbf{PCA}
-  & 0.079 & 0.063 & 0.115 & 0.079 & 1.00 & 1.00 \\
+  & 0.079 & 0.063 & 0.115 & 0.079 & 1.0 & 1.0 \\
 SPX Mar & \textbf{\citeauthor{aitsahalia2003}}
-  & 0.596 & 0.401 & 0.963 & 0.789 & 1.01 & 0.99 \\
+  & 0.596 & 0.401 & 0.963 & 0.789 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{grith2012}, IV
-  & 0.027 & 0.024 & 0.034 & 0.042 & 1.14 & 1.36 \\
+  & 0.027 & 0.024 & 0.034 & 0.042 & 1.1 & 1.4 \\
 SPX Mar & \citeauthor{grith2012}, call
-  & 0.031 & 0.029 & 0.038 & 0.061 & 1.00 & 1.10 \\
+  & 0.031 & 0.029 & 0.038 & 0.061 & 1.0 & 1.1 \\
 SPX Mar & \citeauthor{aitsahalia1998}
-  & 0.073 & 0.064 & 0.094 & 0.158 & 1.20 & 5.03 \\
+  & 0.073 & 0.064 & 0.094 & 0.158 & 1.2 & 5.0 \\
 \midrule
 NDX Dec & \textbf{Ours}
-  & 1.047 & 1.094 & 0.781 & 1.103 & 1.00 & 1.00 \\
+  & 1.042 & 1.088 & 0.780 & 1.099 & 1.0 & 1.0 \\
 NDX Dec & \textbf{PCA}
-  & 1.147 & 1.131 & 1.221 & 1.187 & 1.00 & 1.00 \\
+  & 1.147 & 1.131 & 1.221 & 1.187 & 1.0 & 1.0 \\
 NDX Dec & \textbf{\citeauthor{aitsahalia2003}}
-  & 2.499 & 2.418 & 2.858 & 3.278 & 1.02 & 1.00 \\
+  & 2.499 & 2.418 & 2.858 & 3.278 & 1.0 & 1.0 \\
 NDX Dec & \citeauthor{grith2012}, IV
-  & 0.874 & 0.927 & 0.548 & 1.018 & 1.02 & 2.65 \\
+  & 0.874 & 0.927 & 0.548 & 1.018 & 1.0 & 2.7 \\
 NDX Dec & \citeauthor{grith2012}, call
-  & 0.892 & 0.943 & 0.579 & 1.087 & 1.00 & 2.11 \\
+  & 0.892 & 0.943 & 0.579 & 1.087 & 1.0 & 2.1 \\
 NDX Dec & \citeauthor{aitsahalia1998}
-  & 1.734 & 1.648 & 2.104 & 2.623 & 1.34 & 10.99 \\
+  & 1.734 & 1.648 & 2.104 & 2.623 & 1.3 & 11.0 \\
 \midrule
 RUT Dec & \textbf{Ours}
-  & 0.025 & 0.026 & 0.024 & 0.031 & 1.00 & 1.01 \\
+  & 0.025 & 0.025 & 0.024 & 0.030 & 1.0 & 1.0 \\
 RUT Dec & \textbf{PCA}
-  & 0.034 & 0.030 & 0.039 & 0.038 & 1.00 & 1.00 \\
+  & 0.034 & 0.030 & 0.039 & 0.038 & 1.0 & 1.0 \\
 RUT Dec & \textbf{\citeauthor{aitsahalia2003}}
-  & 0.339 & 0.293 & 0.394 & 0.467 & 1.09 & 1.00 \\
+  & 0.339 & 0.293 & 0.394 & 0.467 & 1.1 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV
-  & 0.023 & 0.023 & 0.024 & 0.031 & 3.53 & 1.66 \\
+  & 0.023 & 0.023 & 0.024 & 0.031 & 3.5 & 1.7 \\
 RUT Dec & \citeauthor{grith2012}, call
-  & 0.022 & 0.022 & 0.022 & 0.061 & 1.07 & 1.20 \\
+  & 0.022 & 0.022 & 0.022 & 0.061 & 1.1 & 1.2 \\
 RUT Dec & \citeauthor{aitsahalia1998}
-  & 0.098 & 0.124 & 0.035 & 0.201 & 1.57 & 7.63 \\
+  & 0.098 & 0.124 & 0.035 & 0.201 & 1.6 & 7.6 \\
 \midrule
 Average & \textbf{Ours}
-  & 0.290 & 0.300 & 0.226 & 0.308 & 1.00 & 1.01 \\
+  & 0.288 & 0.298 & 0.225 & 0.306 & 1.0 & 1.0 \\
 Average & \textbf{PCA}
-  & 0.325 & 0.315 & 0.355 & 0.336 & 1.00 & 1.00 \\
+  & 0.325 & 0.315 & 0.355 & 0.336 & 1.0 & 1.0 \\
 Average & \textbf{\citeauthor{aitsahalia2003}}
-  & 0.943 & 0.841 & 1.183 & 1.245 & 1.03 & 1.00 \\
+  & 0.943 & 0.841 & 1.183 & 1.245 & 1.0 & 1.0 \\
 Average & \citeauthor{grith2012}, IV
-  & 0.238 & 0.251 & 0.159 & 0.282 & 2.50 & 2.22 \\
+  & 0.238 & 0.251 & 0.159 & 0.282 & 2.5 & 2.2 \\
 Average & \citeauthor{grith2012}, call
-  & 0.244 & 0.256 & 0.169 & 0.312 & 1.02 & 1.40 \\
+  & 0.244 & 0.256 & 0.169 & 0.312 & 1.0 & 1.4 \\
 Average & \citeauthor{aitsahalia1998}
-  & 0.492 & 0.475 & 0.577 & 0.774 & 1.42 & 8.65 \\
+  & 0.492 & 0.475 & 0.577 & 0.774 & 1.4 & 8.6 \\
 \bottomrule
 \end{tabular}}%
 }
@@ -587,13 +587,13 @@ Average & \citeauthor{aitsahalia1998}
 
 On SPX December the quoted calls sit \(0.022\) from the decreasing-convex cone, so a fit that stays inside the cone cannot undercut that error. The cross-validated local linear of \citeauthor{aitsahalia2003} is \(0.337\), \(0.596\), \(2.499\), and \(0.339\). With centers on the quoted log-strike range and a width chosen by pricing error, PCA out-of-the-money error is \(0.038\) on SPX December, \(0.079\) on SPX March, \(1.147\) on NDX December, and \(0.034\) on RUT December.
 
-The estimator of this paper is the Gaussian inversion of the cubic spline of \(P\), with tails and thricing, at \eqref{eq:h-d2}. The pricing error is \(0.035\), \(0.052\), \(1.047\), and \(0.025\). The hold-out error is \(0.039\), \(0.060\), \(1.103\), and \(0.031\). Each of the four curves has one peak on \([0.55F,1.40F]\) and mass \(1.00\). The bandwidth in that row is the same number that prices the chain.
+The estimator of this paper is the Gaussian inversion of the cubic spline of \(P\), with tails and thricing, at \eqref{eq:h-d2}. The pricing error is \(0.035\), \(0.050\), \(1.042\), and \(0.025\). The hold-out error is \(0.039\), \(0.058\), \(1.099\), and \(0.030\). Each of the four curves has one peak on \([0.55F,1.40F]\) and mass \(1.0\). The bandwidth in that row is the same number that prices the chain.
 
-\citeauthor{aitsahalia1998}, at a pricing cross-validation of the implied-volatility regression, has error \(0.064\), \(0.073\), \(1.734\), and \(0.098\), with \(32\), \(14\), \(26\), and \(15\) peaks and mass \(1.56\), \(1.20\), \(1.34\), and \(1.57\). The call cubic of \citeauthor{grith2012} is the smoothest of this group and the closest on price: \(0.031\), \(0.031\), \(0.892\), and \(0.022\), with \(3\), \(3\), \(13\), and \(1\) peaks. Their implied-volatility cubic prices at \(0.030\), \(0.027\), \(0.874\), and \(0.023\), and the integral of the positive part on the window is \(4.32\), \(1.14\), \(1.02\), and \(3.53\).
+\citeauthor{aitsahalia1998}, at a pricing cross-validation of the implied-volatility regression, has error \(0.064\), \(0.073\), \(1.734\), and \(0.098\), with \(32\), \(14\), \(26\), and \(15\) peaks and mass \(1.6\), \(1.2\), \(1.3\), and \(1.6\). The call cubic of \citeauthor{grith2012} is the smoothest of this group and the closest on price: \(0.031\), \(0.031\), \(0.892\), and \(0.022\), with \(3\), \(3\), \(13\), and \(1\) peaks. Their implied-volatility cubic prices at \(0.030\), \(0.027\), \(0.874\), and \(0.023\), and the integral of the positive part on the window is \(4.3\), \(1.1\), \(1.0\), and \(3.5\).
 
-A peak count treats a ripple and a spike as the same event, and the count depends on where the height cutoff is set. The TV column of Table~\ref{tab:listed} is the total variation of \(\max(\hat q,0)\) on the strike window of Figure~\ref{fig:listed}, divided by twice the highest value on that window. A unimodal curve climbs once and descends once, so the ratio equals one, apart from whatever mass remains at the two edges. An extra oscillation of height \(a\) adds \(2a\) to the numerator and so adds \(a\) divided by the height of the mode. The spline scores \(1.01\), \(1.00\), \(1.00\), and \(1.01\). PCA scores \(1.00\). \citeauthor{aitsahalia2003} scores \(1.00\), apart from \(0.99\) on SPX March. The call cubic scores \(1.17\), \(1.10\), \(2.11\), and \(1.20\): a small wiggle on three chains and a material one on NDX. \citeauthor{aitsahalia1998} scores \(10.94\), \(5.03\), \(10.99\), and \(7.63\). \citeauthor{aitsahalia2003} already separate the two widths. The local cubic in Figure~\ref{fig:listed} uses \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\), two and a half times \eqref{eq:h-d2}. The call cubic is on the left of Figure~\ref{fig:listed}. Figure~\ref{fig:listed-kern} draws the other two pricing-bandwidth kernels on that same vertical scale.
+A peak count treats a ripple and a spike as the same event, and the count depends on where the height cutoff is set. The TV column of Table~\ref{tab:listed} is the total variation of \(\max(\hat q,0)\) on the strike window of Figure~\ref{fig:listed}, divided by twice the highest value on that window. A unimodal curve climbs once and descends once, so the ratio equals one, apart from whatever mass remains at the two edges. An extra oscillation of height \(a\) adds \(2a\) to the numerator and so adds \(a\) divided by the height of the mode. The three bold rows score \(1.0\). The call cubic scores \(1.2\), \(1.1\), \(2.1\), and \(1.2\): a small wiggle on three chains and a material one on NDX. \citeauthor{aitsahalia1998} scores \(10.9\), \(5.0\), \(11.0\), and \(7.6\). \citeauthor{aitsahalia2003} already separate the two widths. The local cubic in Figure~\ref{fig:listed} uses \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\), about two and a half times \eqref{eq:h-d2}. The call cubic is on the left of Figure~\ref{fig:listed}. Figure~\ref{fig:listed-kern} draws the other two pricing-bandwidth kernels on that same vertical scale.
 
-Averaging the out-of-the-money hold-out error across the four chains, one obtains \(0.308\) for the estimator of this paper, \(1.245\) for \citeauthor{aitsahalia2003}, \(0.774\) for \citeauthor{aitsahalia1998}, \(0.312\) for the call cubic of \citeauthor{grith2012}, \(0.282\) for their implied-volatility cubic, and \(0.336\) for PCA.
+Averaging the out-of-the-money hold-out error across the four chains, one obtains \(0.306\) for the estimator of this paper, \(1.245\) for \citeauthor{aitsahalia2003}, \(0.774\) for \citeauthor{aitsahalia1998}, \(0.312\) for the call cubic of \citeauthor{grith2012}, \(0.282\) for their implied-volatility cubic, and \(0.336\) for PCA.
 
 \begin{figure}[H]
 \centering
@@ -612,7 +612,7 @@ Averaging the out-of-the-money hold-out error across the four chains, one obtain
 \section{Conclusion}
 \label{sec:conc}
 
-The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. That pricing criterion, applied to the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} and to both local cubics of \citeauthor{grith2012}, reprices as closely or more closely, and the densities have many peaks or an integral well above one on the window past the quotes. The call cubic is the nearest of that group, with \(3\), \(3\), \(13\), and \(1\) peaks. On the four listed chains the spline has one peak and mass \(1.00\), and its out-of-the-money error is below the mixture on each chain. PCA remains a sieve of fixed dimension.
+The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. That pricing criterion, applied to the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} and to both local cubics of \citeauthor{grith2012}, reprices as closely or more closely, and the densities have many peaks or an integral well above one on the window past the quotes. The call cubic is the nearest of that group, with \(3\), \(3\), \(13\), and \(1\) peaks. On the four listed chains the spline has one peak and mass \(1.0\), and its out-of-the-money error is below the mixture on each chain. PCA remains a sieve of fixed dimension.
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:thrice} and a replication script are available at \url{https://github.com/s-broda/RND}.

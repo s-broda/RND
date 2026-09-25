@@ -5,7 +5,7 @@ apart from NumPy and SciPy. The estimator rescales calls to a complementary
 cdf, interpolates that function with a natural cubic spline, completes the
 unquoted tails with two endpoints, and convolves the spline with a Gaussian.
 Thricing is on by default. The default bandwidth is
-``0.36 F σ_ATM √T n^{-1/9}``.
+``0.35 F σ_ATM √T n^{-1/9}``.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from scipy.interpolate import CubicSpline
 from scipy.special import erf
 from scipy.stats import norm
 
-DERIV_C = 0.36
+DERIV_C = 0.35
 
 
 def estimate_rnd(
@@ -47,7 +47,7 @@ def estimate_rnd(
         Strikes at which to return the call interpolant. Omitted if None.
     h : float or {"deriv", "mesh"}, optional
         Bandwidth. The default ``"deriv"`` rule is
-        ``0.36 F σ_ATM √T n^{-1/9}``, with ``n`` the number of quoted
+        ``0.35 F σ_ATM √T n^{-1/9}``, with ``n`` the number of quoted
         strikes. ``"mesh"`` is ``min(1.2 δ, 0.30(K_m − K_1))``.
         A number is used as given.
     tails : bool
@@ -179,7 +179,7 @@ def _atm_sigma(K, C, S0, r, T, q, F):
 
 
 def _bandwidth(K, C, S0, r, T, q, F, rule):
-    """``mesh`` or ``deriv`` (``0.36 F σ √T n^{-1/9}``)."""
+    """``mesh`` or ``deriv`` (``0.35 F σ √T n^{-1/9}``)."""
     if rule == "mesh":
         return _mesh_h(K)
     n = max(len(K), 8)
