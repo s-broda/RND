@@ -2,8 +2,8 @@
 
 The historical λ=0 / fixed-bandwidth routines remain in this file. The
 listed table uses the routines at the bottom: a solved call-coordinate
-projection, cross-validated tuning, Bondarenko weights that are not
-rescaled, and the cubic Priestley--Chao smoother.
+projection, cross-validated tuning, Bondarenko's Gaussian convolution
+on the spot, and the cubic Priestley--Chao smoother.
 """
 
 from __future__ import annotations
@@ -721,63 +721,72 @@ def asd_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
     return np.maximum(C_hat, 0.0), q_hat, m
 
 
-def _pca_centers(K, n_centers=41):
+def _pca_nodes(K, h):
+    """Equally spaced mixing nodes on the quoted strike range.
+
+    Bondarenko's mixing measure sits on a uniform grid between the lowest
+    and highest quoted strikes. The spacing is the bandwidth, with the
+    count kept between 12 and 61.
+    """
     K = np.asarray(K, dtype=float)
-    lo = np.log(max(float(K[0]), 1e-8))
-    hi = np.log(max(float(K[-1]), float(K[0]) * 1.01))
+    lo, hi = float(K[0]), float(K[-1])
     if hi <= lo:
-        hi = lo + 0.05
-    return np.linspace(lo, hi, int(n_centers))
+        hi = lo + 1.0
+    step = max(float(h), (hi - lo) / 60.0)
+    n = int(np.clip(np.round((hi - lo) / step) + 1.0, 12, 61))
+    return np.linspace(lo, hi, n)
 
 
 def _pca_h_grid(K):
-    z = _pca_centers(K, 41)
-    dz = float(z[1] - z[0]) if z.size > 1 else 0.05
-    return np.unique(np.clip(dz * np.array([1.0, 2.0, 4.0, 8.0, 16.0]), 0.015, 1.25))
-
-
-def _pca_matrices(K, z, h, F, disc):
-    h = max(float(h), 1e-4)
     K = np.asarray(K, dtype=float)
+    span = max(float(K[-1] - K[0]), 1.0)
+    delta = float(np.median(np.diff(K))) if len(K) > 1 else span / 20.0
+    lo = max(4.0 * delta, 0.002 * span, 1e-3)
+    hi = max(0.20 * span, 8.0 * lo)
+    return np.geomspace(lo, hi, 8)
+
+
+def _bachelier_call(z, h, K, disc):
+    """Discounted call of a normal centred at ``z`` with standard deviation ``h``."""
     z = np.asarray(z, dtype=float)
-    d2 = np.clip((z[None, :] - np.log(np.maximum(K, 1e-12))[:, None]) / h, -30.0, 30.0)
-    d1 = d2 + h
-    Fm = np.exp(z + 0.5 * h * h)
-    W = disc * (Fm[None, :] * norm.cdf(d1) - K[:, None] * norm.cdf(d2))
-    return np.nan_to_num(W, nan=0.0, posinf=0.0, neginf=0.0), Fm
+    K = np.asarray(K, dtype=float)
+    h = max(float(h), 1e-8)
+    d = np.clip((z[None, :] - K[:, None]) / h, -30.0, 30.0)
+    undisc = (z[None, :] - K[:, None]) * norm.cdf(d) + h * norm.pdf(d)
+    return np.nan_to_num(float(disc) * undisc, nan=0.0, posinf=0.0, neginf=0.0)
 
 
 def _pca_density(K_eval, z, h, a):
-    h = max(float(h), 1e-4)
+    h = max(float(h), 1e-8)
     K_eval = np.asarray(K_eval, dtype=float)
-    x = np.log(np.maximum(K_eval, 1e-12))[:, None]
-    u = np.clip((x - z[None, :]) / h, -20.0, 20.0)
-    kern = np.exp(-0.5 * u * u) / (
-        np.maximum(K_eval[:, None], 1e-12) * h * np.sqrt(2.0 * np.pi)
-    )
-    a = np.clip(np.nan_to_num(np.asarray(a, dtype=float), nan=0.0), 0.0, 1.0)
+    u = np.clip((K_eval[:, None] - z[None, :]) / h, -20.0, 20.0)
+    kern = norm.pdf(u) / h
+    a = np.maximum(np.nan_to_num(np.asarray(a, dtype=float), nan=0.0), 0.0)
     return np.nan_to_num(kern @ a, nan=0.0, posinf=0.0, neginf=0.0)
 
 
-def _pca_weights(W, C, Fm, F):
-    """NNLS with sum-to-one and forward penalties. Weights are not rescaled."""
-    n = W.shape[1]
-    col = np.maximum(np.linalg.norm(W, axis=0), 1e-12)
-    scale = max(float(np.median(np.abs(C))), 1e-6)
-    lam = 8.0 * scale
-    W_aug = np.vstack([W / col, lam / col, lam * Fm / (max(float(F), 1e-12) * col)])
-    c_aug = np.concatenate([np.asarray(C, dtype=float), [lam, lam]])
-    W_aug = np.nan_to_num(W_aug, nan=0.0, posinf=0.0, neginf=0.0)
-    try:
-        with np.errstate(all="ignore"):
-            a_n, _ = nnls(W_aug, c_aug, maxiter=500)
-    except Exception:
-        a_n = np.zeros(n)
-    a = np.maximum(a_n / col, 0.0)
-    return np.clip(np.nan_to_num(a, nan=0.0), 0.0, 1.0)
+def _pca_weights(z, h, K, C, F, disc):
+    """Nonnegative weights with unit mass and mean equal to the forward.
+
+    The two equalities are the arbitrage restrictions on a risk-neutral
+    density once the kernel is a Gaussian on the spot. They are imposed
+    as rows whose weight dominates the pricing residuals.
+    """
+    from scipy.optimize import lsq_linear
+
+    z = np.asarray(z, dtype=float)
+    W = _bachelier_call(z, h, K, disc)
+    C = np.asarray(C, dtype=float)
+    lam = 1.0e6
+    A = np.vstack([W, lam * np.ones(z.size), lam * z / max(float(F), 1e-12)])
+    b = np.concatenate([C, [lam], [lam]])
+    with np.errstate(all="ignore"):
+        res = lsq_linear(A, b, bounds=(0.0, np.inf), tol=1e-12, max_iter=250)
+    return np.maximum(np.nan_to_num(res.x, nan=0.0), 0.0)
 
 
 def pca_cv_bandwidth(K, C, S0, r, T, q, F):
+    """Even/odd pricing bandwidth for the Gaussian kernel on the spot."""
     K, C = _sorted(K, C)
     disc = float(np.exp(-r * T))
     grid = _pca_h_grid(K)
@@ -787,11 +796,9 @@ def pca_cv_bandwidth(K, C, S0, r, T, q, F):
         for train, test in _splits(len(K)):
             if int(train.sum()) < 6 or int(test.sum()) < 2:
                 continue
-            z = _pca_centers(K[train], 41)
-            W, Fm = _pca_matrices(K[train], z, float(h), F, disc)
-            a = _pca_weights(W, C[train], Fm, F)
-            W_te, _ = _pca_matrices(K[test], z, float(h), F, disc)
-            pred = np.nan_to_num(W_te @ a, nan=0.0, posinf=0.0, neginf=0.0)
+            z = _pca_nodes(K[train], float(h))
+            a = _pca_weights(z, float(h), K[train], C[train], F, disc)
+            pred = _bachelier_call(z, float(h), K[test], disc) @ a
             errs.append(_otm_rmse(K[test], pred, C[test], S0, r, T, q, F))
         if errs and float(np.mean(errs)) < best:
             best = float(np.mean(errs))
@@ -800,15 +807,14 @@ def pca_cv_bandwidth(K, C, S0, r, T, q, F):
 
 
 def pca_fit(K, C, r, T, F, h, K_price, K_dens, n_centers=41):
+    del n_centers
     K, C = _sorted(K, C)
     disc = float(np.exp(-r * T))
-    z = _pca_centers(K, n_centers)
-    W, Fm = _pca_matrices(K, z, h, F, disc)
-    a = _pca_weights(W, C, Fm, F)
-    W_price, _ = _pca_matrices(np.asarray(K_price, dtype=float), z, h, F, disc)
-    C_hat = np.nan_to_num(W_price @ a, nan=0.0, posinf=0.0, neginf=0.0)
+    z = _pca_nodes(K, h)
+    a = _pca_weights(z, h, K, C, F, disc)
+    C_hat = _bachelier_call(z, h, np.asarray(K_price, dtype=float), disc) @ a
     q_hat = _pca_density(K_dens, z, h, a)
-    return C_hat, q_hat, a, z, h
+    return np.maximum(C_hat, 0.0), q_hat, a, z, h
 
 
 def _spacing(K):

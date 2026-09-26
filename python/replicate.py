@@ -24,7 +24,7 @@ PY = Path(__file__).resolve().parent
 ROOT = PY.parent
 sys.path.insert(0, str(PY))
 
-from rnd import estimate_rnd
+from rnd import estimate_rnd, estimate_splice
 from src import black_scholes as bs
 from src.competitors import (
     asd_bandwidth,
@@ -244,6 +244,11 @@ def _holdout_method(sl, method):
                 Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=Ke, h="deriv",
                 tails=True, higher=True,
             )["C"]
+        elif method == "splice":
+            C_te = estimate_splice(
+                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=Ke, h="deriv",
+                tails=True, higher=True,
+            )["C"]
         elif method == "yh":
             lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
             C_te, _ = yatchew_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, lam)
@@ -318,6 +323,7 @@ def _row_metrics(sl, C_hat, q, s, ho):
 
 _METHODS = (
     "Ours",
+    "Splice and Thrice",
     "PCA",
     "GHS IV, 2×",
     "GHS IV, CV",
@@ -344,6 +350,10 @@ def _chain_scores(sl):
         tails=True, higher=True,
     )
     h = fit["h"]
+    splice = estimate_splice(
+        sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, h="deriv",
+        tails=True, higher=True,
+    )
     h_asd = asd_bandwidth(sl.K, C, sl.r, sl.T, sl.F)
     C_asd, q_asd, _ = asd_fit(
         sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asd
@@ -361,6 +371,7 @@ def _chain_scores(sl):
     C_ghs_i, q_ghs_i = ghs_iv_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, 2.0 * h_ghs_i)
     calls = {
         "Ours": fit["C"],
+        "Splice and Thrice": splice["C"],
         "Aït-Sahalia–Duarte": C_asd,
         "Aït-Sahalia–Lo": C_asl,
         "GHS call, CV": C_ghs_cv,
@@ -371,6 +382,7 @@ def _chain_scores(sl):
     }
     dens = {
         "Ours": fit["q"],
+        "Splice and Thrice": splice["q"],
         "Aït-Sahalia–Duarte": q_asd,
         "Aït-Sahalia–Lo": q_asl,
         "GHS call, CV": q_ghs_cv,
@@ -381,6 +393,7 @@ def _chain_scores(sl):
     }
     keys = {
         "Ours": "ours",
+        "Splice and Thrice": "splice",
         "Aït-Sahalia–Duarte": "asd",
         "Aït-Sahalia–Lo": "asl",
         "GHS call, CV": "ghs_call_cv",
@@ -396,7 +409,8 @@ def _chain_scores(sl):
     peaks = {name: _mass_peaks(sl.F, dens[name], s)[1] for name in _METHODS}
     tv = {name: _variation(sl.F, dens[name], s) for name in _METHODS}
     bundle = dict(
-        C=C, fit=fit, h=h, s=s, q_asd=q_asd, q_pca=q_pca,
+        C=C, fit=fit, h=h, s=s, q_splice=splice["q"], C_splice=splice["C"],
+        q_asd=q_asd, q_pca=q_pca,
         q_asl=q_asl, q_ghs_i=q_ghs_i, q_ghs_c=q_ghs_c,
         q_ghs_cv=q_ghs_cv, q_ghs_iv_cv=q_ghs_iv_cv,
         C_pca=C_pca, C_asl=C_asl, C_ghs_c=C_ghs_c, C_ghs_i=C_ghs_i,
@@ -490,6 +504,7 @@ def _plot_listed(scored):
     for row, (title, sl, bundle) in enumerate(x for x in scored if x[0] in want):
         fit, h, s = bundle["fit"], bundle["h"], bundle["s"]
         q_asd, q_pca, q_ghs_c = bundle["q_asd"], bundle["q_pca"], bundle["q_ghs_c"]
+        q_splice = bundle["q_splice"]
         C_pca, C_ghs_c = bundle["C_pca"], bundle["C_ghs_c"]
         C_asl = bundle["C_asl"]
         print(
@@ -500,6 +515,7 @@ def _plot_listed(scored):
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
         ymax = 1.15 * np.nanmax(np.maximum(fit["q"][core], 0))
         h_ours, = ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.5, label="Ours", zorder=5)
+        h_splice, = ax.plot(s, np.maximum(q_splice, 0), color="#9467bd", lw=1.05, ls=":", label="Splice and Thrice", zorder=6)
         h_pca, = ax.plot(s, np.maximum(q_pca, 0), color="#2ca02c", lw=1.15, ls="-.", label="PCA", zorder=4)
         h_ghs_c, = ax.plot(s, np.maximum(q_ghs_c, 0), color="#ff7f0e", lw=1.15, label="GHS, call, 2×", zorder=4)
         h_asd, = ax.plot(s, np.maximum(q_asd, 0), color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte", zorder=3)
@@ -509,8 +525,8 @@ def _plot_listed(scored):
         ax.set_title(title)
         ax.set_xlabel(r"Strike $K$")
         ax.legend(
-            [h_ours, h_pca, h_ghs_c, h_asd],
-            ["Ours", "PCA", "GHS, call, 2×", "Aït-Sahalia–Duarte"],
+            [h_ours, h_splice, h_pca, h_ghs_c, h_asd],
+            ["Ours", "Splice and Thrice", "PCA", "GHS, call, 2×", "Aït-Sahalia–Duarte"],
             frameon=False, fontsize=7.5, loc="upper right",
         )
         if row == 0:

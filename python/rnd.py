@@ -90,15 +90,99 @@ def estimate_rnd(
     G = None if K_price is None else np.zeros(len(np.asarray(K_price, dtype=float)), dtype=float)
     price = None if K_price is None else np.asarray(K_price, dtype=float)
     for fac, w in weights:
-        qq, _ = _smooth(K_eval, Ks, spl, h_use * fac, F)
-        qhat += w * qq
+        H2, _, _ = _smooth(K_eval, Ks, spl, h_use * fac)
+        qhat += w * (-float(F) * H2)
         if price is not None:
-            G += w * _smooth(price, Ks, spl, h_use * fac, F)[1]
+            G += w * _smooth(price, Ks, spl, h_use * fac)[1]
     C_hat = None
     if G is not None:
         G = np.clip(G, 0.0, 1.0)
         C_hat = stock * np.clip(1.0 - G, 0.0, 1.0)
     return {"q": qhat, "C": C_hat, "h": float(h_use)}
+
+
+def estimate_splice(
+    K,
+    C,
+    S0,
+    r,
+    T,
+    q=0.0,
+    K_eval=None,
+    K_price=None,
+    h=None,
+    tails=True,
+    higher=True,
+):
+    """Put spline left of the forward, call spline to the right, then thrice.
+
+    The call side is the complementary cdf of Section 2. The put side splines
+    ``G(K)=e^{rT} Put(K)/K``, whose density is ``2G'+KG''``. Both sides use
+    the same Gaussian convolution. The splice is formed at each bandwidth
+    and only then thriced, so the higher-order kernel crosses the forward.
+    """
+    K = np.asarray(K, dtype=float)
+    C = np.asarray(C, dtype=float)
+    order = np.argsort(K)
+    K, C = K[order], C[order]
+    disc = float(np.exp(-float(r) * float(T)))
+    stock = float(S0) * np.exp(-float(q) * float(T))
+    F = float(S0) * np.exp((float(r) - float(q)) * float(T))
+    if K_eval is None:
+        K_eval = K
+    else:
+        K_eval = np.asarray(K_eval, dtype=float)
+    price = None if K_price is None else np.asarray(K_price, dtype=float)
+    if h is None or h == "deriv":
+        h_use = _bandwidth(K, C, S0, r, T, q, F, "deriv")
+    elif h == "mesh":
+        h_use = _bandwidth(K, C, S0, r, T, q, F, h)
+    else:
+        h_use = float(h)
+
+    Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
+    spl_c = CubicSpline(Ks, Ps, bc_type="natural")
+    Kg, Gg = _put_knots(K, C, F, disc, tails=tails)
+    spl_p = CubicSpline(Kg, Gg, bc_type="natural")
+    weights = ((1.0, 8.0 / 3.0), (np.sqrt(2.0), -2.0), (2.0, 1.0 / 3.0)) if higher else ((1.0, 1.0),)
+    qhat = np.zeros(len(np.atleast_1d(K_eval)), dtype=float)
+    C_hat = None if price is None else np.zeros(len(price), dtype=float)
+    for fac, w in weights:
+        q_c = -float(F) * _smooth(K_eval, Ks, spl_c, h_use * fac)[0]
+        H2, Gs, H1 = _smooth(K_eval, Kg, spl_p, h_use * fac)
+        q_p = 2.0 * H1 + np.asarray(K_eval, dtype=float) * H2
+        qhat += w * np.where(np.asarray(K_eval, dtype=float) < F, q_p, q_c)
+        if price is not None:
+            G_c = _smooth(price, Ks, spl_c, h_use * fac)[1]
+            C_c = stock * (1.0 - G_c)
+            G_p = _smooth(price, Kg, spl_p, h_use * fac)[1]
+            P_p = disc * price * G_p
+            C_p = P_p - disc * (price - F)
+            C_hat += w * np.where(price < F, C_p, C_c)
+    if C_hat is not None:
+        C_hat = np.maximum(C_hat, 0.0)
+    return {"q": qhat, "C": C_hat, "h": float(h_use)}
+
+
+def _put_knots(K, C, F, disc, tails=True):
+    """Knots of ``G(K)=1-F/K+e^{rT}C/K``, with a hyperbolic right tail."""
+    K = np.asarray(K, dtype=float)
+    C = np.maximum(np.asarray(C, dtype=float), 0.0)
+    scale = np.maximum(K, 1e-16)
+    G = 1.0 - float(F) / scale + C / (scale * max(float(disc), 1e-16))
+    G = np.maximum.accumulate(np.clip(G, 0.0, 1.0))
+    Ks = np.concatenate([[0.0], K])
+    Gs = np.concatenate([[0.0], G])
+    if tails and Ks[-1] < 8.0 * float(F):
+        c = float(Ks[-1]) * (1.0 - float(Gs[-1]))
+        if c > 0.0:
+            Kt = np.geomspace(float(Ks[-1]) * 1.02, 8.0 * float(F), 12)
+            Gt = np.clip(1.0 - c / Kt, 0.0, 1.0)
+            Gt = np.maximum.accumulate(np.maximum(Gt, float(Gs[-1])))
+            Ks = np.concatenate([Ks, Kt])
+            Gs = np.concatenate([Gs, Gt])
+    keep = np.concatenate([[True], np.diff(Ks) > 1e-8])
+    return Ks[keep], Gs[keep]
 
 
 def _knots(K, C, stock, F, disc, tails=True):
@@ -118,11 +202,18 @@ def _knots(K, C, stock, F, disc, tails=True):
     return Ks[keep], Ps[keep]
 
 
-def _smooth(x, Ks, spl, h, F):
+def _smooth(x, Ks, spl, h):
+    """Gaussian convolution of a cubic spline.
+
+    Returns the smoothed second derivative, the smoothed level, and the
+    smoothed first derivative. The call density is ``-F`` times the first
+    of these.
+    """
     x = np.atleast_1d(np.asarray(x, dtype=float))
     h = max(float(h), 1e-6)
     gprime = np.zeros_like(x)
     G = np.zeros_like(x)
+    gfirst = np.zeros_like(x)
     for L, R in zip(Ks[:-1], Ks[1:]):
         alpha = float(spl(L, 1))
         beta = float(spl(L, 2))
@@ -141,6 +232,7 @@ def _smooth(x, Ks, spl, h, F):
         dI1 = (uL * _phi(uL) - uR * _phi(uR)) / h
         dI2 = (uL * uL * _phi(uL) - uR * uR * _phi(uR)) / h
         gprime += dA0 * I0 + A0 * dI0 + dA1 * I1 + A1 * dI1 + A2 * dI2
+        gfirst += A0 * I0 + A1 * I1 + A2 * I2
 
         def J0(u):
             return u * _Phi(u) + _phi(u)
@@ -156,7 +248,7 @@ def _smooth(x, Ks, spl, h, F):
             + A1 * (J1(uL) - J1(uR))
             + A2 * (J2(uL) - J2(uR))
         )
-    return -float(F) * gprime, G
+    return gprime, G, gfirst
 
 
 def _Phi(u):
