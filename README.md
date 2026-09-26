@@ -15,7 +15,7 @@ python3 python/replicate.py
 
 This prints the Heston and variance-gamma ISE tables and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, `figures/ccdf_listed.pdf`, and `figures/ccdf_listed_kern.pdf`.
 
-Every listed fit starts from the same unpenalized decreasing-convex projection of the quoted calls and is scored against the quoted mids. The listed comparison chooses the Aït-Sahalia–Duarte, Aït-Sahalia–Lo, and Grith–Härdle–Schienle bandwidths, and the lognormal-mixture width, by even/odd out-of-the-money error. The spline prices from the interpolant at \(0.35 F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\). Exact Heston and variance-gamma quotes are scored for the spline at the mesh rule and at the \(n^{-1/9}\) rule, on a dense grid and on a 32-strike grid. The four working slices are one Cboe session, 23 September 2026.
+Every listed fit starts from the same unpenalized decreasing-convex projection of the quoted calls and is scored against the quoted mids. The listed comparison chooses the Aït-Sahalia–Duarte bandwidth, the Aït-Sahalia–Lo bandwidth, and the lognormal-mixture width by even/odd out-of-the-money error. The Grith–Härdle–Schienle bandwidth is the leave-one-out width of the local cubic, and the comparison also reports twice that width. The spline prices from the interpolant at \(0.35 F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\). Exact Heston and variance-gamma quotes are scored for the spline at the mesh rule and at the \(n^{-1/9}\) rule, on a dense grid and on a 32-strike grid. The four working slices are one Cboe session, 23 September 2026.
 
 ## Data
 

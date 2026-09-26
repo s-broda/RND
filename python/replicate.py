@@ -32,6 +32,8 @@ from src.competitors import (
     asl_fit,
     ghs_call_fit,
     ghs_iv_fit,
+    ghs_loo_bandwidth,
+    _iv_on_calls,
     kernel_price_cv,
     pca_cv_bandwidth,
     _second_diff_q,
@@ -255,10 +257,21 @@ def _holdout_method(sl, method):
             _, _, C_te = priestley_chao_cubic(
                 Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
             )
-        elif method in ("asl", "ghs_call", "ghs_iv"):
-            fit = {"asl": asl_fit, "ghs_call": ghs_call_fit, "ghs_iv": ghs_iv_fit}[method]
+        elif method == "asl":
             h = kernel_price_cv(method, Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            C_te, _ = fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h)
+            C_te, _ = asl_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h)
+        elif method in ("ghs_call_cv", "ghs_call_2", "ghs_iv_cv", "ghs_iv_2"):
+            if method.startswith("ghs_call"):
+                h = ghs_loo_bandwidth(Kt, Ct)
+                if method.endswith("_2"):
+                    h *= 2.0
+                C_te, _ = ghs_call_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h)
+            else:
+                sig = _iv_on_calls(Kt, Ct, sl.S0, sl.r, sl.T, sl.q)
+                h = ghs_loo_bandwidth(Kt, sig)
+                if method.endswith("_2"):
+                    h *= 2.0
+                C_te, _ = ghs_iv_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h)
         else:
             raise ValueError(method)
         errs.append(_otm_rmse_slice(sl, C_te, test))
@@ -304,11 +317,13 @@ def _row_metrics(sl, C_hat, q, s, ho):
 
 _METHODS = (
     "Ours",
-    "Aït-Sahalia–Duarte",
-    "Aït-Sahalia–Lo",
-    "GHS call",
-    "GHS IV",
     "PCA",
+    "Aït-Sahalia–Duarte",
+    "GHS IV, 2×",
+    "GHS IV, CV",
+    "Aït-Sahalia–Lo",
+    "GHS call, 2×",
+    "GHS call, CV",
 )
 
 
@@ -336,32 +351,41 @@ def _chain_scores(sl):
     C_pca, q_pca, _, _, _ = pca_fit(sl.K, C, sl.r, sl.T, sl.F, h_pca, sl.K, s)
     h_asl = kernel_price_cv("asl", sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
     C_asl, q_asl = asl_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asl)
-    h_ghs_c = kernel_price_cv("ghs_call", sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_ghs_c, q_ghs_c = ghs_call_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_ghs_c)
-    h_ghs_i = kernel_price_cv("ghs_iv", sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-    C_ghs_i, q_ghs_i = ghs_iv_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_ghs_i)
+    h_ghs_c = ghs_loo_bandwidth(sl.K, C)
+    C_ghs_cv, q_ghs_cv = ghs_call_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_ghs_c)
+    C_ghs_c, q_ghs_c = ghs_call_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, 2.0 * h_ghs_c)
+    sig = _iv_on_calls(sl.K, C, sl.S0, sl.r, sl.T, sl.q)
+    h_ghs_i = ghs_loo_bandwidth(sl.K, sig)
+    C_ghs_iv_cv, q_ghs_iv_cv = ghs_iv_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_ghs_i)
+    C_ghs_i, q_ghs_i = ghs_iv_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, 2.0 * h_ghs_i)
     calls = {
         "Ours": fit["C"],
         "Aït-Sahalia–Duarte": C_asd,
         "Aït-Sahalia–Lo": C_asl,
-        "GHS call": C_ghs_c,
-        "GHS IV": C_ghs_i,
+        "GHS call, CV": C_ghs_cv,
+        "GHS call, 2×": C_ghs_c,
+        "GHS IV, CV": C_ghs_iv_cv,
+        "GHS IV, 2×": C_ghs_i,
         "PCA": C_pca,
     }
     dens = {
         "Ours": fit["q"],
         "Aït-Sahalia–Duarte": q_asd,
         "Aït-Sahalia–Lo": q_asl,
-        "GHS call": q_ghs_c,
-        "GHS IV": q_ghs_i,
+        "GHS call, CV": q_ghs_cv,
+        "GHS call, 2×": q_ghs_c,
+        "GHS IV, CV": q_ghs_iv_cv,
+        "GHS IV, 2×": q_ghs_i,
         "PCA": q_pca,
     }
     keys = {
         "Ours": "ours",
         "Aït-Sahalia–Duarte": "asd",
         "Aït-Sahalia–Lo": "asl",
-        "GHS call": "ghs_call",
-        "GHS IV": "ghs_iv",
+        "GHS call, CV": "ghs_call_cv",
+        "GHS call, 2×": "ghs_call_2",
+        "GHS IV, CV": "ghs_iv_cv",
+        "GHS IV, 2×": "ghs_iv_2",
         "PCA": "pca",
     }
     metrics = {
@@ -373,7 +397,9 @@ def _chain_scores(sl):
     bundle = dict(
         C=C, fit=fit, h=h, s=s, q_asd=q_asd, q_pca=q_pca,
         q_asl=q_asl, q_ghs_i=q_ghs_i, q_ghs_c=q_ghs_c,
+        q_ghs_cv=q_ghs_cv, q_ghs_iv_cv=q_ghs_iv_cv,
         C_pca=C_pca, C_asl=C_asl, C_ghs_c=C_ghs_c, C_ghs_i=C_ghs_i,
+        C_ghs_cv=C_ghs_cv, C_ghs_iv_cv=C_ghs_iv_cv,
         h_asd_d=h_asd_d, h_pca=h_pca,
         h_asl=h_asl, h_ghs_c=h_ghs_c, h_ghs_i=h_ghs_i, peaks=peaks, tv=tv,
     )
@@ -474,7 +500,7 @@ def _plot_listed(scored):
         ymax = 1.15 * np.nanmax(np.maximum(fit["q"][core], 0))
         h_ours, = ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.5, label="Ours", zorder=5)
         h_pca, = ax.plot(s, np.maximum(q_pca, 0), color="#2ca02c", lw=1.15, ls="-.", label="PCA", zorder=4)
-        h_ghs_c, = ax.plot(s, np.maximum(q_ghs_c, 0), color="#ff7f0e", lw=1.15, label="GHS, call", zorder=4)
+        h_ghs_c, = ax.plot(s, np.maximum(q_ghs_c, 0), color="#ff7f0e", lw=1.15, label="GHS, call, 2×", zorder=4)
         h_asd, = ax.plot(s, np.maximum(q_asd, 0), color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte", zorder=3)
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlim(0.55 * sl.F, 1.40 * sl.F)
@@ -483,7 +509,7 @@ def _plot_listed(scored):
         ax.set_xlabel(r"Strike $K$")
         ax.legend(
             [h_ours, h_pca, h_ghs_c, h_asd],
-            ["Ours", "PCA", "GHS, call", "Aït-Sahalia–Duarte"],
+            ["Ours", "PCA", "GHS, call, 2×", "Aït-Sahalia–Duarte"],
             frameon=False, fontsize=7.5, loc="upper right",
         )
         if row == 0:
@@ -508,14 +534,14 @@ def _plot_listed(scored):
         ax.set_ylim(y1, y2)
         h_mkt, = ax.plot(sl.K[show], iv_m[show], "k.", ms=2.6, alpha=0.40, label="Market", zorder=2)
         h_asl, = ax.plot(sl.K[show], iv_asl[show], color="#d62728", lw=1.0, ls="--", label="Aït-Sahalia–Lo", zorder=4)
-        h_ghs_c, = ax.plot(sl.K[show], iv_ghs_c[show], color="#ff7f0e", lw=1.15, label="GHS, call", zorder=5)
+        h_ghs_c, = ax.plot(sl.K[show], iv_ghs_c[show], color="#ff7f0e", lw=1.15, label="GHS, call, 2×", zorder=5)
         h_pca, = ax.plot(sl.K[show], iv_pca[show], color="#2ca02c", lw=1.05, ls="-.", label="PCA", zorder=5)
         h_ours, = ax.plot(sl.K[show], iv[show], color="#1f77b4", lw=1.4, label="Ours", zorder=6)
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlabel(r"Strike $K$")
         ax.legend(
             [h_mkt, h_ours, h_ghs_c, h_pca, h_asl],
-            ["Market", "Ours", "GHS, call", "PCA", "Aït-Sahalia–Lo"],
+            ["Market", "Ours", "GHS, call, 2×", "PCA", "Aït-Sahalia–Lo"],
             frameon=False, fontsize=6.5, loc="upper right",
         )
         if row == 0:
@@ -533,33 +559,41 @@ def _plot_listed(scored):
         ymax = 1.15 * np.nanmax(np.maximum(fit["q"][core], 0))
         ax = axes[row, 0]
         ax.plot(s, np.maximum(bundle["q_asl"], 0), color="#d62728", lw=1.0, ls="--", label="Aït-Sahalia–Lo")
-        ax.plot(s, np.maximum(bundle["q_ghs_i"], 0), color="#17becf", lw=1.05, ls="-.", label="GHS, IV")
+        ax.plot(s, np.maximum(bundle["q_ghs_cv"], 0), color="#ff7f0e", lw=1.0, ls=":", label="GHS call, CV")
+        ax.plot(s, np.maximum(bundle["q_ghs_iv_cv"], 0), color="#17becf", lw=1.0, ls="--", label="GHS IV, CV")
+        ax.plot(s, np.maximum(bundle["q_ghs_i"], 0), color="#17becf", lw=1.15, ls="-.", label="GHS IV, 2×")
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlim(0.55 * sl.F, 1.40 * sl.F)
         ax.set_ylim(0, ymax)
         ax.set_title(title)
         ax.set_xlabel(r"Strike $K$")
-        ax.legend(frameon=False, fontsize=7.5, loc="upper right")
+        ax.legend(frameon=False, fontsize=6.5, loc="upper right")
         if row == 0:
             ax.set_ylabel(r"$f_{\mathbb{Q}}(K)$")
 
         P_asl, C_asl = _parity(sl, bundle["C_asl"])
+        P_cv, C_cv = _parity(sl, bundle["C_ghs_cv"])
+        P_iv, C_iv = _parity(sl, bundle["C_ghs_iv_cv"])
         P_ghs_i, C_ghs_i = _parity(sl, bundle["C_ghs_i"])
         iv_asl = _otm_iv(sl, P_asl, C_asl)
+        iv_cv = _otm_iv(sl, P_cv, C_cv)
+        iv_iv = _otm_iv(sl, P_iv, C_iv)
         iv_ghs_i = _otm_iv(sl, P_ghs_i, C_ghs_i)
         iv_m = _otm_iv(sl, sl.P, sl.C)
         lo, hi = 0.55 * sl.F, 1.40 * sl.F
         show = np.isfinite(iv_m) & (sl.K >= lo) & (sl.K <= hi)
         ax = axes[row, 1]
-        y1, y2 = _iv_ylim([iv_m[show], iv_asl[show], iv_ghs_i[show]])
+        y1, y2 = _iv_ylim([iv_m[show], iv_asl[show], iv_cv[show], iv_iv[show], iv_ghs_i[show]])
         ax.set_xlim(lo, hi)
         ax.set_ylim(y1, y2)
         ax.plot(sl.K[show], iv_m[show], "k.", ms=2.6, alpha=0.40, label="Market", zorder=2)
         ax.plot(sl.K[show], iv_asl[show], color="#d62728", lw=1.05, ls="--", label="Aït-Sahalia–Lo", zorder=4)
-        ax.plot(sl.K[show], iv_ghs_i[show], color="#17becf", lw=1.15, ls="-.", label="GHS, IV", zorder=5)
+        ax.plot(sl.K[show], iv_cv[show], color="#ff7f0e", lw=1.0, ls=":", label="GHS call, CV", zorder=4)
+        ax.plot(sl.K[show], iv_iv[show], color="#17becf", lw=1.0, ls="--", label="GHS IV, CV", zorder=5)
+        ax.plot(sl.K[show], iv_ghs_i[show], color="#17becf", lw=1.15, ls="-.", label="GHS IV, 2×", zorder=5)
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlabel(r"Strike $K$")
-        ax.legend(frameon=False, fontsize=7.5, loc="upper right")
+        ax.legend(frameon=False, fontsize=6.5, loc="upper right")
         if row == 0:
             ax.set_ylabel("OTM implied vol")
     fig.tight_layout()

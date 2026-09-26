@@ -796,9 +796,9 @@ def priestley_chao_cv(K, C, S0, r, T, q, F):
 
 # --- Aït-Sahalia–Lo and Grith–Härdle–Schienle, single maturity ---
 #
-# Bandwidth ``h`` is the standard deviation of the weight function, in strike
-# units. The quartic kernel has sd 1/sqrt(7) on its native support, so its
-# support radius is h*sqrt(7) when it is asked to match a Gaussian of width h.
+# For the Gaussian Nadaraya–Watson fit, ``h`` is the standard deviation.
+# For the quartic local cubic, ``h`` is the half-width of the kernel support,
+# as in Grith, Härdle and Schienle: weights ``(1-u^2)^2`` for ``|x-X|<=h``.
 
 
 def second_derivative_h(K, C, S0, r, T, q, F, c=0.9):
@@ -875,7 +875,9 @@ def _kernel_weights(dx, h, kernel):
     dx = np.asarray(dx, dtype=float)
     h = max(float(h), 1e-6)
     if kernel == "quartic":
-        u = dx / (h * np.sqrt(7.0))
+        # Grith, Härdle and Schienle: K_h(u) = K(u/h) on |u|<=1.
+        # h is the half-width of the window, not the kernel's standard deviation.
+        u = dx / h
         w = np.zeros_like(u)
         inside = np.abs(u) <= 1.0
         uu = u[inside]
@@ -886,25 +888,17 @@ def _kernel_weights(dx, h, kernel):
 
 def _local_beta(K, Y, x, h, degree, kernel):
     K = np.asarray(K, dtype=float)
-    # A compact kernel can leave fewer than degree+2 strikes in the window.
-    # Widen that fit until the local polynomial is determined.
     h_use = max(float(h), 1e-6)
     dx_all = K - float(x)
     w_all = _kernel_weights(dx_all, h_use, kernel)
-    need = degree + 2
-    while int(np.sum(w_all > 1e-14)) < need and h_use < 40.0 * float(h):
-        h_use *= 1.6
-        w_all = _kernel_weights(dx_all, h_use, kernel)
     if kernel == "quartic":
         sel = w_all > 1e-14
     else:
         sel = np.abs(dx_all) <= max(6.0 * h_use, 1e-8)
     if int(sel.sum()) < degree + 1:
-        take = np.argsort(np.abs(dx_all))[: max(need, degree + 1)]
-        sel = np.zeros(dx_all.size, dtype=bool)
-        sel[take] = True
-        w_all = np.maximum(w_all, 0.0)
-        w_all[take] = np.maximum(w_all[take], 1e-6)
+        # Compact kernel with nothing in the window: no observation is used.
+        nearest = float(np.asarray(Y, dtype=float)[np.argmin(np.abs(dx_all))])
+        return np.array([nearest, 0.0, 0.0, 0.0][: degree + 1])
     dx = dx_all[sel]
     yy = np.asarray(Y, dtype=float)[sel]
     w = w_all[sel]
@@ -957,23 +951,27 @@ def asl_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
 def ghs_call_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
     """Grith–Härdle–Schienle local cubic of the call. Quartic kernel.
 
-    The density is e^{rT} times twice the quadratic coefficient. The price is
-    the local level at the same bandwidth.
+    The call is divided by the spot and the second derivative is scaled back.
+    ``h`` is the half-width of the quartic support. The density is ``e^{rT}``
+    times twice the quadratic coefficient. The price is the local level.
     """
-    del S0, q, F
+    del q, F
     K, C = _sorted(K, C)
-    beta_p = _local_poly_eval(K, C, K_price, h, 3, "quartic")
-    beta_d = _local_poly_eval(K, C, K_dens, h, 3, "quartic")
-    call = np.maximum(beta_p[:, 0], 0.0)
-    dens = np.exp(float(r) * float(T)) * 2.0 * beta_d[:, 2]
+    scale = max(float(S0), 1e-8)
+    y = C / scale
+    beta_p = _local_poly_eval(K, y, K_price, h, 3, "quartic")
+    beta_d = _local_poly_eval(K, y, K_dens, h, 3, "quartic")
+    call = np.maximum(beta_p[:, 0] * scale, 0.0)
+    dens = np.exp(float(r) * float(T)) * scale * 2.0 * beta_d[:, 2]
     return call, dens
 
 
 def ghs_iv_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
-    """Rookley estimator as used by Grith–Härdle–Schienle.
+    """Implied-volatility local cubic used by Grith–Härdle–Schienle.
 
-    Local cubic of implied volatility, quartic kernel. Prices are Black–Scholes
-    at the local level. The density uses the local slope and curvature.
+    Local cubic of Black–Scholes implied volatility against strike, quartic
+    kernel, ``h`` the support half-width. Prices are Black–Scholes at the
+    local level. The density uses the local slope and curvature in the strike.
     """
     del F
     K, C = _sorted(K, C)
@@ -990,6 +988,54 @@ def ghs_iv_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
         S0, r, T, q,
     )
     return call, dens
+
+
+def _ghs_cv_grid(K):
+    K = np.asarray(K, dtype=float)
+    delta = float(np.median(np.diff(K))) if len(K) > 1 else 1.0
+    span = float(K[-1] - K[0]) if len(K) > 1 else 1.0
+    # Smallest window that can hold a cubic on the median gap, up to half the range.
+    return np.geomspace(max(4.0 * delta, span / 200.0), max(0.5 * span, 12.0 * delta), 18)
+
+
+def ghs_loo_bandwidth(K, Y):
+    """Leave-one-out bandwidth for the local cubic.
+
+    Grith, Härdle and Schienle minimise the squared gap between the local
+    cubic and the observed response. ``h`` is the quartic half-width. A
+    candidate is kept only when every scored strike has a full window, and
+    the score uses the central 90 percent of strikes.
+    """
+    K = np.asarray(K, dtype=float)
+    Y = np.asarray(Y, dtype=float)
+    order = np.argsort(K)
+    K, Y = K[order], Y[order]
+    n = len(K)
+    grid = _ghs_cv_grid(K)
+    lo, hi = np.quantile(K, [0.05, 0.95])
+    interior = np.where((K >= lo) & (K <= hi))[0]
+    if interior.size < 8:
+        interior = np.arange(n)
+    best_h, best = None, np.inf
+    for h in grid:
+        sse = 0.0
+        admissible = True
+        for i in interior:
+            mask = np.ones(n, dtype=bool)
+            mask[i] = False
+            dx = K[mask] - float(K[i])
+            if int(np.sum(np.abs(dx) <= float(h))) < 4:
+                admissible = False
+                break
+            beta = _local_beta(K[mask], Y[mask], float(K[i]), float(h), 3, "quartic")
+            sse += (float(Y[i]) - float(beta[0])) ** 2
+        if not admissible:
+            continue
+        if sse < best:
+            best, best_h = sse, float(h)
+    if best_h is None:
+        best_h = float(grid[0])
+    return best_h
 
 
 def kernel_h_grid(K, C, S0, r, T, q, F):
