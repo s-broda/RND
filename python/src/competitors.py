@@ -133,7 +133,12 @@ def local_cubic_bl(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None):
 
 
 def pca_lognormal(K_obs, C_obs, S0, r, T, K_eval, q=0.0, h=None, n_centers=41):
-    """Bondarenko PCA: q = μ * lognormal kernel, μ ≥ 0 fitted by NNLS."""
+    """Log-price analog kept for a separate note, not Bondarenko's estimator.
+
+    Forty-one lognormals. The scored strike-span version and its table
+    numbers are in other_stuff/notes/pca_analog_note.tex. The listed
+    comparison uses pca_fit.
+    """
     K_obs, C_obs = _sorted(K_obs, C_obs)
     F = S0 * np.exp((r - q) * T)
     disc = np.exp(-r * T)
