@@ -600,45 +600,125 @@ def _local_cubic_second(K, Y, K_eval, h):
     return out
 
 
-def asd_cv_bandwidth(K, C, S0, r, T, q, F):
-    """Even/odd local-linear bandwidth on the solved projection.
+def asd_plugin_bandwidth(K, m):
+    """Fan–Gijbels plug-in for the local linear, Aït-Sahalia and Duarte (3.23).
 
-    Returns ``(h_price, h_density)``. The density bandwidth is the fixed
-    second-derivative rate ``0.9 F σ √T n^{-1/9}``.
+    Global polynomial of order 4, Gaussian constant 0.776, rate n^{-1/5}.
+    The weight is one within 1.5 standard deviations of the mean strike.
+    Their market-data figures reuse a Monte Carlo bandwidth for n=25, which
+    is not a formula. This is the automatic rule in their Section 3.5.
     """
+    K = np.asarray(K, dtype=float)
+    m = np.asarray(m, dtype=float)
+    n = max(len(K), 8)
+    mu = float(np.mean(K))
+    sd = float(np.std(K, ddof=1))
+    sd = max(sd, 1e-8)
+    z = (K - mu) / sd
+    coef = np.polyfit(z, m, 4)
+    resid = m - np.polyval(coef, z)
+    ssr = float(np.dot(resid, resid))
+    c4, c3, c2 = coef[0], coef[1], coef[2]
+    mzz = 12.0 * c4 * z ** 2 + 6.0 * c3 * z + 2.0 * c2
+    m2 = mzz / sd ** 2
+    w0 = (np.abs(K - mu) <= 1.5 * sd).astype(float)
+    integ = 3.0 * sd
+    denom = float(np.sum((m2 ** 2) * w0))
+    if denom < 1e-18 or ssr <= 0.0:
+        return float(1.06 * sd * n ** (-0.2))
+    inside = ssr * integ / (n * denom)
+    return float(max(0.776 * inside ** 0.2, 1e-6))
+
+
+def asd_bandwidth(K, C, r, T, F):
+    """Plug-in bandwidth of the constrained call prices."""
     K, C = _sorted(K, C)
     disc = float(np.exp(-r * T))
-    n = max(len(K), 8)
-    sig = _atm_vol(C, S0, K, r, T, q, F)
-    s = F * sig * np.sqrt(T)
-    h_dens = float(0.9 * s * n ** (-1.0 / 9.0))
-    grid = s * n ** (-0.2) * np.array([0.25, 0.5, 1.0, 2.0, 4.0])
-    best_h, best = float(grid[2]), np.inf
-    folds = []
-    for train, test in _splits(len(K)):
-        if int(train.sum()) < 4 or int(test.sum()) < 2:
-            continue
-        m_tr = shape_fit_calls(K[train], C[train], disc, lam=0.0)
-        folds.append((train, test, m_tr))
-    for h in grid:
-        errs = []
-        for train, test, m_tr in folds:
-            C_te = _local_linear(K[train], m_tr, K[test], float(h))
-            errs.append(_otm_rmse(K[test], C_te, C[test], S0, r, T, q, F))
-        if errs and float(np.mean(errs)) < best:
-            best = float(np.mean(errs))
-            best_h = float(h)
-    return best_h, h_dens
+    intrinsic = disc * np.maximum(float(F) - K, 0.0)
+    m = shape_fit_calls(K, C, disc, lam=0.0, intrinsic=intrinsic)
+    return asd_plugin_bandwidth(K, m)
 
 
-def asd_fit(K, C, S0, r, T, q, F, K_price, K_dens, h_price, h_dens):
+def _local_linear_curve(K, Y, K_eval, h):
+    """Gaussian local linear. Returns level, slope, and d(slope)/dK.
+
+    Weights are exp(-u^2/2). The factor 1/sqrt(2 pi) cancels in the
+    weighted least squares. Differentiating the slope in the strike is the
+    second derivative of the estimator, which is not the second coefficient
+    of any one local line.
+    """
+    K = np.asarray(K, dtype=float)
+    Y = np.asarray(Y, dtype=float)
+    x = np.atleast_1d(np.asarray(K_eval, dtype=float))
+    h = max(float(h), 1e-6)
+    dx = K[None, :] - x[:, None]
+    w = np.exp(-0.5 * (dx / h) ** 2)
+    dw = w * dx / (h * h)
+    S0 = w.sum(axis=1)
+    S1 = (w * dx).sum(axis=1)
+    S2 = (w * dx * dx).sum(axis=1)
+    T0 = (w * Y).sum(axis=1)
+    T1 = (w * dx * Y).sum(axis=1)
+    dS0 = dw.sum(axis=1)
+    dS1 = (dw * dx - w).sum(axis=1)
+    dS2 = (dw * dx * dx - 2.0 * w * dx).sum(axis=1)
+    dT0 = (dw * Y).sum(axis=1)
+    dT1 = ((dw * dx - w) * Y).sum(axis=1)
+    denom = S0 * S2 - S1 * S1
+    num0 = S2 * T0 - S1 * T1
+    num1 = S0 * T1 - S1 * T0
+    tiny = np.abs(denom) < 1e-18
+    denom_s = np.where(tiny, 1.0, denom)
+    level = num0 / denom_s
+    slope = num1 / denom_s
+    ddenom = dS0 * S2 + S0 * dS2 - 2.0 * S1 * dS1
+    dnum1 = dS0 * T1 + S0 * dT1 - dS1 * T0 - S1 * dT0
+    curve = (dnum1 * denom_s - num1 * ddenom) / (denom_s * denom_s)
+    nearest = Y[np.argmin(np.abs(dx), axis=1)]
+    level = np.where(tiny, nearest, level)
+    slope = np.where(tiny, 0.0, slope)
+    curve = np.where(tiny, 0.0, curve)
+    return level, slope, curve
+
+
+def _asd_density(K_dens, curve, r, T, F):
+    """e^{rT} times the curvature, scaled to unit mass and shifted onto F.
+
+    Aït-Sahalia and Duarte impose the integral and forward-mean constraints
+    on the second derivative after the local linear step. The shift is the
+    constant that puts the mean of the scaled density on the forward.
+    """
+    K_dens = np.asarray(K_dens, dtype=float)
+    q = np.exp(float(r) * float(T)) * np.asarray(curve, dtype=float)
+    if K_dens.size < 4:
+        return q
+    mass = float(np.trapezoid(q, K_dens))
+    if not np.isfinite(mass) or mass <= 1e-12:
+        return q
+    q = q / mass
+    mean = float(np.trapezoid(K_dens * q, K_dens))
+    if not np.isfinite(mean):
+        return q
+    z = float(F) - mean
+    moved = np.interp(K_dens - z, K_dens, q, left=0.0, right=0.0)
+    return moved
+
+
+def asd_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
+    """Shape-constrained Gaussian local linear.
+
+    The price is the local level. The density is e^{rT} times the strike
+    derivative of the local slope, then scaled and shifted as in their
+    Section 3.6. ``h`` is the single bandwidth of that local linear.
+    """
     K, C = _sorted(K, C)
     disc = float(np.exp(-r * T))
     intrinsic = disc * np.maximum(F - K, 0.0)
     m = shape_fit_calls(K, C, disc, lam=0.0, intrinsic=intrinsic)
-    C_hat = _local_linear(K, m, K_price, h_price)
-    q_hat = np.exp(r * T) * _local_cubic_second(K, m, K_dens, h_dens)
-    return C_hat, q_hat, m
+    C_hat, _, _ = _local_linear_curve(K, m, K_price, h)
+    _, _, curve = _local_linear_curve(K, m, K_dens, h)
+    q_hat = _asd_density(K_dens, curve, r, T, F)
+    return np.maximum(C_hat, 0.0), q_hat, m
 
 
 def _pca_centers(K, n_centers=41):
@@ -929,22 +1009,48 @@ def _local_poly_eval(K, Y, K_eval, h, degree, kernel):
     return out
 
 
-def asl_fit(K, C, S0, r, T, q, F, K_price, K_dens, h):
-    """Aït-Sahalia–Lo semiparametric estimator on one maturity.
+def asl_bandwidth(K, F):
+    """Moneyness bandwidth from Aït-Sahalia and Lo (1998), Appendix A.
 
-    Nadaraya–Watson of Black–Scholes implied volatility, Gaussian kernel.
-    Prices are the Black–Scholes calls at the smoothed volatility. The density
-    is the strike derivative of that call, including the slope and curvature
-    of the smoothed smile.
+    On one maturity the futures price and the expiry drop out of their
+    semiparametric regression, which leaves Nadaraya–Watson of implied
+    volatility on moneyness. For the state-price density the kernel on
+    that regressor is the order-2 Gaussian. They assume four continuous
+    derivatives, so with one regressor the rate in (A3) is n^{-1/9}.
+    Table II reports c_X = 1.260 at n = 14,431, and that constant is
+    c_{X0}/ln(n). The same c_{X0} is used here.
+    """
+    M = np.asarray(K, dtype=float) / float(F)
+    n = max(len(M), 8)
+    c = 1.260 * np.log(14431.0) / np.log(float(n))
+    return float(c * np.std(M, ddof=1) * n ** (-1.0 / 9.0))
+
+
+def asl_fit(K, C, S0, r, T, q, F, K_price, K_dens, h=None):
+    """Aït-Sahalia–Lo estimator on one maturity.
+
+    Nadaraya–Watson of Black–Scholes implied volatility on moneyness K/F,
+    Gaussian kernel. ``h`` is in moneyness units; the default is their
+    Appendix A rule. Prices are Black–Scholes at the smoothed volatility.
+    The density differentiates that call in the strike.
     """
     K, C = _sorted(K, C)
     sig = _iv_on_calls(K, C, S0, r, T, q)
+    if h is None:
+        h = asl_bandwidth(K, F)
+    M = K / float(F)
     K_price = np.asarray(K_price, dtype=float)
     K_dens = np.asarray(K_dens, dtype=float)
-    sig_p, sig_p1, _ = _nw_iv(K, sig, K_price, h)
-    call = np.maximum(bs.call_price(S0, K_price, r, T, sig_p, q), 0.0)
-    sig_d, sig_d1, sig_d2 = _nw_iv(K, sig, K_dens, h)
-    dens = rnd_from_iv(K_dens, sig_d, sig_d1, sig_d2, S0, r, T, q)
+    sig_p, _, _ = _nw_iv(M, sig, K_price / float(F), h)
+    call = np.maximum(bs.call_price(S0, K_price, r, T, np.clip(sig_p, 1e-4, 4.0), q), 0.0)
+    sig_d, sig_d1, sig_d2 = _nw_iv(M, sig, K_dens / float(F), h)
+    dens = rnd_from_iv(
+        K_dens,
+        np.clip(sig_d, 1e-4, 4.0),
+        sig_d1 / float(F),
+        sig_d2 / float(F) ** 2,
+        S0, r, T, q,
+    )
     return call, dens
 
 
@@ -1058,10 +1164,10 @@ def kernel_h_grid(K, C, S0, r, T, q, F):
 
 
 def kernel_price_cv(kind, K, C, S0, r, T, q, F):
-    """Even/odd OTM bandwidth. ``kind`` is ``asl``, ``ghs_call``, or ``ghs_iv``."""
+    """Even/odd OTM bandwidth. ``kind`` is ``ghs_call`` or ``ghs_iv``."""
     K, C = _sorted(K, C)
     grid = kernel_h_grid(K, C, S0, r, T, q, F)
-    fit = {"asl": asl_fit, "ghs_call": ghs_call_fit, "ghs_iv": ghs_iv_fit}[kind]
+    fit = {"ghs_call": ghs_call_fit, "ghs_iv": ghs_iv_fit}[kind]
     best_h, best = float(grid[0]), np.inf
     for h in grid:
         errs = []

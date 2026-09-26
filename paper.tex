@@ -32,7 +32,7 @@
 \cortext[cor1]{Corresponding author.}
 
 \begin{abstract}
-Kernel estimators of the risk-neutral density differentiate a smooth of the call twice. The bandwidth that prices the quotes leaves many peaks. The bandwidth that removes the peaks moves the price. This paper uses one Gaussian kernel, at the second-derivative rate, on a cubic spline of the complementary distribution of a single maturity, and thrices that kernel. The same fit is a unimodal density of unit mass and a call interpolant. The convolution has a closed form, and the estimator is in-fill consistent. On four listed chains the out-of-the-money error is below the lognormal mixture and with the pricing-bandwidth kernels.
+Kernel estimators of the risk-neutral density differentiate a smooth of the call twice. The bandwidth that prices the quotes leaves many peaks. The bandwidth that removes the peaks moves the price. This paper uses one Gaussian kernel, at the second-derivative rate, on a cubic spline of the complementary distribution of a single maturity, and thrices that kernel. The same fit is a unimodal density of unit mass and a call interpolant. The convolution has a closed form, and the estimator is in-fill consistent. On four listed chains the out-of-the-money error is below the lognormal mixture, and each fitted density has one peak and mass \(1.0\).
 \end{abstract}
 
 \begin{keyword}
@@ -69,7 +69,7 @@ A third family estimates the call, or its Black--Scholes implied volatility, by 
 
 \citet{grith2012} survey this literature and estimate a local cubic of the rescaled call with a quartic kernel. For a second derivative the optimal bandwidth is of order \(n^{-1/9}\). On their one-month DAX chain, least-squares cross-validation selects \(h=114\), which they describe as wiggly, so the densities they plot use \(h=228\) and \(h=434\). The implied-volatility smoother they display is widened further, to \(h=372\). Smoothing the call is more sensitive to that choice than smoothing implied volatility, and the tails oscillate unless the bandwidth is increased at a cost in bias. Twice differentiating a Nadaraya--Watson or \citet{gassermuller1979} level fit is set aside as the statistically worse route to the same derivative. \citet{jackwerth2004} starts a kernel regression of implied volatility from Silverman's rule, of order \(n^{-1/5}\). He warns that the bandwidth which prices overfits noise from one day to the next, that a kernel does not continue across gaps in the strike list, and that a spline has to be of degree higher than three if the recovered distribution is to be smooth. \citet{figlewski2018} finds that filling the implied-volatility curve with a cubic spline puts spikes in the density, because the second derivative of a cubic is continuous but not differentiable, and recommends a spline of degree four or higher. \citet{fanmancini2009} combine a parametric guide with a nonparametric correction. Related shape-constrained least squares are studied by \citet{yatchew2006} and \citet{birke2009}.
 
-The estimator of Section~\ref{sec:est} is exposed to these objections. It is a kernel smooth of a single maturity. The pilot is a cubic spline of the complementary distribution function, the kernel is Gaussian, and the listed bandwidth is a fixed multiple of \(n^{-1/9}\), shorter than the constants used above to calm a local polynomial. Thricing raises the order of the kernel and puts negative sidelobes in the equivalent kernel for \(f_{\Q}\). The convolution is closed form. Without that correction, the smooth of the call is the fixed-design estimator of \citet{priestley1972} applied to a cubic interpolant, so that object is not entered as a separate method. Section~\ref{sec:emp} asks whether the listed fit still has to split the bandwidth, one width for the price and a wider one for a unimodal density. That section implements the Nadaraya--Watson implied-volatility regression of \citeauthor{aitsahalia1998} at a pricing cross-validation bandwidth, and the local cubics of \citeauthor{grith2012} at the leave-one-out width and at twice that width, together with the two-step procedure of \citeauthor{aitsahalia2003}: a least-squares projection of the quoted calls onto the decreasing convex cone, followed by a local polynomial of the constrained values whose pricing bandwidth is chosen the same way. The density drawn for \citeauthor{aitsahalia2003} uses the wider rule \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\).
+The estimator of Section~\ref{sec:est} is exposed to these objections. It is a kernel smooth of a single maturity. The pilot is a cubic spline of the complementary distribution function, the kernel is Gaussian, and the listed bandwidth is a fixed multiple of \(n^{-1/9}\), shorter than the constants used above to calm a local polynomial. Thricing raises the order of the kernel and puts negative sidelobes in the equivalent kernel for \(f_{\Q}\). The convolution is closed form. Without that correction, the smooth of the call is the fixed-design estimator of \citet{priestley1972} applied to a cubic interpolant, so that object is not entered as a separate method. Section~\ref{sec:emp} asks whether the listed fit still has to split the bandwidth, one width for the price and a wider one for a unimodal density. That section implements the Nadaraya--Watson implied-volatility regression of \citeauthor{aitsahalia1998} at the bandwidth in their Appendix A, the local cubics of \citeauthor{grith2012} at the leave-one-out width and at twice that width, and the two-step procedure of \citeauthor{aitsahalia2003}: the same projection of the quoted calls, followed by one Gaussian local linear at the Fan--Gijbels plug-in. The density is the scaled and shifted derivative of that local linear.
 
 \citet{bondarenko2003} proposed the positive convolution approximation (PCA). The density is required to lie in the set of functions obtained by convolving a discrete probability with a positive kernel, and the discrete probability is chosen to minimize the sum of squared pricing errors. The kernel enforces smoothness and, together with positive weights, guarantees that the result is a density. In \citeauthor{bondarenko2003}'s comparison, the method dominated mixtures of lognormals, Hermite expansions, and several regularization methods. Subsequent simulation evidence on affine jump-diffusions is consistent with this ranking \citep{lu2019}. Section~\ref{sec:emp} implements a log-price analog: forty-one lognormals of common width, centered on a uniform grid in log strike from the first quoted strike to the last, fitted by nonnegative least squares. Sum-to-one and forward-mean penalties stay penalties; the weights are not rescaled after the fit. The width is chosen by even/odd pricing error.
 
@@ -343,7 +343,7 @@ c\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/9},
 \end{equation}
 with \(n\) the number of quoted strikes and \(c=0.35\). On chains of one to several hundred strikes this is the bandwidth used for the listed prices of our estimator. Section~\ref{sec:heston} reports both rules.
 
-The exponent is the one \citet{grith2012} derive for a local cubic of a second derivative and the order \citet{aitsahalia2003} take from \citet{fangijbels1996}. The bandwidths those papers plot are wider. \citeauthor{grith2012} double a cross-validated width, and plot one further widening, because the cross-validated density is wiggly, and \citeauthor{aitsahalia2003} report that an unconstrained local polynomial stops taking negative values only after substantial oversmoothing. \citet{jackwerth2004} starts from a multiple of \(n^{-1/5}\). That exponent leaves \(nh^{5}\) bounded, which is why it is not used. Any fixed \(c>0\) sends \(nh^{5}\) to infinity. The constant \(c=0.35\) is the short end of that family. On the four listed chains it is just under two-fifths of the factor \(0.9\) used for the \citeauthor{aitsahalia2003} density in Section~\ref{sec:emp}.
+The exponent is the one \citet{grith2012} derive for a local cubic of a second derivative and the order \citet{aitsahalia2003} take from \citet{fangijbels1996}. The bandwidths those papers plot are wider. \citeauthor{grith2012} double a cross-validated width, and plot one further widening, because the cross-validated density is wiggly, and \citeauthor{aitsahalia2003} report that an unconstrained local polynomial stops taking negative values only after substantial oversmoothing. \citet{jackwerth2004} starts from a multiple of \(n^{-1/5}\). That exponent leaves \(nh^{5}\) bounded, which is why it is not used. Any fixed \(c>0\) sends \(nh^{5}\) to infinity. The constant \(c=0.35\) is the short end of that family.
 
 \subsection{Numerical Illustration}
 \label{sec:heston}
@@ -490,13 +490,13 @@ RUT 18 Dec 2026 & 218 & 218 & 115 & 99 & 58 \\
 Start from the projected calls of Section~\ref{sec:data}. Set \(P_i=1-C_i/(S_0e^{-qT})\). Pass a natural cubic spline through those values, with the tail knots of Section~\ref{sec:tails}, and invert at \eqref{eq:h-d2} with thricing. The listed prices are that interpolant, floored at zero, with puts by parity.
 
 \paragraph{\citeauthor{aitsahalia2003}}
-Start from the projected calls of Section~\ref{sec:data}. The call used for pricing is a local linear regression of those values, with Gaussian weights. Its bandwidth is chosen by even/odd pricing error from the grid \(0.25,0.5,1,2,4\) times \(F\hat\sigma\sqrt{T}\,n^{-1/5}\). The density drawn in Figure~\ref{fig:listed} is \(e^{rT}\) times twice the quadratic coefficient of a local cubic of the same list, at the fixed second-derivative bandwidth \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). Prices in the table are the local-linear calls, floored, with puts by parity. 
+Start from the projected calls of Section~\ref{sec:data}. The price is a Gaussian local linear regression of those values. The bandwidth is the plug-in in their Section 3.5, taken from \citet{fangijbels1996}: a global polynomial of order four supplies the pilot curvature, the weight equals one within 1.5 standard deviations of the mean strike, the Gaussian constant is \(0.776\), and the rate is \(n^{-1/5}\). The widths are \(h=140.9\), \(256.1\), \(715.3\), and \(68.8\). The density is \(e^{rT}\) times the strike derivative of the local slope, scaled so that the mass on \([\max(50,0.2F),2.4F]\) equals one and shifted so that the mean equals the forward. Their May 1999 figure uses the bandwidth that minimised integrated squared error in a Monte Carlo sample of \(25\) strikes. That optimum is not stated as a formula, and the listed row uses the plug-in. The curves have \(2\), \(1\), \(4\), and \(4\) peaks. Prices in the table are the local-linear calls, floored, with puts by parity. 
 
 \paragraph{\citeauthor{bondarenko2003} PCA}
 Start from the projected calls of Section~\ref{sec:data}. The density is a mixture of \(41\) lognormals with a common log-width \(h\) and nonnegative weights. The centers are equally spaced in log strike from the first quoted strike to the last. Each component prices a call in closed form, Black--Scholes with forward \(e^{z_j+h^2/2}\). The weights minimise the sum of squared errors in those projected calls, plus two penalties, one for \(\sum_j a_j=1\) and one for \(\sum_j a_j e^{z_j+h^2/2}=F\). Nonnegative least squares returns the weights. They are not divided by their sum afterwards; a weight above one is clipped to one. The width \(h\) is chosen by even/odd pricing error on a grid of multiples of the center spacing. Prices in Table~\ref{tab:listed} are those closed-form calls, floored, with puts by parity.
 
 \paragraph{\citeauthor{aitsahalia1998}}
-Start from the projected calls of Section~\ref{sec:data}. Regress Black--Scholes implied volatility on strike by Nadaraya--Watson with a Gaussian kernel. The bandwidth minimizes the same even/odd pricing error. Prices are the Black--Scholes calls at the smoothed volatility, floored, with puts by parity. The density is the strike derivative of that call, including the slope and curvature of the smoothed smile. The selected bandwidths are \(h=20\), \(50\), \(200\), and \(20\). The resulting curves have \(32\), \(14\), \(26\), and \(15\) peaks.
+Start from the projected calls of Section~\ref{sec:data}. On one maturity the futures price and the expiry are constant, and the semiparametric regression reduces to Nadaraya--Watson of Black--Scholes implied volatility on moneyness \(K/F\). The kernel on that regressor, for the second strike derivative, is the order-2 Gaussian. With four continuous derivatives and one regressor, the bandwidth in their Appendix A is \(c\,s(K/F)\,n^{-1/9}\), and \(c=c_{0}/\ln n\). Table II of that paper gives \(c=1.260\) at \(n=14{,}431\), which fixes \(c_{0}\). The bandwidths are \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\) in units of moneyness. Prices are the Black--Scholes calls at the smoothed volatility, floored, with puts by parity. The density is the strike derivative of that call. Each curve has one peak and mass \(1.0\).
 
 \paragraph{\citeauthor{grith2012}}
 Start from the projected calls of Section~\ref{sec:data}. Both objects are a local cubic with the quartic kernel, and \(h\) is the half-width of that kernel. The bandwidth minimises the leave-one-out squared error of the local cubic, the cross-validation they compute and then set aside because the density is wiggly. The width in their comparison figure is twice that value: on the DAX chain, \(114\) against \(228\). The call row divides the call by the spot, reads the density as \(e^{rT}\) times the scaled second derivative, and prices from the local level. Cross-validation selects \(h=52.2\), \(317.9\), \(498.7\), and \(110.7\), so the doubled widths are \(104.4\), \(635.7\), \(997.4\), and \(221.5\). The implied-volatility row is a local cubic of Black--Scholes implied volatility against the strike, with Black--Scholes prices at the local level and a density that uses the local slope and curvature. Its cross-validated widths are \(h=88.9\), \(504.8\), \(498.7\), and \(204.0\), and the doubled widths are \(177.9\), \(1009.6\), \(997.4\), and \(407.9\). Their DAX figure for this row shows one widened curve, at \(372\), and does not print the cross-validated width, so the same doubling is used. The doubled call cubic is drawn on the left of Figure~\ref{fig:listed}. Figure~\ref{fig:listed-kern} draws the cross-validated call cubic and both implied-volatility widths, together with \citeauthor{aitsahalia1998}. Prices are floored, with puts by parity.
@@ -505,7 +505,7 @@ Hold-out refits the projection and every tuned method on the training strikes on
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=90.9\), \(152.8\), \(558.2\), \(54.4\)). \citeauthor{aitsahalia2003} is priced from the local linear at its cross-validated bandwidth; the mass is the local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\). \citeauthor{aitsahalia1998} uses an even/odd pricing bandwidth. Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the lognormal mixture. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Bold method names are the unimodal curves in Figure~\ref{fig:listed}: the spline, the lognormal mixture, and \citeauthor{aitsahalia2003}.}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=90.9\), \(152.8\), \(558.2\), \(54.4\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. \citeauthor{aitsahalia1998} uses the Appendix A bandwidth, in moneyness units \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the lognormal mixture. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Bold method names are the spline and the lognormal mixture.}
 \label{tab:listed}
 {\scriptsize
 \setlength{\tabcolsep}{3pt}%
@@ -521,119 +521,119 @@ SPX Dec & \textbf{Ours}
   & 0.035 & 0.033 & 0.039 & 0.039 & 1.0 & 1.0 \\
 SPX Dec & \textbf{PCA}
   & 0.038 & 0.035 & 0.046 & 0.040 & 1.0 & 1.0 \\
-SPX Dec & \textbf{\citeauthor{aitsahalia2003}}
-  & 0.337 & 0.252 & 0.518 & 0.444 & 1.0 & 1.0 \\
 SPX Dec & \citeauthor{grith2012}, IV, \(2\times\)
   & 0.032 & 0.031 & 0.037 & 0.055 & 1.0 & 1.1 \\
 SPX Dec & \citeauthor{grith2012}, IV, CV
   & 0.031 & 0.030 & 0.035 & 0.074 & 1.0 & 1.3 \\
-SPX Dec & \citeauthor{aitsahalia1998}
-  & 0.064 & 0.061 & 0.073 & 0.113 & 1.6 & 10.9 \\
+SPX Dec & \citeauthor{aitsahalia2003}
+  & 4.272 & 3.263 & 6.450 & 5.385 & 1.0 & 1.0 \\
 SPX Dec & \citeauthor{grith2012}, call, \(2\times\)
   & 0.031 & 0.030 & 0.036 & 9.964 & 1.0 & 1.1 \\
 SPX Dec & \citeauthor{grith2012}, call, CV
   & 0.029 & 0.029 & 0.032 & 14.653 & 1.0 & 3.4 \\
+SPX Dec & \citeauthor{aitsahalia1998}
+  & 31.225 & 22.162 & 49.619 & 37.922 & 1.0 & 1.0 \\
 \midrule
 SPX Mar & \textbf{Ours}
   & 0.050 & 0.047 & 0.059 & 0.058 & 1.0 & 1.0 \\
 SPX Mar & \textbf{PCA}
   & 0.079 & 0.063 & 0.115 & 0.079 & 1.0 & 1.0 \\
-SPX Mar & \textbf{\citeauthor{aitsahalia2003}}
-  & 0.596 & 0.401 & 0.963 & 0.789 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{grith2012}, IV, \(2\times\)
   & 0.165 & 0.143 & 0.215 & 0.282 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{grith2012}, IV, CV
   & 0.051 & 0.049 & 0.057 & 0.091 & 1.0 & 1.0 \\
-SPX Mar & \citeauthor{aitsahalia1998}
-  & 0.073 & 0.064 & 0.094 & 0.158 & 1.2 & 5.0 \\
+SPX Mar & \citeauthor{aitsahalia2003}
+  & 7.837 & 5.633 & 12.202 & 9.965 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{grith2012}, call, \(2\times\)
   & 0.152 & 0.107 & 0.240 & 1.339 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{grith2012}, call, CV
   & 0.042 & 0.040 & 0.048 & 18.635 & 1.0 & 1.0 \\
+SPX Mar & \citeauthor{aitsahalia1998}
+  & 75.231 & 53.202 & 118.303 & 89.227 & 1.0 & 1.0 \\
 \midrule
 NDX Dec & \textbf{Ours}
   & 1.042 & 1.088 & 0.780 & 1.099 & 1.0 & 1.0 \\
 NDX Dec & \textbf{PCA}
   & 1.147 & 1.131 & 1.221 & 1.187 & 1.0 & 1.0 \\
-NDX Dec & \textbf{\citeauthor{aitsahalia2003}}
-  & 2.499 & 2.418 & 2.858 & 3.278 & 1.0 & 1.0 \\
 NDX Dec & \citeauthor{grith2012}, IV, \(2\times\)
   & 0.946 & 0.991 & 0.686 & 1.236 & 1.0 & 1.2 \\
 NDX Dec & \citeauthor{grith2012}, IV, CV
   & 0.867 & 0.921 & 0.524 & 1.248 & 1.0 & 3.0 \\
-NDX Dec & \citeauthor{aitsahalia1998}
-  & 1.734 & 1.648 & 2.104 & 2.623 & 1.3 & 11.0 \\
+NDX Dec & \citeauthor{aitsahalia2003}
+  & 16.023 & 14.909 & 20.619 & 19.189 & 1.0 & 1.1 \\
 NDX Dec & \citeauthor{grith2012}, call, \(2\times\)
   & 0.946 & 0.993 & 0.677 & 40.791 & 1.0 & 1.1 \\
 NDX Dec & \citeauthor{grith2012}, call, CV
   & 0.867 & 0.922 & 0.523 & 79.411 & 0.9 & 2.8 \\
+NDX Dec & \citeauthor{aitsahalia1998}
+  & 179.751 & 157.159 & 263.641 & 241.766 & 1.0 & 1.0 \\
 \midrule
 RUT Dec & \textbf{Ours}
   & 0.025 & 0.025 & 0.024 & 0.030 & 1.0 & 1.0 \\
 RUT Dec & \textbf{PCA}
   & 0.034 & 0.030 & 0.039 & 0.038 & 1.0 & 1.0 \\
-RUT Dec & \textbf{\citeauthor{aitsahalia2003}}
-  & 0.339 & 0.293 & 0.394 & 0.467 & 1.1 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV, \(2\times\)
   & 0.042 & 0.047 & 0.033 & 0.116 & 1.3 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV, CV
   & 0.026 & 0.027 & 0.025 & 0.039 & 1.0 & 1.1 \\
-RUT Dec & \citeauthor{aitsahalia1998}
-  & 0.098 & 0.124 & 0.035 & 0.201 & 1.6 & 7.6 \\
+RUT Dec & \citeauthor{aitsahalia2003}
+  & 2.224 & 1.968 & 2.544 & 2.834 & 1.0 & 1.1 \\
 RUT Dec & \citeauthor{grith2012}, call, \(2\times\)
   & 0.056 & 0.051 & 0.063 & 0.432 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, call, CV
   & 0.022 & 0.022 & 0.023 & 7.026 & 1.0 & 1.1 \\
+RUT Dec & \citeauthor{aitsahalia1998}
+  & 12.871 & 9.304 & 16.660 & 15.912 & 1.0 & 1.0 \\
 \midrule
 Average & \textbf{Ours}
   & 0.288 & 0.298 & 0.225 & 0.306 & 1.0 & 1.0 \\
 Average & \textbf{PCA}
   & 0.325 & 0.315 & 0.355 & 0.336 & 1.0 & 1.0 \\
-Average & \textbf{\citeauthor{aitsahalia2003}}
-  & 0.943 & 0.841 & 1.183 & 1.245 & 1.0 & 1.0 \\
 Average & \citeauthor{grith2012}, IV, \(2\times\)
   & 0.296 & 0.303 & 0.243 & 0.422 & 1.1 & 1.1 \\
 Average & \citeauthor{grith2012}, IV, CV
   & 0.244 & 0.257 & 0.160 & 0.363 & 1.0 & 1.6 \\
-Average & \citeauthor{aitsahalia1998}
-  & 0.492 & 0.475 & 0.577 & 0.774 & 1.4 & 8.6 \\
+Average & \citeauthor{aitsahalia2003}
+  & 7.589 & 6.443 & 10.454 & 9.343 & 1.0 & 1.0 \\
 Average & \citeauthor{grith2012}, call, \(2\times\)
   & 0.297 & 0.295 & 0.254 & 13.131 & 1.0 & 1.1 \\
 Average & \citeauthor{grith2012}, call, CV
   & 0.240 & 0.253 & 0.156 & 29.932 & 1.0 & 2.1 \\
+Average & \citeauthor{aitsahalia1998}
+  & 74.769 & 60.456 & 112.056 & 96.207 & 1.0 & 1.0 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-On SPX December the quoted calls sit \(0.022\) from the decreasing-convex cone, so a fit that stays inside the cone cannot undercut that error. The cross-validated local linear of \citeauthor{aitsahalia2003} is \(0.337\), \(0.596\), \(2.499\), and \(0.339\). With centers on the quoted log-strike range and a width chosen by pricing error, PCA out-of-the-money error is \(0.038\) on SPX December, \(0.079\) on SPX March, \(1.147\) on NDX December, and \(0.034\) on RUT December.
+On SPX December the quoted calls sit \(0.022\) from the decreasing-convex cone, so a fit that stays inside the cone cannot undercut that error. The local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth is \(4.272\), \(7.837\), \(16.023\), and \(2.224\). With centers on the quoted log-strike range and a width chosen by pricing error, PCA out-of-the-money error is \(0.038\) on SPX December, \(0.079\) on SPX March, \(1.147\) on NDX December, and \(0.034\) on RUT December.
 
 The estimator of this paper is the Gaussian inversion of the cubic spline of \(P\), with tails and thricing, at \eqref{eq:h-d2}. The pricing error is \(0.035\), \(0.050\), \(1.042\), and \(0.025\). The hold-out error is \(0.039\), \(0.058\), \(1.099\), and \(0.030\). Each of the four curves has one peak on \([0.55F,1.40F]\) and mass \(1.0\). The bandwidth in that row is the same number that prices the chain.
 
-\citeauthor{aitsahalia1998}, at a pricing cross-validation of the implied-volatility regression, has error \(0.064\), \(0.073\), \(1.734\), and \(0.098\), with \(32\), \(14\), \(26\), and \(15\) peaks and mass \(1.6\), \(1.2\), \(1.3\), and \(1.6\). The cross-validated call cubic of \citeauthor{grith2012} prices at \(0.029\), \(0.042\), \(0.867\), and \(0.022\), and the doubled width at \(0.031\), \(0.152\), \(0.946\), and \(0.056\). The cross-validated implied-volatility cubic prices at \(0.031\), \(0.051\), \(0.867\), and \(0.026\), and the doubled width at \(0.032\), \(0.165\), \(0.946\), and \(0.042\). The call cubic's hold-out is \(14.653\), \(18.635\), \(79.411\), and \(7.026\) at the cross-validated width, and \(9.964\), \(1.339\), \(40.791\), and \(0.432\) at twice that width. Those errors sit in the far wing, where a one-sided local cubic on the held-out strikes misses the put.
+\citeauthor{aitsahalia1998}, at the Appendix A bandwidth, has error \(31.225\), \(75.231\), \(179.751\), and \(12.871\), with one peak on each chain and mass \(1.0\). The cross-validated call cubic of \citeauthor{grith2012} prices at \(0.029\), \(0.042\), \(0.867\), and \(0.022\), and the doubled width at \(0.031\), \(0.152\), \(0.946\), and \(0.056\). The cross-validated implied-volatility cubic prices at \(0.031\), \(0.051\), \(0.867\), and \(0.026\), and the doubled width at \(0.032\), \(0.165\), \(0.946\), and \(0.042\). The call cubic's hold-out is \(14.653\), \(18.635\), \(79.411\), and \(7.026\) at the cross-validated width, and \(9.964\), \(1.339\), \(40.791\), and \(0.432\) at twice that width. Those errors sit in the far wing, where a one-sided local cubic on the held-out strikes misses the put.
 
-A peak count treats a ripple and a spike as the same event, and the count depends on where the height cutoff is set. The TV column of Table~\ref{tab:listed} is the total variation of \(\max(\hat q,0)\) on the strike window of Figure~\ref{fig:listed}, divided by twice the highest value on that window. A unimodal curve climbs once and descends once, so the ratio equals one, apart from whatever mass remains at the two edges. An extra oscillation of height \(a\) adds \(2a\) to the numerator and so adds \(a\) divided by the height of the mode. The three bold rows score \(1.0\). At the cross-validated width the call cubic scores \(3.4\), \(1.0\), \(2.8\), and \(1.1\), and at twice that width \(1.1\), \(1.0\), \(1.1\), and \(1.0\). The implied-volatility cubic scores \(1.3\), \(1.0\), \(3.0\), and \(1.1\) at the cross-validated width, and \(1.1\), \(1.0\), \(1.2\), and \(1.0\) at twice that width. \citeauthor{aitsahalia1998} scores \(10.9\), \(5.0\), \(11.0\), and \(7.6\). \citeauthor{aitsahalia2003} already separate the two widths. The local cubic in Figure~\ref{fig:listed} uses \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\), about two and a half times \eqref{eq:h-d2}. The doubled call cubic is on the left of Figure~\ref{fig:listed}. Figure~\ref{fig:listed-kern} draws the cross-validated call cubic and both implied-volatility widths on that same vertical scale.
+A peak count treats a ripple and a spike as the same event, and the count depends on where the height cutoff is set. The TV column of Table~\ref{tab:listed} is the total variation of \(\max(\hat q,0)\) on the strike window of Figure~\ref{fig:listed}, divided by twice the highest value on that window. A unimodal curve climbs once and descends once, so the ratio equals one, apart from whatever mass remains at the two edges. An extra oscillation of height \(a\) adds \(2a\) to the numerator and so adds \(a\) divided by the height of the mode. The two bold rows score \(1.0\). At the cross-validated width the call cubic scores \(3.4\), \(1.0\), \(2.8\), and \(1.1\), and at twice that width \(1.1\), \(1.0\), \(1.1\), and \(1.0\). The implied-volatility cubic scores \(1.3\), \(1.0\), \(3.0\), and \(1.1\) at the cross-validated width, and \(1.1\), \(1.0\), \(1.2\), and \(1.0\) at twice that width. \citeauthor{aitsahalia1998} scores \(1.0\) on each chain. \citeauthor{aitsahalia2003} scores \(1.0\), \(1.0\), \(1.1\), and \(1.1\). The doubled call cubic and that local linear are on the left of Figure~\ref{fig:listed}. Figure~\ref{fig:listed-kern} draws \citeauthor{aitsahalia1998}, the cross-validated call cubic, and both implied-volatility widths on that same vertical scale.
 
-Averaging the out-of-the-money hold-out error across the four chains, one obtains \(0.306\) for the estimator of this paper, \(1.245\) for \citeauthor{aitsahalia2003}, \(0.774\) for \citeauthor{aitsahalia1998}, \(0.422\) and \(0.363\) for the doubled and cross-validated implied-volatility cubics of \citeauthor{grith2012}, \(13.131\) and \(29.932\) for the doubled and cross-validated call cubics, and \(0.336\) for PCA.
+The average out-of-the-money hold-out error is \(0.306\) for the estimator of this paper, \(9.343\) for \citeauthor{aitsahalia2003}, and \(96.207\) for \citeauthor{aitsahalia1998}. The doubled and cross-validated implied-volatility cubics of \citeauthor{grith2012} average \(0.422\) and \(0.363\), the call cubics \(13.131\) and \(29.932\), and PCA \(0.336\).
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/ccdf_listed.pdf}
-\caption{SPX, NDX, and RUT, 18 December 2026, snapshot 23~September 2026. Each curve is fit to the projected call of Section~\ref{sec:data}. Left: \(\max(\hat f_{\Q},0)\) for the cubic-spline estimator at \eqref{eq:h-d2}, the lognormal mixture, the \citeauthor{aitsahalia2003} local cubic at \(0.9\,F\hat\sigma\sqrt{T}\,n^{-1/9}\), and the call cubic of \citeauthor{grith2012} at twice its cross-validated bandwidth. Right: out-of-the-money implied volatility for the spline, the mixture, that call cubic, and \citeauthor{aitsahalia1998}. The dashed line is the forward. The cross-validated call cubic and the implied-volatility cubics are in Figure~\ref{fig:listed-kern}.}
+\caption{SPX, NDX, and RUT, 18 December 2026, snapshot 23~September 2026. Each curve is fit to the projected call of Section~\ref{sec:data}. Left: \(\max(\hat f_{\Q},0)\) for the cubic-spline estimator at \eqref{eq:h-d2}, the lognormal mixture, the call cubic of \citeauthor{grith2012} at twice its cross-validated bandwidth, and the constrained local linear of \citeauthor{aitsahalia2003} at the Fan--Gijbels plug-in. Right: out-of-the-money implied volatility for the spline, the mixture, that call cubic, and \citeauthor{aitsahalia1998} at the Appendix A bandwidth. The dashed line is the forward. \citeauthor{aitsahalia1998}, the cross-validated call cubic, and the implied-volatility cubics are in Figure~\ref{fig:listed-kern}.}
 \label{fig:listed}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/ccdf_listed_kern.pdf}
-\caption{The cross-validated kernels on the chains of Figure~\ref{fig:listed}. \citeauthor{aitsahalia1998} uses the even/odd pricing bandwidth. The call cubic of \citeauthor{grith2012} is at the leave-one-out width, and the implied-volatility cubic is drawn at that width and at twice that width. Left: \(\max(\hat f_{\Q},0)\), on the strike window and vertical scale of the left panel of Figure~\ref{fig:listed}, with curves truncated there. Right: out-of-the-money implied volatility of the same fits. The dashed line is the forward.}
+\caption{Further kernels on the chains of Figure~\ref{fig:listed}. \citeauthor{aitsahalia1998} uses the Appendix A moneyness bandwidth. The call cubic of \citeauthor{grith2012} is at the leave-one-out width, and the implied-volatility cubic is drawn at that width and at twice that width. Left: \(\max(\hat f_{\Q},0)\), on the strike window and vertical scale of the left panel of Figure~\ref{fig:listed}, with curves truncated there. Right: out-of-the-money implied volatility of the same fits. The dashed line is the forward.}
 \label{fig:listed-kern}
 \end{figure}
 
 \section{Conclusion}
 \label{sec:conc}
 
-The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. The pricing bandwidth of the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} reprices closely, and the density has many peaks. The leave-one-out call cubic of \citeauthor{grith2012} also reprices in sample, and twice that width is the curve in their comparison figure; neither width holds out on the far wing. On the four listed chains the spline has one peak and mass \(1.0\), and its out-of-the-money error is below the mixture on each chain. PCA remains a sieve of fixed dimension.
+The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. The Appendix A bandwidth of the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} leaves one peak and mass \(1.0\), with out-of-the-money error \(31.225\), \(75.231\), \(179.751\), and \(12.871\). The constrained local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth has error \(4.272\), \(7.837\), \(16.023\), and \(2.224\). The leave-one-out call cubic of \citeauthor{grith2012} reprices in sample, and twice that width is the curve in their comparison figure; neither width holds out on the far wing. On the four listed chains the spline has one peak and mass \(1.0\), and its out-of-the-money error is below the mixture on each chain. PCA remains a sieve of fixed dimension.
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:thrice} and a replication script are available at \url{https://github.com/s-broda/RND}.

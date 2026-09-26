@@ -27,8 +27,9 @@ sys.path.insert(0, str(PY))
 from rnd import estimate_rnd
 from src import black_scholes as bs
 from src.competitors import (
-    asd_cv_bandwidth,
+    asd_bandwidth,
     asd_fit,
+    asl_bandwidth,
     asl_fit,
     ghs_call_fit,
     ghs_iv_fit,
@@ -247,8 +248,8 @@ def _holdout_method(sl, method):
             lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
             C_te, _ = yatchew_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, lam)
         elif method == "asd":
-            h_p, h_d = asd_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
-            C_te, _, _ = asd_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h_p, h_d)
+            h = asd_bandwidth(Kt, Ct, sl.r, sl.T, sl.F)
+            C_te, _, _ = asd_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h)
         elif method == "pca":
             h = pca_cv_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
             C_te, _, _, _, _ = pca_fit(Kt, Ct, sl.r, sl.T, sl.F, h, Ke, Ke[:1])
@@ -258,7 +259,7 @@ def _holdout_method(sl, method):
                 Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
             )
         elif method == "asl":
-            h = kernel_price_cv(method, Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
+            h = asl_bandwidth(Kt, sl.F)
             C_te, _ = asl_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h)
         elif method in ("ghs_call_cv", "ghs_call_2", "ghs_iv_cv", "ghs_iv_2"):
             if method.startswith("ghs_call"):
@@ -318,12 +319,12 @@ def _row_metrics(sl, C_hat, q, s, ho):
 _METHODS = (
     "Ours",
     "PCA",
-    "Aït-Sahalia–Duarte",
     "GHS IV, 2×",
     "GHS IV, CV",
-    "Aït-Sahalia–Lo",
+    "Aït-Sahalia–Duarte",
     "GHS call, 2×",
     "GHS call, CV",
+    "Aït-Sahalia–Lo",
 )
 
 
@@ -343,13 +344,13 @@ def _chain_scores(sl):
         tails=True, higher=True,
     )
     h = fit["h"]
-    h_asd, h_asd_d = asd_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    h_asd = asd_bandwidth(sl.K, C, sl.r, sl.T, sl.F)
     C_asd, q_asd, _ = asd_fit(
-        sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asd, h_asd_d
+        sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asd
     )
     h_pca = pca_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
     C_pca, q_pca, _, _, _ = pca_fit(sl.K, C, sl.r, sl.T, sl.F, h_pca, sl.K, s)
-    h_asl = kernel_price_cv("asl", sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+    h_asl = asl_bandwidth(sl.K, sl.F)
     C_asl, q_asl = asl_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asl)
     h_ghs_c = ghs_loo_bandwidth(sl.K, C)
     C_ghs_cv, q_ghs_cv = ghs_call_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_ghs_c)
@@ -400,7 +401,7 @@ def _chain_scores(sl):
         q_ghs_cv=q_ghs_cv, q_ghs_iv_cv=q_ghs_iv_cv,
         C_pca=C_pca, C_asl=C_asl, C_ghs_c=C_ghs_c, C_ghs_i=C_ghs_i,
         C_ghs_cv=C_ghs_cv, C_ghs_iv_cv=C_ghs_iv_cv,
-        h_asd_d=h_asd_d, h_pca=h_pca,
+        h_asd=h_asd, h_pca=h_pca,
         h_asl=h_asl, h_ghs_c=h_ghs_c, h_ghs_i=h_ghs_i, peaks=peaks, tv=tv,
     )
     return metrics, bundle
@@ -436,8 +437,8 @@ def listed():
         titles.append(title)
         print(
             f"  {title:8} F={sl.F:.1f} h={bundle['h']:.2f} "
-            f"ASL {bundle['h_asl']:.4g} GHSc {bundle['h_ghs_c']:.4g} "
-            f"GHSi {bundle['h_ghs_i']:.4g}"
+            f"ASD {bundle['h_asd']:.4g} ASL {bundle['h_asl']:.4g} "
+            f"GHSc {bundle['h_ghs_c']:.4g} GHSi {bundle['h_ghs_i']:.4g}"
         )
         for name in _METHODS:
             peaks = bundle["peaks"][name]
@@ -492,7 +493,7 @@ def _plot_listed(scored):
         C_pca, C_ghs_c = bundle["C_pca"], bundle["C_ghs_c"]
         C_asl = bundle["C_asl"]
         print(
-            f"  fig {title}: ASD h={bundle['h_asd_d']:.1f}  PCA h={bundle['h_pca']:.4f}  "
+            f"  fig {title}: ASD h={bundle['h_asd']:.1f}  PCA h={bundle['h_pca']:.4f}  "
             f"ASL h={bundle['h_asl']:.1f}  GHS IV h={bundle['h_ghs_i']:.1f}"
         )
         ax = axes[row, 0]
@@ -666,10 +667,10 @@ def _kernel_stats(x, q):
 def literature():
     """Aït-Sahalia–Lo, Aït-Sahalia–Duarte, and Grith–Härdle–Schienle.
 
-    The density bandwidth is ``0.9 F σ_ATM √T n^{-1/9}`` (the ASD local-cubic
-    rule). The quartic kernel is scaled to the same weight standard deviation.
-    Pricing CV is even/odd OTM error on a fixed grid. Priestley–Chao is not
-    in this comparison.
+    Aït-Sahalia–Lo uses the Appendix A moneyness bandwidth. Aït-Sahalia–Duarte
+    uses the Fan–Gijbels plug-in for one local linear. The Grith–Härdle–Schienle
+    rows in this diagnostic still search an even/odd pricing grid; the listed
+    table uses leave-one-out and twice that width.
     """
     from src.competitors import (
         asl_fit,
@@ -680,11 +681,10 @@ def literature():
     )
 
     fits = {
-        "AS-Lo": asl_fit,
         "GHS call": ghs_call_fit,
         "GHS IV": ghs_iv_fit,
     }
-    kinds = {"AS-Lo": "asl", "GHS call": "ghs_call", "GHS IV": "ghs_iv"}
+    kinds = {"GHS call": "ghs_call", "GHS IV": "ghs_iv"}
 
     def _one(K, C, S0, r, T, q, F, K_eval, q_true=None, label=""):
         h_rule = second_derivative_h(K, C, S0, r, T, q, F, c=0.9)
@@ -708,14 +708,22 @@ def literature():
                 f"[{time.time()-t0:.1f}s]"
             )
             rows[name] = (h_cv, q_cv, h_rule, q_ru, ise_cv, ise_ru)
-        # ASD: price at its CV local linear, density at the same rule.
-        h_p, h_d = asd_cv_bandwidth(K, C, S0, r, T, q, F)
-        C_asd, q_asd, _ = asd_fit(K, C, S0, r, T, q, F, K, K_eval, h_p, h_d)
+        h_asl = asl_bandwidth(K, F)
+        C_asl, q_asl = asl_fit(K, C, S0, r, T, q, F, K, K_eval, h_asl)
+        otm_asl = _otm_rmse(K, C_asl, C, S0, r, T, q, F)
+        neg_l, pk_l = _kernel_stats(K_eval, q_asl)
+        ise_l = _ise(K_eval, q_asl, q_true) if q_true is not None else float("nan")
+        print(
+            f"    {'AS-Lo':8} h={h_asl:.4g} OTM {otm_asl:.4g} ISE {ise_l:.4e} "
+            f"peaks {pk_l} neg {neg_l:.3e}"
+        )
+        h_asd = asd_bandwidth(K, C, r, T, F)
+        C_asd, q_asd, _ = asd_fit(K, C, S0, r, T, q, F, K, K_eval, h_asd)
         otm_asd = _otm_rmse(K, C_asd, C, S0, r, T, q, F)
         neg_a, pk_a = _kernel_stats(K_eval, q_asd)
         ise_a = _ise(K_eval, q_asd, q_true) if q_true is not None else float("nan")
         print(
-            f"    {'ASD':8} price h={h_p:.4g} dens h={h_d:.4g} OTM {otm_asd:.4g} "
+            f"    {'ASD':8} h={h_asd:.4g} OTM {otm_asd:.4g} "
             f"ISE {ise_a:.4e} peaks {pk_a} neg {neg_a:.3e}"
         )
         for rule in ("mesh", "deriv"):
@@ -773,8 +781,12 @@ def literature():
                 _, q_ru = fit(K, C_proj, p.S0, p.r, p.T, p.q, p.forward, K[:1], K_eval, h_rule)
                 acc[name].append(_ise(K_eval, q_ru, q_true))
                 acc_cv[name].append(_ise(K_eval, q_cv, q_true))
-            h_p, h_d = asd_cv_bandwidth(K, C_proj, p.S0, p.r, p.T, p.q, p.forward)
-            _, q_asd, _ = asd_fit(K, C_proj, p.S0, p.r, p.T, p.q, p.forward, K[:1], K_eval, h_p, h_d)
+            h_asl = asl_bandwidth(K, p.forward)
+            _, q_asl = asl_fit(K, C_proj, p.S0, p.r, p.T, p.q, p.forward, K[:1], K_eval, h_asl)
+            acc["AS-Lo"].append(_ise(K_eval, q_asl, q_true))
+            acc_cv["AS-Lo"].append(_ise(K_eval, q_asl, q_true))
+            h_asd = asd_bandwidth(K, C_proj, p.r, p.T, p.forward)
+            _, q_asd, _ = asd_fit(K, C_proj, p.S0, p.r, p.T, p.q, p.forward, K[:1], K_eval, h_asd)
             acc["ASD"].append(_ise(K_eval, q_asd, q_true))
             for rule, key in (("mesh", "Ours mesh"), ("deriv", "Ours deriv")):
                 fit_o = estimate_rnd(
@@ -817,14 +829,24 @@ def literature():
             C_ru, q_ru = fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_rule)
             _show(name + " CV", h_cv, C_cv, q_cv, _holdout_kernel(sl, kinds[name], "cv"))
             _show(name + " rule", h_rule, C_ru, q_ru, _holdout_kernel(sl, kinds[name], "rule"))
-        h_p, h_d = asd_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
-        C_asd, q_asd, _ = asd_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_p, h_d)
+        h_asd = asd_bandwidth(sl.K, C, sl.r, sl.T, sl.F)
+        C_asd, q_asd, _ = asd_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asd)
         o, pu, ca = _otm(sl, C_asd)
         mass, peaks = _mass_peaks(sl.F, q_asd, s)
         neg = _kernel_stats(s, q_asd)[0]
         ho = _holdout_method(sl, "asd")
         print(
-            f"    {'ASD':16} h={h_p:.4g}/{h_d:.4g} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
+            f"    {'ASD':16} h={h_asd:.4g} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
+            f"hold {ho:.3f} mass {mass:.2f} peaks {peaks} neg {neg:.3e}"
+        )
+        h_asl = asl_bandwidth(sl.K, sl.F)
+        C_asl, q_asl = asl_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asl)
+        o, pu, ca = _otm(sl, C_asl)
+        mass, peaks = _mass_peaks(sl.F, q_asl, s)
+        neg = _kernel_stats(s, q_asl)[0]
+        ho = _holdout_method(sl, "asl")
+        print(
+            f"    {'AS-Lo':16} h={h_asl:.4g} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
             f"hold {ho:.3f} mass {mass:.2f} peaks {peaks} neg {neg:.3e}"
         )
         fit_o = estimate_rnd(
