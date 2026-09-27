@@ -694,6 +694,60 @@ The average out-of-the-money hold-out error is \(0.312\) for the estimator of th
 
 The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. The Appendix A bandwidth of the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} leaves one peak and mass \(1.0\), with out-of-the-money error \(31.225\), \(75.231\), \(179.751\), and \(12.871\). The constrained local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth has error \(4.272\), \(7.837\), \(16.023\), and \(2.224\). The leave-one-out call cubic of \citeauthor{grith2012} reprices in sample, and twice that width is the curve in their comparison figure; neither width holds out on the far wing. On exact quotes the thriced spline at the mesh bandwidth has the smallest integrated squared error on dense Heston and on dense variance gamma, and at \eqref{eq:h-d2} on sparse variance gamma. On sparse Heston the cross-validated implied-volatility cubic is smaller. With noise in implied volatility the positive convolution has the smaller mean integrated squared error, and thricing raises the spline's error relative to the tailed spline. On the four listed chains the spline has one peak and mass \(1.0\), and its out-of-the-money error is below the mixture on each chain. PCA remains a mixture of normals of fixed bandwidth.
 
+\appendix
+\section{Pilots for noisy quotes}
+\label{app:noise}
+
+The bandwidth in \eqref{eq:h-d2} is the same function on the listed chains, on the exact Heston and variance-gamma chains, and on the noisy Heston draws. The constant is \(c=0.38\), \(\hat\sigma_{\mathrm{ATM}}\) is the median implied volatility within \(3\%\) of the forward, and \(n\) is the number of strikes passed to the estimator. On a noisy draw those two inputs are computed from that draw, so the realised width moves with the quotes. The mesh rule \eqref{eq:h-mesh} is likewise one function, used wherever that column appears. The listed fits and the noisy fits start from the decreasing-convex projection. On the exact model quotes the projection leaves the calls unchanged, and the integrated squared error is the same to the reported digits.
+
+Three changes of the pilot were scored at this same width. The first drops thricing and keeps the Gaussian convolution. The second replaces the complementary distribution at the quoted strikes by a Nadaraya--Watson average at bandwidth \(h/4\), and then thrices. The third replaces the interpolating cubic by a least-squares natural cubic whose knots are spaced \(h\) apart, and then thrices. A squared-exponential regression before the spline is the same construction as the Nadaraya--Watson average. Table~\ref{tab:app-exact} is the exact-quote integrated squared error. Table~\ref{tab:app-noise} is the mean over the thirty noisy Heston replications of Table~\ref{tab:heston-noise}, with the convolution bandwidth held at the width of the projected draw.
+
+\begin{table}[H]
+\centering
+\caption{Exact-quote integrated squared error on \([60,150]\) for the pilots in Appendix~\ref{app:noise}. Each row is one pilot at one bandwidth rule.}
+\label{tab:app-exact}
+{\scriptsize
+\setlength{\tabcolsep}{3pt}%
+\begin{tabular}{@{}l *{4}{S[table-format=1.2e-1, scientific-notation=true]}@{}}
+\toprule
+& \multicolumn{2}{c}{Heston} & \multicolumn{2}{c}{Variance gamma} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5}
+\multicolumn{1}{@{}c}{Pilot} &
+  \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} &
+  \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
+\midrule
+Thrice, \(n^{-1/9}\) & 2.50e-8 & 9.98e-7 & 1.95e-5 & 5.67e-5 \\
+Thrice, mesh & 7.12e-12 & 1.14e-6 & 4.90e-6 & 3.00e-4 \\
+No thrice, \(n^{-1/9}\) & 1.70e-5 & 3.98e-5 & 1.55e-4 & 3.04e-4 \\
+No thrice, mesh & 7.36e-7 & 5.29e-5 & 5.08e-5 & 1.25e-3 \\
+Knots at \(h\), \(n^{-1/9}\) & 2.50e-8 & 1.37e-6 & 1.96e-5 & 5.67e-5 \\
+Knots at \(h\), mesh & 3.87e-9 & 1.47e-6 & 4.90e-6 & 3.00e-4 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Mean integrated squared error on noisy Heston quotes for the pilots in Appendix~\ref{app:noise}. The bandwidth is \eqref{eq:h-d2} of the projected draw. Thirty replications.}
+\label{tab:app-noise}
+{\scriptsize
+\setlength{\tabcolsep}{4pt}%
+\begin{tabular}{@{}l *{2}{S[table-format=1.2e-1, scientific-notation=true]}@{}}
+\toprule
+\multicolumn{1}{@{}c}{Pilot} & \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
+\midrule
+Thrice & 5.93e-3 & 5.79e-3 \\
+No thrice & 1.79e-3 & 1.68e-3 \\
+Nadaraya--Watson at \(h/4\), then thrice & 5.18e-3 & 5.76e-3 \\
+Knots spaced by \(h\), then thrice & 5.87e-3 & 3.94e-3 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+Dropping thricing lowers the noisy error, from \(5.93\times 10^{-3}\) to \(1.79\times 10^{-3}\) on the dense chain and from \(5.79\times 10^{-3}\) to \(1.68\times 10^{-3}\) on the sparse chain. On the listed chains the out-of-the-money error rises from \(0.036\), \(0.056\), \(1.057\), and \(0.026\) to \(2.303\), \(3.581\), \(15.667\), and \(1.793\). The Nadaraya--Watson pilot at \(h/4\) leaves the noisy error near the thriced figure and raises the listed error to \(0.764\), \(0.974\), \(8.195\), and \(0.741\), with several peaks. A Gaussian average at the full width \(h\), before thricing, takes the exact Heston error from \(2.50\times 10^{-8}\) to \(1.76\times 10^{-5}\) on the dense chain and from \(9.98\times 10^{-7}\) to \(3.25\times 10^{-2}\) on the sparse chain. The knot pilot stays with the thriced spline on the exact chains and on the listed prices, and it trims the sparse noisy error from \(5.79\times 10^{-3}\) to \(3.94\times 10^{-3}\). The positive convolution in Table~\ref{tab:heston-noise} remains smaller, at \(4.36\times 10^{-4}\) and \(3.61\times 10^{-4}\).
+
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:thrice} and a replication script are available at \url{https://github.com/s-broda/RND}.
 

@@ -921,6 +921,79 @@ def _holdout_kernel(sl, kind, which):
     return float(np.mean(errs))
 
 
+def _nw_prefilter(K, C, S0, r, T, q, b):
+    """Gaussian average of the complementary cdf, at bandwidth ``b``."""
+    stock = float(S0) * np.exp(-float(q) * float(T))
+    P = np.clip(1.0 - np.asarray(C, float) / max(stock, 1e-12), 0.0, 1.0)
+    d = (K[:, None] - K[None, :]) / max(float(b), 1e-8)
+    w = np.exp(-0.5 * d * d)
+    Ps = w @ P / np.maximum(w.sum(axis=1), 1e-12)
+    return stock * (1.0 - Ps)
+
+
+def _knot_pilot(K, C, S0, r, T, q, b):
+    """Least-squares natural cubic of the complementary cdf, knots spaced by ``b``."""
+    from scipy.interpolate import CubicSpline
+
+    stock = float(S0) * np.exp(-float(q) * float(T))
+    P = np.clip(1.0 - np.asarray(C, float) / max(stock, 1e-12), 0.0, 1.0)
+    idx = [0]
+    for i in range(1, len(K) - 1):
+        if K[i] - K[idx[-1]] >= b:
+            idx.append(i)
+    if idx[-1] != len(K) - 1:
+        idx.append(len(K) - 1)
+    knots = K[np.array(idx)]
+    eye = np.eye(len(knots))
+    A = np.column_stack([
+        CubicSpline(knots, eye[j], bc_type="natural")(K) for j in range(len(knots))
+    ])
+    coef = np.linalg.lstsq(A, P, rcond=None)[0]
+    return stock * (1.0 - CubicSpline(knots, coef, bc_type="natural")(K))
+
+
+def noise_pilots(n_reps=30, seed=20260923, sd=0.01):
+    """Appendix pilots. The convolution bandwidth stays the deriv rule."""
+    print(f"\nNoise pilots  reps={n_reps}  iv sd={sd}  seed={seed}")
+    rng = np.random.default_rng(seed)
+    p = BCC97
+    K_eval = np.linspace(60.0, 150.0, 401)
+    q_true = heston_spot_density(K_eval, p)
+    calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
+    specs = (
+        ("Thrice", True, None),
+        ("No thrice", False, None),
+        ("NW at h/4, then thrice", True, "nw"),
+        ("Knots at h, then thrice", True, "knot"),
+    )
+    for chain, K in (
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
+    ):
+        C_true = np.maximum(calls(K), 0.0)
+        acc = {name: [] for name, _, _ in specs}
+        for _rep in range(n_reps):
+            C = _projected_calls(
+                K, _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd),
+                p.r, p.T, p.forward,
+            )
+            h = estimate_rnd(K, C, p.S0, p.r, p.T, p.q, h="deriv")["h"]
+            for name, higher, kind in specs:
+                Cc = C
+                if kind == "nw":
+                    Cc = _nw_prefilter(K, C, p.S0, p.r, p.T, p.q, h / 4.0)
+                elif kind == "knot":
+                    Cc = _knot_pilot(K, C, p.S0, p.r, p.T, p.q, h)
+                fit = estimate_rnd(
+                    K, Cc, p.S0, p.r, p.T, p.q, K_eval=K_eval, h=h,
+                    tails=True, higher=higher,
+                )
+                acc[name].append(_ise(K_eval, fit["q"], q_true))
+        print(f"  -- {chain}")
+        for name, _, _ in specs:
+            print(f"    {name:26} ISE={np.mean(acc[name]):.4e}")
+
+
 def main():
     K_eval = np.linspace(60.0, 150.0, 401)
     p = BCC97
@@ -934,6 +1007,7 @@ def main():
     rec_v, plot_v, _, qv = _exact("VG", v, lambda K: vg_calls(K, v), vg_spot_density(K_eval, v), K_eval)
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
     noisy_heston()
+    noise_pilots()
     listed()
     print("DONE")
 
