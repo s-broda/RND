@@ -269,9 +269,8 @@ def _holdout_method(sl, method):
         Kt, Ct = sl.K[train], _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
         Ke = sl.K[test]
         if method == "ours":
-            C_te = estimate_rnd(
-                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=Ke, h="deriv",
-                tails=True, higher=True,
+            C_te = smoothing_spline_fit(
+                Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=Ke,
             )["C"]
         elif method == "yh":
             lam = yatchew_cv_lambda(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
@@ -368,9 +367,8 @@ def _chain_scores(sl):
     """In-sample prices, densities, and even/odd hold-out for Table 4."""
     C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
     s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
-    fit = estimate_rnd(
-        sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K, h="deriv",
-        tails=True, higher=True,
+    fit = smoothing_spline_fit(
+        sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K,
     )
     h = fit["h"]
     h_asd = asd_bandwidth(sl.K, C, sl.r, sl.T, sl.F)

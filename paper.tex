@@ -19,8 +19,7 @@
 
 \begin{frontmatter}
 
-\title{\texorpdfstring{Thricing Is All You Need\\[0.35em]
-{\small Well, and a proper bandwidth: risk neutral densities and accurate prices from the same kernel}}{Thricing Is All You Need}}
+\title{Identifying Risk-Neutral Densities from an Empirical Measure of Listed Quotes}
 
 \author[ifz]{Simon A.\ Broda\corref{cor1}}
 \ead{simon.broda@hslu.ch}
@@ -32,7 +31,7 @@
 \cortext[cor1]{Corresponding author.}
 
 \begin{abstract}
-Kernel estimators of the risk-neutral density differentiate a smooth of the call twice. The bandwidth that prices the quotes leaves many peaks. The bandwidth that removes the peaks moves the price. This paper uses one Gaussian kernel, at the second-derivative rate, on a cubic spline of the complementary distribution of a single maturity, and thrices that kernel. The same fit is a unimodal density of unit mass and a call interpolant. The convolution has a closed form, and the estimator is in-fill consistent. On four listed chains the out-of-the-money error is below the positive convolution approximation, and each fitted density has one peak and mass \(1.0\).
+European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. The calls are rescaled to a complementary distribution, the empirical measure of the risk-neutral jumps in strike, and that measure is fit by a smoothing spline. A Gaussian damping of its characteristic function inverts in closed form and, after the unquoted tails are filled and the kernel is thriced, supplies both the density and the call. The penalty is zero when the thriced density is already unimodal. The estimator is in-fill consistent. On four listed chains the out-of-the-money error is below the positive convolution approximation, each fitted density has one peak and mass \(1.0\), and on noisy Heston quotes the mean integrated squared error is below that convolution as well.
 \end{abstract}
 
 \begin{keyword}
@@ -48,13 +47,11 @@ risk-neutral density \sep option prices \sep kernel estimation \sep in-fill cons
 
 \citet{breeden1978} identified the risk-neutral density of the underlying at a fixed expiry with the second strike derivative of the corresponding European call, scaled by a discount factor. The identity assumes a twice differentiable price curve. A market supplies a finite ordered list of strikes and a quote at each knot. Numerical second differentiation of that list is ill-posed: interpolants oscillate, change sign, and depend on the interpolating scheme. The literature responds with parametric mixtures and Gram--Charlier expansions, implied-volatility interpolants, local polynomials of the call, and \citet{bondarenko2003}'s positive convolution approximation, which forces the density to be a mixture of a positive kernel with a discrete probability fitted to prices. Section~\ref{sec:lit} reviews these approaches.
 
-Kernel smoothers of the call are usually run at two bandwidths. The width that minimises a pricing error tracks the quotes, and the second derivative has many peaks. The width that balances the variance of a second derivative, of order \(n^{-1/9}\), is the one the surveys widen further, and the price moves with it \citep{aitsahalia1998,aitsahalia2003,grith2012,jackwerth2004,figlewski2018}.
+This paper estimates that density from the empirical measure of a single maturity. The calls are rescaled to a complementary distribution, which records the risk-neutral jumps in strike. A smoothing spline fits the measure: a natural cubic, with a penalty on the second derivative that is zero when the thriced density is already unimodal and positive when that derivative is noisy. A Gaussian damping of the characteristic function of the spline inverts in closed form. The same smoothing is the density and, after one integration, the call. Tails complete the unquoted wings, and thricing raises the order of the kernel. With those pieces in place, the estimator converges to the true density on the interior of a compact interval as the strike mesh fills that interval and the bandwidth tends to zero, and the same limit holds for noisy quotes when \(nh^{5}\to\infty\). The consistency argument is proved for the interpolating spline. On the exact designs below the selected penalty is zero, so the reported fit is that spline.
 
-This paper uses one bandwidth for both objects, that rate with a short constant, on a single maturity. The calls are rescaled to a complementary distribution, a cubic spline interpolates that function, and a Gaussian kernel smooths the spline. Thricing replaces the kernel by a higher-order kernel. The same smoothing is the density and, after one integration, the call. A Gaussian damping of the characteristic function of the spline makes the convolution closed form. With the unquoted tails filled in, the estimator converges to the true density on the interior of a compact interval as the strike mesh fills that interval and the bandwidth tends to zero, and the same limit holds for noisy quotes when \(nh^{5}\to\infty\).
+We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{aitsahalia2003} smooth a decreasing-convex projection of the calls with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. \citet{aitsahalia1998} smooth implied volatility, and \citet{grith2012} use a local cubic of the call and of implied volatility. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}, and on noisy Heston quotes the mean integrated squared error is below it as well.
 
-We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{yatchew2006} replace the quoted calls by the nearest decreasing convex list; the second differences of that list are a discrete nonnegative measure, not a curve, so that projection is not in the comparison below. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}. The interpolant can lie below the \citeauthor{yatchew2006} floor because it is not required to be convex. 
-
-The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency for exact quotes and for noisy quotes. Section~\ref{sec:h} chooses bandwidths that meet those conditions and compares the spline with the estimators of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
+The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records three refinements: completing the tails, thricing, and the penalty. Section~\ref{sec:ifc} proves in-fill consistency for exact quotes and for noisy quotes. Section~\ref{sec:h} chooses bandwidths that meet those conditions and compares the estimator with those of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
 
 \section{Related Work}
 \label{sec:lit}
@@ -69,7 +66,7 @@ A third family estimates the call, or its Black--Scholes implied volatility, by 
 
 \citet{grith2012} survey this literature and estimate a local cubic of the rescaled call with a quartic kernel. For a second derivative the optimal bandwidth is of order \(n^{-1/9}\). On their one-month DAX chain, least-squares cross-validation selects \(h=114\), which they describe as wiggly, so the densities they plot use \(h=228\) and \(h=434\). The implied-volatility smoother they display is widened further, to \(h=372\). Smoothing the call is more sensitive to that choice than smoothing implied volatility, and the tails oscillate unless the bandwidth is increased at a cost in bias. Twice differentiating a Nadaraya--Watson or \citet{gassermuller1979} level fit is set aside as the statistically worse route to the same derivative. \citet{jackwerth2004} starts a kernel regression of implied volatility from Silverman's rule, of order \(n^{-1/5}\). He warns that the bandwidth which prices overfits noise from one day to the next, that a kernel does not continue across gaps in the strike list, and that a spline has to be of degree higher than three if the recovered distribution is to be smooth. \citet{figlewski2018} finds that filling the implied-volatility curve with a cubic spline puts spikes in the density, because the second derivative of a cubic is continuous but not differentiable, and recommends a spline of degree four or higher. \citet{fanmancini2009} combine a parametric guide with a nonparametric correction. Related shape-constrained least squares are studied by \citet{yatchew2006} and \citet{birke2009}.
 
-The estimator of Section~\ref{sec:est} is exposed to these objections. It is a kernel smooth of a single maturity. The pilot is a cubic spline of the complementary distribution function, the kernel is Gaussian, and the listed bandwidth is a fixed multiple of \(n^{-1/9}\), shorter than the constants used above to calm a local polynomial. Thricing raises the order of the kernel and puts negative sidelobes in the equivalent kernel for \(f_{\Q}\). The convolution is closed form. Without that correction, the smooth of the call is the fixed-design estimator of \citet{priestley1972} applied to a cubic interpolant, so that object is not entered as a separate method. Section~\ref{sec:emp} asks whether the listed fit still has to split the bandwidth, one width for the price and a wider one for a unimodal density. That section implements the Nadaraya--Watson implied-volatility regression of \citeauthor{aitsahalia1998} at the bandwidth in their Appendix A, the local cubics of \citeauthor{grith2012} at the leave-one-out width and at twice that width, and the two-step procedure of \citeauthor{aitsahalia2003}: the same projection of the quoted calls, followed by one Gaussian local linear at the Fan--Gijbels plug-in. The density is the scaled and shifted derivative of that local linear.
+The estimator of Section~\ref{sec:est} is a kernel smooth of that empirical measure on a single maturity. The pilot is a smoothing spline of the complementary distribution, the kernel is Gaussian, and the bandwidth is a fixed multiple of \(n^{-1/9}\). The penalty of Section~\ref{sec:penalty} is what responds when the second derivative is noisy. Thricing raises the order of the kernel and puts negative sidelobes in the equivalent kernel for \(f_{\Q}\). The convolution is closed form. Section~\ref{sec:emp} implements the Nadaraya--Watson implied-volatility regression of \citeauthor{aitsahalia1998} at the bandwidth in their Appendix A, the local cubics of \citeauthor{grith2012} at the leave-one-out width and at twice that width, and the two-step procedure of \citeauthor{aitsahalia2003}: the same projection of the quoted calls, followed by one Gaussian local linear at the Fan--Gijbels plug-in. The density is the scaled and shifted derivative of that local linear.
 
 \citet{bondarenko2003} proposed the positive convolution approximation (PCA). The density is required to lie in the set of functions obtained by convolving a discrete probability with a positive kernel, and the discrete probability is chosen to minimize the sum of squared pricing errors. The kernel enforces smoothness and, together with positive weights, guarantees that the result is a density. In \citeauthor{bondarenko2003}'s comparison, the method dominated mixtures of lognormals, Hermite expansions, and several regularization methods. Subsequent simulation evidence on affine jump-diffusions is consistent with this ranking \citep{lu2019}. Section~\ref{sec:emp} implements that convolution with a Gaussian kernel on the spot. The mixing nodes are equally spaced from the first quoted strike to the last, the weights are a probability with mean \(F\), and the bandwidth is chosen by even/odd pricing error.
 
@@ -256,7 +253,23 @@ which is the Fourier transform of \(\tfrac83\kappa_h-2\kappa_{h\sqrt{2}}+\tfrac1
 \end{equation}
 and the same combination is applied to the interpolant in \eqref{eq:cubic}. The equivalent kernel takes negative values, so \(\hat f_{\Q}^{\mathrm{th}}\) is not a density. The call is \(S_0e^{-qT}(1-\hat P^{\mathrm{th}})\), with \(\hat P^{\mathrm{th}}\) clipped to \([0,1]\) and both premiums floored at zero.
 
-Thricing a truncated distribution amplifies leakage from the missing tails, so it is applied only after Section~\ref{sec:tails}. The estimator used below is \eqref{eq:cubic} with those tails and with \eqref{eq:thrice}.
+Thricing a truncated distribution amplifies leakage from the missing tails, so it is applied only after Section~\ref{sec:tails}.
+
+\subsection{The penalty}
+\label{sec:penalty}
+
+The spline in \eqref{eq:cubic} interpolates every quoted value of \(P\). When those values are exact, that is the right constraint. When the quotes are noisy, the second derivative that thricing amplifies is not. The estimator replaces the interpolant by the natural cubic \(f\) that minimises
+\begin{equation}
+\label{eq:smooth-penalty}
+\sum_i\bigl(P(K_i)-f(K_i)\bigr)^2
+\;+\;
+c\,F^3\int\bigl(f''(K)\bigr)^2\,\mathrm{d}K,
+\end{equation}
+with the tail knots of Section~\ref{sec:tails} included among the \(K_i\). The factor \(F^3\) makes \(c\) dimensionless. At \(c=0\) the minimiser is the interpolant, and \eqref{eq:thrice} is the estimator of the preceding subsection. The solution remains a cubic spline, so the convolution stays closed form.
+
+The candidates are \(c=0\) and sixteen values spaced geometrically from \(10^{-7}\) to \(3\times 10^{-4}\). Let \(c_0\) be the smallest candidate at which \(\hat f_{\Q}^{\mathrm{th}}\) has one peak on \([0.55F,1.40F]\) and total variation at most \(1.02\). A curve that already meets that test keeps \(c_0\). Above \(c_0\), the log root-mean-square gap between the fitted calls and the input quotes is plotted against the log root-mean-square gap between \(\hat f_{\Q}^{\mathrm{th}}\) and the plain Gaussian convolution, on that same window. If the discrete curvature of the curve is at least \(1/2\), the penalty is the corner. A flatter bend keeps \(c_0\).
+
+The estimator used below is \eqref{eq:smooth-penalty} with the tails, followed by \eqref{eq:thrice} at the bandwidth \eqref{eq:h-d2}. On the exact Heston and variance-gamma quotes the selected penalty is zero.
 
 \section{In-Fill Consistency}
 \label{sec:ifc}
@@ -446,11 +459,11 @@ Sparse & Tails+Thrice
 
 On the dense chain the wings again do not move the digits. Thricing cuts the mesh error from \(5.08\times 10^{-5}\) to \(4.90\times 10^{-6}\), against an oracle \(4.04\times 10^{-7}\). At \eqref{eq:h-d2} the thriced error is \(1.95\times 10^{-5}\) (\(h=1.28\)). The density of \(S_T\) is more peaked than under Heston, and the absolute errors are larger. On the sparse chain the quoted spline without tails has mesh error \(0.105\). Tails bring the plain mesh error to \(1.25\times 10^{-3}\), and thricing lowers it to \(3.00\times 10^{-4}\) at the mesh and \(5.67\times 10^{-5}\) at \eqref{eq:h-d2} (\(h=1.59\)), against an oracle \(3.13\times 10^{-5}\). Here the mesh bandwidth \(h=2.71\) is the wider of the two. Figure~\ref{fig:vg-rnd} plots the three estimators at the mesh bandwidth.
 
-Table~\ref{tab:sim-comp} scores the estimators of Section~\ref{sec:emp} on the same four chains. Each of those fits starts from the decreasing-convex projection and uses the bandwidth rule of that section, recomputed on the chain. The thriced spline is reported at both rules of this section. On dense Heston the mesh bandwidth has integrated squared error \(7.12\times 10^{-12}\). The cross-validated implied-volatility cubic is next among the single-bandwidth rows, at \(6.24\times 10^{-9}\), and it is the smallest error on sparse Heston, \(5.66\times 10^{-7}\), against \(9.98\times 10^{-7}\) for the thriced spline at \eqref{eq:h-d2}. On dense variance gamma the mesh error \(4.90\times 10^{-6}\) is below that cubic's \(2.16\times 10^{-5}\). On sparse variance gamma the thriced spline at \eqref{eq:h-d2} has error \(5.67\times 10^{-5}\), below the cubic's \(2.53\times 10^{-4}\). The Appendix~A bandwidth of \citeauthor{aitsahalia1998} and the plug-in local linear of \citeauthor{aitsahalia2003} are larger on every chain. The leave-one-out call cubic is between the two.
+Table~\ref{tab:sim-comp} scores the estimator of Section~\ref{sec:penalty} against the methods of Section~\ref{sec:emp} on the same four chains. Each fit starts from the decreasing-convex projection. On these exact quotes the penalty is zero, so the row is the thriced spline at \eqref{eq:h-d2}. The mesh bandwidth in Table~\ref{tab:heston-tail} is smaller on dense Heston, \(7.12\times 10^{-12}\), and on dense variance gamma, \(4.90\times 10^{-6}\). The cross-validated implied-volatility cubic is the smallest error on sparse Heston, \(5.66\times 10^{-7}\), against \(9.98\times 10^{-7}\) for the estimator. On sparse variance gamma the estimator has error \(5.67\times 10^{-5}\), below that cubic's \(2.53\times 10^{-4}\). The Appendix~A bandwidth of \citeauthor{aitsahalia1998} and the plug-in local linear of \citeauthor{aitsahalia2003} are larger on every chain.
 
 \begin{table}[H]
 \centering
-\caption{Integrated squared error on \([60,150]\) for the estimators of Section~\ref{sec:emp}. The thriced spline is shown at \eqref{eq:h-mesh} and at \eqref{eq:h-d2}. Each other row uses that estimator's bandwidth from Section~\ref{sec:emp}. \citeauthor{grith2012} is shown at the leave-one-out width and at twice that width.}
+\caption{Integrated squared error on \([60,150]\) for the estimator of Section~\ref{sec:penalty} and the methods of Section~\ref{sec:emp}. Ours is thriced at \eqref{eq:h-d2}; on these exact quotes the penalty is zero. Each other row uses that estimator's bandwidth from Section~\ref{sec:emp}. \citeauthor{grith2012} is shown at the leave-one-out width and at twice that width.}
 \label{tab:sim-comp}
 {\scriptsize
 \setlength{\tabcolsep}{4pt}%
@@ -460,8 +473,7 @@ Table~\ref{tab:sim-comp} scores the estimators of Section~\ref{sec:emp} on the s
   \multicolumn{1}{c}{Heston dense} & \multicolumn{1}{c}{Heston sparse} &
   \multicolumn{1}{c}{VG dense} & \multicolumn{1}{c}{VG sparse} \\
 \midrule
-Tails+Thrice, mesh & 7.12e-12 & 1.14e-6 & 4.90e-6 & 3.00e-4 \\
-Tails+Thrice, \(n^{-1/9}\) & 2.50e-8 & 9.98e-7 & 1.95e-5 & 5.67e-5 \\
+Ours & 2.50e-8 & 9.98e-7 & 1.95e-5 & 5.67e-5 \\
 PCA & 8.55e-8 & 3.39e-4 & 2.05e-4 & 9.29e-3 \\
 \citeauthor{grith2012}, IV, \(2\times\) & 9.27e-8 & 4.34e-6 & 1.15e-4 & 7.03e-4 \\
 \citeauthor{grith2012}, IV, CV & 6.24e-9 & 5.66e-7 & 2.16e-5 & 2.53e-4 \\
@@ -474,11 +486,11 @@ PCA & 8.55e-8 & 3.39e-4 & 2.05e-4 & 9.29e-3 \\
 }
 \end{table}
 
-The same designs are repeated with noise in the quotes. Black--Scholes implied volatility receives independent \(N(0,0.01^{2})\) noise. Values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Each replication starts from the projection of those calls. Table~\ref{tab:heston-noise} reports the mean integrated squared error over thirty replications of the Heston chains. On the dense chain the quoted spline and the tailed spline coincide. On the sparse chain the quoted spline remains near \(10^{-1}\). Thricing raises the error relative to the tailed spline at both bandwidths: on the dense chain, \(4.07\times 10^{-2}\) against \(1.69\times 10^{-2}\) at the mesh and \(5.93\times 10^{-3}\) against \(1.79\times 10^{-3}\) at \eqref{eq:h-d2}. The positive convolution has the smallest mean on both chains, \(4.36\times 10^{-4}\) dense and \(3.61\times 10^{-4}\) sparse.
+The same designs are repeated with noise in the quotes. Black--Scholes implied volatility receives independent \(N(0,0.01^{2})\) noise. Values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Each replication starts from the projection of those calls, and the penalty is chosen on that draw. Table~\ref{tab:heston-noise} reports the mean integrated squared error over thirty replications of the Heston chains. The smoothing spline has mean \(2.22\times 10^{-4}\) on the dense chain and \(2.58\times 10^{-4}\) on the sparse chain. The positive convolution is \(4.36\times 10^{-4}\) and \(3.61\times 10^{-4}\).
 
 \begin{table}[H]
 \centering
-\caption{Mean integrated squared error on \([60,150]\) for noisy Heston quotes. Implied volatility is perturbed by \(N(0,0.01^{2})\) noise. Thirty replications. Bandwidth rules as in Table~\ref{tab:sim-comp}.}
+\caption{Mean integrated squared error on \([60,150]\) for noisy Heston quotes. Implied volatility is perturbed by \(N(0,0.01^{2})\) noise. Thirty replications. Ours chooses the penalty of Section~\ref{sec:penalty} on each draw, at the bandwidth \eqref{eq:h-d2}. Each other row uses that estimator's bandwidth from Section~\ref{sec:emp}.}
 \label{tab:heston-noise}
 {\scriptsize
 \setlength{\tabcolsep}{4pt}%
@@ -487,12 +499,7 @@ The same designs are repeated with noise in the quotes. Black--Scholes implied v
 \multicolumn{1}{@{}c}{Estimator} &
   \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
 \midrule
-Quoted spline, mesh & 1.69e-2 & 1.05e-1 \\
-Quoted spline, \(n^{-1/9}\) & 1.79e-3 & 1.14e-1 \\
-Tails, mesh & 1.69e-2 & 1.21e-3 \\
-Tails, \(n^{-1/9}\) & 1.79e-3 & 1.68e-3 \\
-Tails+Thrice, mesh & 4.07e-2 & 4.25e-3 \\
-Tails+Thrice, \(n^{-1/9}\) & 5.93e-3 & 5.79e-3 \\
+Ours & 2.22e-4 & 2.58e-4 \\
 PCA & 4.36e-4 & 3.61e-4 \\
 \citeauthor{grith2012}, IV, \(2\times\) & 2.56e-3 & 1.20e-1 \\
 \citeauthor{grith2012}, IV, CV & 1.56e-2 & 3.55e-2 \\
@@ -611,7 +618,7 @@ SPX Mar & \citeauthor{aitsahalia1998}
   & 75.231 & 53.202 & 118.303 & 89.227 & 1.0 & 1.0 \\
 \midrule
 NDX Dec & \textbf{Ours}
-  & 1.057 & 1.105 & 0.781 & 1.110 & 1.0 & 1.0 \\
+  & 1.065 & 1.113 & 0.792 & 1.109 & 1.0 & 1.0 \\
 NDX Dec & PCA
   & 1.151 & 1.117 & 1.304 & 1.324 & 1.0 & 1.3 \\
 NDX Dec & \citeauthor{grith2012}, IV, \(2\times\)
@@ -645,7 +652,7 @@ RUT Dec & \citeauthor{aitsahalia1998}
   & 12.871 & 9.304 & 16.660 & 15.912 & 1.0 & 1.0 \\
 \midrule
 Average & \textbf{Ours}
-  & 0.294 & 0.304 & 0.228 & 0.312 & 1.0 & 1.0 \\
+  & 0.296 & 0.306 & 0.231 & 0.312 & 1.0 & 1.0 \\
 Average & PCA
   & 0.331 & 0.324 & 0.368 & 0.380 & 1.0 & 1.1 \\
 Average & \citeauthor{grith2012}, IV, \(2\times\)
@@ -667,7 +674,7 @@ Average & \citeauthor{aitsahalia1998}
 
 On SPX December the quoted calls sit \(0.022\) from the decreasing-convex cone, so a fit that stays inside the cone cannot undercut that error. The local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth is \(4.272\), \(7.837\), \(16.023\), and \(2.224\). With a Gaussian kernel on the spot and a width chosen by pricing error, PCA out-of-the-money error is \(0.051\) on SPX December, \(0.066\) on SPX March, \(1.151\) on NDX December, and \(0.058\) on RUT December. The NDX density has four peaks.
 
-The estimator of this paper is the Gaussian inversion of the cubic spline of \(P\), with tails and thricing, at \eqref{eq:h-d2}. The pricing error is \(0.036\), \(0.056\), \(1.057\), and \(0.026\). The hold-out error is \(0.041\), \(0.066\), \(1.110\), and \(0.031\). Each of the four curves has one peak on \([0.55F,1.40F]\) and mass \(1.0\). The bandwidth in that row is the same number that prices the chain.
+The estimator of this paper is the smoothing spline of \(P\) in \eqref{eq:smooth-penalty}, with tails and thricing, at \eqref{eq:h-d2}. The pricing error is \(0.036\), \(0.056\), \(1.065\), and \(0.026\). The hold-out error is \(0.041\), \(0.066\), \(1.109\), and \(0.031\). Each of the four curves has one peak on \([0.55F,1.40F]\) and mass \(1.0\). On SPX December, SPX March, and RUT the selected penalty leaves the prices on the interpolant. On NDX the penalty is \(1.44\times 10^{-6}\).
 
 \citeauthor{aitsahalia1998}, at the Appendix A bandwidth, has error \(31.225\), \(75.231\), \(179.751\), and \(12.871\), with one peak on each chain and mass \(1.0\). The cross-validated call cubic of \citeauthor{grith2012} prices at \(0.029\), \(0.042\), \(0.867\), and \(0.022\), and the doubled width at \(0.031\), \(0.152\), \(0.946\), and \(0.056\). The cross-validated implied-volatility cubic prices at \(0.031\), \(0.051\), \(0.867\), and \(0.026\), and the doubled width at \(0.032\), \(0.165\), \(0.946\), and \(0.042\). The call cubic's hold-out is \(14.653\), \(18.635\), \(79.411\), and \(7.026\) at the cross-validated width, and \(9.964\), \(1.339\), \(40.791\), and \(0.432\) at twice that width. Those errors sit in the far wing, where a one-sided local cubic on the held-out strikes misses the put.
 
@@ -678,7 +685,7 @@ The average out-of-the-money hold-out error is \(0.312\) for the estimator of th
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/ccdf_listed.pdf}
-\caption{SPX, NDX, and RUT, 18 December 2026, snapshot 23~September 2026. Each curve is fit to the projected call of Section~\ref{sec:data}. Left: \(\max(\hat f_{\Q},0)\) for the cubic-spline estimator at \eqref{eq:h-d2}, the Gaussian convolution of \citeauthor{bondarenko2003}, the call cubic of \citeauthor{grith2012} at twice its cross-validated bandwidth, and the constrained local linear of \citeauthor{aitsahalia2003} at the Fan--Gijbels plug-in. Right: out-of-the-money implied volatility for the spline, the Gaussian convolution, that call cubic, and \citeauthor{aitsahalia1998} at the Appendix A bandwidth. The dashed line is the forward. \citeauthor{aitsahalia1998}, the cross-validated call cubic, and the implied-volatility cubics are in Figure~\ref{fig:listed-kern}.}
+\caption{SPX, NDX, and RUT, 18 December 2026, snapshot 23~September 2026. Each curve is fit to the projected call of Section~\ref{sec:data}. Left: \(\max(\hat f_{\Q},0)\) for the smoothing spline at \eqref{eq:h-d2}, the Gaussian convolution of \citeauthor{bondarenko2003}, the call cubic of \citeauthor{grith2012} at twice its cross-validated bandwidth, and the constrained local linear of \citeauthor{aitsahalia2003} at the Fan--Gijbels plug-in. Right: out-of-the-money implied volatility for the smoothing spline, the Gaussian convolution, that call cubic, and \citeauthor{aitsahalia1998} at the Appendix A bandwidth. The dashed line is the forward. \citeauthor{aitsahalia1998}, the cross-validated call cubic, and the implied-volatility cubics are in Figure~\ref{fig:listed-kern}.}
 \label{fig:listed}
 \end{figure}
 
@@ -692,125 +699,7 @@ The average out-of-the-money hold-out error is \(0.312\) for the estimator of th
 \section{Conclusion}
 \label{sec:conc}
 
-The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. The Appendix A bandwidth of the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} leaves one peak and mass \(1.0\), with out-of-the-money error \(31.225\), \(75.231\), \(179.751\), and \(12.871\). The constrained local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth has error \(4.272\), \(7.837\), \(16.023\), and \(2.224\). The leave-one-out call cubic of \citeauthor{grith2012} reprices in sample, and twice that width is the curve in their comparison figure; neither width holds out on the far wing. On exact quotes the thriced spline at the mesh bandwidth has the smallest integrated squared error on dense Heston and on dense variance gamma, and at \eqref{eq:h-d2} on sparse variance gamma. On sparse Heston the cross-validated implied-volatility cubic is smaller. With noise in implied volatility the positive convolution has the smaller mean integrated squared error, and thricing raises the spline's error relative to the tailed spline. On the four listed chains the spline has one peak and mass \(1.0\), and its out-of-the-money error is below the mixture on each chain. PCA remains a mixture of normals of fixed bandwidth.
-
-\appendix
-\section{A smoothing spline for the penalty}
-\label{app:smooth}
-
-The estimator in the body passes a natural cubic through every quoted value of \(P\), completes the tails, and thrices a Gaussian convolution at the bandwidth \(h\) in \eqref{eq:h-d2}. That cubic is an interpolant: the penalty on its second derivative is zero. A smoothing spline is the same object with a positive penalty. It minimises
-\begin{equation}
-\label{eq:smooth-penalty}
-\sum_i\bigl(P(K_i)-f(K_i)\bigr)^2
-\;+\;
-c\,F^3\int\bigl(f''(K)\bigr)^2\,\mathrm{d}K
-\end{equation}
-over natural cubics \(f\), with the tail knots of Section~\ref{sec:tails} included. The factor \(F^3\) makes \(c\) dimensionless, so the same grid of \(c\) is used on a forward near \(100\) and on the listed forwards. At \(c=0\) the minimiser is the interpolant, and the thriced density is the estimator in the body. The convolution stays the one in \eqref{eq:cubic} and \eqref{eq:thrice}, because the solution is still a cubic spline.
-
-The level of \(P\) is already smooth after the decreasing-convex projection, so a cross-validation that watches only the residual of \(P\) selects \(c=0\) on the noisy Heston draws as well as on the exact quotes. The noise that thricing amplifies is in the second derivative. The penalty is chosen from that.
-
-The candidates are \(c=0\) and sixteen values spaced geometrically from \(10^{-7}\) to \(3\times 10^{-4}\). Let \(c_0\) be the smallest candidate at which the thriced density has one peak on \([0.55F,1.40F]\) and total variation at most \(1.02\). A curve that already meets that test keeps \(c_0\), and on the exact quotes and on SPX December and SPX March that value is zero. Above \(c_0\), the log root-mean-square gap between the fitted calls and the projected quotes is plotted against the log root-mean-square gap between the thriced density and the plain Gaussian convolution, on the same strike window. If the discrete curvature of that curve is at least \(1/2\), the penalty is the corner. A flatter bend keeps \(c_0\).
-
-Listed chains and noisy draws start from the decreasing-convex projection. On the exact model quotes the calls are the model calls. Tables~\ref{tab:app-exact}, \ref{tab:app-noise}, and \ref{tab:app-listed} use the columns of the exact, noisy, and listed comparisons, with the interpolating spline and PCA in the same table.
-
-\begin{table}[H]
-\centering
-\caption{Integrated squared error on \([60,150]\). Ours is the thriced interpolating spline, at the mesh bandwidth \eqref{eq:h-mesh} and at \eqref{eq:h-d2}. PCA uses its own bandwidth. The smoothing spline is thriced at \eqref{eq:h-d2}, with the penalty chosen on that chain.}
-\label{tab:app-exact}
-{\scriptsize
-\setlength{\tabcolsep}{4pt}%
-\begin{tabular}{@{}l *{4}{S[table-format=1.2e-1, scientific-notation=true]}@{}}
-\toprule
-\multicolumn{1}{@{}c}{Estimator} &
-  \multicolumn{1}{c}{Heston dense} & \multicolumn{1}{c}{Heston sparse} &
-  \multicolumn{1}{c}{VG dense} & \multicolumn{1}{c}{VG sparse} \\
-\midrule
-Ours, mesh & 7.12e-12 & 1.14e-6 & 4.90e-6 & 3.00e-4 \\
-Ours, \(n^{-1/9}\) & 2.50e-8 & 9.98e-7 & 1.95e-5 & 5.67e-5 \\
-PCA & 8.55e-8 & 3.39e-4 & 2.05e-4 & 9.29e-3 \\
-Smoothing spline & 2.50e-8 & 9.98e-7 & 1.95e-5 & 5.67e-5 \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-
-On each exact chain the selected penalty is zero, so the integrated squared error is the \(n^{-1/9}\) row of the interpolant.
-
-\begin{table}[H]
-\centering
-\caption{Mean integrated squared error on \([60,150]\) for noisy Heston quotes. Implied volatility receives \(N(0,0.01^{2})\) noise, values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Thirty replications. Ours uses the mesh rule or \eqref{eq:h-d2} of the projected draw. PCA uses its own bandwidth. The smoothing spline uses \eqref{eq:h-d2} of that draw, and chooses its penalty on that draw.}
-\label{tab:app-noise}
-{\scriptsize
-\setlength{\tabcolsep}{4pt}%
-\begin{tabular}{@{}l *{2}{S[table-format=1.2e-1, scientific-notation=true]}@{}}
-\toprule
-\multicolumn{1}{@{}c}{Estimator} & \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
-\midrule
-Ours, mesh & 4.07e-2 & 4.25e-3 \\
-Ours, \(n^{-1/9}\) & 5.93e-3 & 5.79e-3 \\
-PCA & 4.36e-4 & 3.61e-4 \\
-Smoothing spline & 2.22e-4 & 2.58e-4 \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-
-With one volatility point of noise, the smoothing spline has mean error \(2.22\times 10^{-4}\) on the dense chain and \(2.58\times 10^{-4}\) on the sparse chain. PCA has \(4.36\times 10^{-4}\) and \(3.61\times 10^{-4}\). The interpolant at \eqref{eq:h-d2} has \(5.93\times 10^{-3}\) and \(5.79\times 10^{-3}\).
-
-\begin{table}[H]
-\centering
-\caption{Listed repricing for the chains of Table~\ref{tab:listed}. Ours is the interpolating spline at \eqref{eq:h-d2}. PCA uses its pricing bandwidth. The smoothing spline uses the same \(h\) and the penalty chosen on that chain. OTM is the put root-mean-square error for \(K\le F\) and the call error for \(K>F\). Hold-out refits the projection and the penalty on each even/odd half. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum. Average is the equal-weight mean of the four chains.}
-\label{tab:app-listed}
-{\scriptsize
-\setlength{\tabcolsep}{3pt}%
-\renewcommand{\arraystretch}{0.9}%
-\begin{tabular}{ll *{4}{S[table-format=2.3]} S[table-format=1.1] S[table-format=1.1]}
-\toprule
-\multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} &
-  \multicolumn{1}{c}{RMSE OTM} & \multicolumn{1}{c}{Puts} &
-  \multicolumn{1}{c}{Calls} & \multicolumn{1}{c}{Hold-out} &
-  \multicolumn{1}{c}{Mass} & \multicolumn{1}{c}{TV} \\
-\midrule
-SPX Dec & \textbf{Ours}
-  & 0.036 & 0.034 & 0.041 & 0.041 & 1.0 & 1.0 \\
-SPX Dec & PCA
-  & 0.051 & 0.053 & 0.048 & 0.055 & 1.0 & 1.0 \\
-SPX Dec & Smoothing spline
-  & 0.036 & 0.034 & 0.041 & 0.041 & 1.0 & 1.0 \\
-\midrule
-SPX Mar & \textbf{Ours}
-  & 0.056 & 0.052 & 0.067 & 0.066 & 1.0 & 1.0 \\
-SPX Mar & PCA
-  & 0.066 & 0.061 & 0.077 & 0.075 & 1.0 & 1.0 \\
-SPX Mar & Smoothing spline
-  & 0.056 & 0.052 & 0.067 & 0.066 & 1.0 & 1.0 \\
-\midrule
-NDX Dec & \textbf{Ours}
-  & 1.057 & 1.105 & 0.781 & 1.110 & 1.0 & 1.0 \\
-NDX Dec & PCA
-  & 1.151 & 1.117 & 1.304 & 1.324 & 1.0 & 1.3 \\
-NDX Dec & Smoothing spline
-  & 1.065 & 1.113 & 0.792 & 1.109 & 1.0 & 1.0 \\
-\midrule
-RUT Dec & \textbf{Ours}
-  & 0.026 & 0.027 & 0.024 & 0.031 & 1.0 & 1.0 \\
-RUT Dec & PCA
-  & 0.058 & 0.066 & 0.043 & 0.067 & 1.0 & 1.0 \\
-RUT Dec & Smoothing spline
-  & 0.026 & 0.027 & 0.024 & 0.031 & 1.0 & 1.0 \\
-\midrule
-Average & \textbf{Ours}
-  & 0.294 & 0.304 & 0.228 & 0.312 & 1.0 & 1.0 \\
-Average & PCA
-  & 0.331 & 0.324 & 0.368 & 0.380 & 1.0 & 1.1 \\
-Average & Smoothing spline
-  & 0.296 & 0.306 & 0.231 & 0.312 & 1.0 & 1.0 \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-
-On SPX December, SPX March, and RUT the selected penalty leaves the listed prices on the interpolant. RUT's penalty is \(10^{-7}\), and the prices still match to the third decimal. On NDX the penalty is \(1.44\times 10^{-6}\). Out-of-the-money error moves from \(1.057\) to \(1.065\), and hold-out from \(1.110\) to \(1.109\). Each smoothing-spline density has one peak, and mass and total variation print as \(1.0\). The estimator reported in the body is the interpolant, which is the fit this rule selects when the thriced density is already unimodal and the corner is flat.
+The estimator reads the risk-neutral density off the empirical measure of a single maturity. Calls are rescaled to a complementary distribution, a smoothing spline fits that measure, the unquoted tails are filled, and a thriced Gaussian convolution of the spline is the density and the call. The penalty is zero when the thriced density is already unimodal. On exact quotes that is the selected value, so the integrated squared error is the thriced interpolant at \eqref{eq:h-d2}. The mesh bandwidth in Table~\ref{tab:heston-tail} is smaller on dense Heston and on dense variance gamma. On sparse Heston the cross-validated implied-volatility cubic of \citeauthor{grith2012} is smaller. With one volatility point of noise in implied volatility, the smoothing spline has mean integrated squared error \(2.22\times 10^{-4}\) and \(2.58\times 10^{-4}\), below the positive convolution. On the four listed chains the density has one peak and mass \(1.0\), and the out-of-the-money error is below that convolution on each chain. The Appendix A bandwidth of the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} leaves one peak and mass \(1.0\), with error \(31.225\), \(75.231\), \(179.751\), and \(12.871\). The constrained local linear of \citeauthor{aitsahalia2003} has error \(4.272\), \(7.837\), \(16.023\), and \(2.224\). The leave-one-out call cubic of \citeauthor{grith2012} reprices in sample, and twice that width is the curve in their comparison figure; neither width holds out on the far wing.
 
 \section*{Code and Data Availability}
 
