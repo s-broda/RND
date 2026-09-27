@@ -6,8 +6,8 @@ Run from the repository root::
 
 Prints the Heston and variance-gamma ISE tables, including the listed
 competitors and a noisy Heston comparison, the listed pricing table, and
-the appendix scores for the midpoint spline and the direct regression
-splines, and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
+the appendix scores for the smoothing spline, and writes
+figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
 figures/ccdf_listed.pdf, and figures/ccdf_listed_kern.pdf.
 """
 
@@ -1326,6 +1326,180 @@ def midpoint_average_pilot(n_reps=30, seed=20260923, sd=0.01):
 
 
 
+# Dimensionless penalty c in λ = c F^3 ∫(P'')^2. Zero is the interpolant.
+_SMOOTH_C = np.array([0.0, *np.geomspace(1e-7, 3e-4, 16)])
+
+
+def _smoothing_base(K, C, S0, r, T, q):
+    K = np.asarray(K, float)
+    C = np.asarray(C, float)
+    h = estimate_rnd(K, C, S0, r, T, q, h="deriv")["h"]
+    disc = float(np.exp(-float(r) * float(T)))
+    stock = float(S0) * np.exp(-float(q) * float(T))
+    F = float(S0) * np.exp((float(r) - float(q)) * float(T))
+    Ks, Ps = _knots(K, C, stock, F, disc, tails=True)
+    return K, C, h, stock, F, Ks, Ps
+
+
+def _thrice_from_spline(spl, Ks, h, F, x):
+    """Thriced convolution of a cubic spline of P. Same weights as estimate_rnd."""
+    from rnd import _smooth
+
+    x = np.asarray(x, float)
+    wts = ((1.0, 8.0 / 3.0), (np.sqrt(2.0), -2.0), (2.0, 1.0 / 3.0))
+    q = np.zeros(x.shape, float)
+    G = np.zeros(x.shape, float)
+    for fac, w in wts:
+        g2, level, _ = _smooth(x, Ks, spl, h * fac)
+        q += w * (-F * g2)
+        G += w * level
+    return q, G
+
+
+def _score_smoothing_c(base, c):
+    from scipy.interpolate import make_smoothing_spline
+
+    K, C, h, stock, F, Ks, Ps = base
+    lam = 0.0 if c <= 0.0 else float(c) * F ** 3
+    spl = make_smoothing_spline(Ks, Ps, lam=lam)
+    s = np.linspace(max(50.0, 0.2 * F), 2.4 * F, 700)
+    q, _ = _thrice_from_spline(spl, Ks, h, F, s)
+    # Plain Gaussian, for the gap that the corner watches.
+    from rnd import _smooth
+    q1 = -F * _smooth(s, Ks, spl, h)[0]
+    m = (s >= 0.55 * F) & (s <= 1.40 * F)
+    corr = float(np.sqrt(np.mean((q[m] - q1[m]) ** 2)))
+    _, G = _thrice_from_spline(spl, Ks, h, F, K)
+    Cf = np.maximum(stock * (1.0 - np.clip(G, 0.0, 1.0)), 0.0)
+    price = float(np.sqrt(np.mean((Cf - C) ** 2)))
+    tv = _variation(F, q, s)
+    mass, peaks = _mass_peaks(F, q, s)
+    return dict(
+        c=float(c), tv=tv, peaks=peaks, mass=mass, price=price, corr=corr,
+        spl=spl, Ks=Ks, h=h, stock=stock, F=F,
+    )
+
+
+def _choose_smoothing_c(rows, curv_min=0.5):
+    """Smallest unimodal penalty, then the L-curve corner when the bend is sharp.
+
+    Unimodal means one peak and total variation at most 1.02 on [0.55F, 1.40F].
+    The corner is of log call residual against log gap between the thriced
+    density and the plain Gaussian. A flat bend keeps the unimodal penalty.
+    """
+    uni = [r for r in rows if r["peaks"] <= 1 and r["tv"] <= 1.02]
+    c0 = uni[0]["c"] if uni else rows[-1]["c"]
+    sub = [r for r in rows if r["c"] + 1e-15 >= c0 and r["price"] > 1e-8 and r["corr"] > 0.0]
+    if len(sub) < 5:
+        return c0
+    x = np.log([r["price"] for r in sub])
+    y = np.log([r["corr"] for r in sub])
+    dx, dy = np.gradient(x), np.gradient(y)
+    ddx, ddy = np.gradient(dx), np.gradient(dy)
+    kap = np.abs(dx * ddy - dy * ddx) / np.maximum((dx * dx + dy * dy) ** 1.5, 1e-18)
+    kap[0] = kap[-1] = -1.0
+    i = int(np.argmax(kap))
+    if float(kap[i]) >= curv_min:
+        return sub[i]["c"]
+    return c0
+
+
+def _smoothing_fit_at(base, c, K_eval=None, K_price=None):
+    row = _score_smoothing_c(base, c)
+    out = {"c": row["c"], "h": row["h"], "q": None, "C": None, "mass": row["mass"],
+           "peaks": row["peaks"], "tv": row["tv"]}
+    if K_eval is not None:
+        q, _ = _thrice_from_spline(row["spl"], row["Ks"], row["h"], row["F"], K_eval)
+        out["q"] = q
+    if K_price is not None:
+        _, G = _thrice_from_spline(row["spl"], row["Ks"], row["h"], row["F"], K_price)
+        out["C"] = np.maximum(row["stock"] * (1.0 - np.clip(G, 0.0, 1.0)), 0.0)
+    return out
+
+
+def smoothing_spline_fit(K, C, S0, r, T, q, K_eval=None, K_price=None):
+    """Thriced smoothing spline of P. The penalty is chosen on this chain."""
+    base = _smoothing_base(K, C, S0, r, T, q)
+    rows = [_score_smoothing_c(base, c) for c in _SMOOTH_C]
+    c = _choose_smoothing_c(rows)
+    return _smoothing_fit_at(base, c, K_eval=K_eval, K_price=K_price)
+
+
+def _smoothing_holdout(sl):
+    errs = []
+    for train, test in _folds(len(sl.K)):
+        Ct = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
+        fit = smoothing_spline_fit(
+            sl.K[train], Ct, sl.S0, sl.r, sl.T, sl.q, K_price=sl.K[test],
+        )
+        errs.append(_otm_rmse_slice(sl, fit["C"], test))
+    return float(np.mean(errs))
+
+
+def smoothing_spline_pilot(n_reps=30, seed=20260923, sd=0.01):
+    """Appendix: smoothing spline of P, penalty chosen per chain, then thrice."""
+    print(f"\nSmoothing spline  reps={n_reps}  iv sd={sd}  seed={seed}")
+    K_eval = np.linspace(60.0, 150.0, 401)
+    designs = (
+        ("Heston", BCC97,
+         lambda K, p: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc,
+         lambda ev, p: heston_spot_density(ev, p)),
+        ("VG", CM99,
+         lambda K, p: vg_calls(K, p),
+         lambda ev, p: vg_spot_density(ev, p)),
+    )
+    chains = (
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
+    )
+    for label, p, calls, dens in designs:
+        q_true = dens(K_eval, p)
+        print(f"  -- exact {label}")
+        for chain, K in chains:
+            C = np.maximum(calls(K, p), 0.0)
+            fit = smoothing_spline_fit(K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval)
+            print(
+                f"    {chain:7} ISE={_ise(K_eval, fit['q'], q_true):.4e}  "
+                f"c={fit['c']:.2e}"
+            )
+    rng = np.random.default_rng(seed)
+    p = BCC97
+    q_true = heston_spot_density(K_eval, p)
+    calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
+    for chain, K in chains:
+        C_true = np.maximum(calls(K), 0.0)
+        acc = []
+        for _rep in range(n_reps):
+            C = _projected_calls(
+                K, _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd),
+                p.r, p.T, p.forward,
+            )
+            fit = smoothing_spline_fit(K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval)
+            acc.append(_ise(K_eval, fit["q"], q_true))
+        print(f"  -- noisy Heston {chain}  ISE={np.mean(acc):.4e}")
+    print("  -- listed")
+    for csv, title in (
+        ("spx_20261218.csv", "SPX Dec"),
+        ("spx_20270319.csv", "SPX Mar"),
+        ("ndx_20261218.csv", "NDX Dec"),
+        ("rut_20261218.csv", "RUT Dec"),
+    ):
+        sl = load_slice(RES / csv)
+        C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
+        s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
+        fit = smoothing_spline_fit(
+            sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K,
+        )
+        o, pu, ca = _otm(sl, fit["C"])
+        mass, peaks = _mass_peaks(sl.F, fit["q"], s)
+        tv = _variation(sl.F, fit["q"], s)
+        ho = _smoothing_holdout(sl)
+        print(
+            f"    {title:8} c={fit['c']:.2e} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
+            f"hold {ho:.3f} mass {mass:.1f} peaks {peaks} tv {tv:.2f}"
+        )
+
+
 def main():
     K_eval = np.linspace(60.0, 150.0, 401)
     p = BCC97
@@ -1339,8 +1513,7 @@ def main():
     rec_v, plot_v, _, qv = _exact("VG", v, lambda K: vg_calls(K, v), vg_spot_density(K_eval, v), K_eval)
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
     noisy_heston()
-    midpoint_average_pilot()
-    direct_secant_pilot()
+    smoothing_spline_pilot()
     listed()
     print("DONE")
 

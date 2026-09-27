@@ -695,38 +695,30 @@ The average out-of-the-money hold-out error is \(0.312\) for the estimator of th
 The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. The Appendix A bandwidth of the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} leaves one peak and mass \(1.0\), with out-of-the-money error \(31.225\), \(75.231\), \(179.751\), and \(12.871\). The constrained local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth has error \(4.272\), \(7.837\), \(16.023\), and \(2.224\). The leave-one-out call cubic of \citeauthor{grith2012} reprices in sample, and twice that width is the curve in their comparison figure; neither width holds out on the far wing. On exact quotes the thriced spline at the mesh bandwidth has the smallest integrated squared error on dense Heston and on dense variance gamma, and at \eqref{eq:h-d2} on sparse variance gamma. On sparse Heston the cross-validated implied-volatility cubic is smaller. With noise in implied volatility the positive convolution has the smaller mean integrated squared error, and thricing raises the spline's error relative to the tailed spline. On the four listed chains the spline has one peak and mass \(1.0\), and its out-of-the-money error is below the mixture on each chain. PCA remains a mixture of normals of fixed bandwidth.
 
 \appendix
-\section{Splines on the midpoints}
-\label{app:mid}
+\section{A smoothing spline for the penalty}
+\label{app:smooth}
 
-The estimator in the body passes a natural cubic through \(P\) at the quoted strikes, completes the tails, and thrices a Gaussian convolution at the bandwidth \(h\) in \eqref{eq:h-d2}. This appendix moves the spline onto the midpoints between those strikes and scores two versions against that estimator and against PCA. The convolution bandwidth is the same \(h\) in every row. On the four listed chains it equals \(98.6\), \(165.9\), \(606.0\), and \(59.0\). On the Heston chains it equals \(2.00\) (dense) and \(2.50\) (sparse). On the variance-gamma chains it equals \(1.28\) (dense) and \(1.59\) (sparse). A knot spacing of \(2h\) is twice that width, and a spacing of \(4h\) is four times that width. On the listed chains the wider knots are \(394.4\), \(663.6\), \(2424\), and \(236\) strike points apart.
-
-A natural cubic is fixed by the value assigned to each of its knots. It passes through those values, and the second derivative is zero at the first knot and at the last. The estimator in the body is of this kind: one knot at each quoted strike, with value \(P_i\).
-
-A regression spline has fewer knots than observations. The values at the knots are chosen to minimise the sum of squared residuals, so the curve follows the observations and does not pass through each one. The observations used here are the secants of \(P\),
+The estimator in the body passes a natural cubic through every quoted value of \(P\), completes the tails, and thrices a Gaussian convolution at the bandwidth \(h\) in \eqref{eq:h-d2}. That cubic is an interpolant: the penalty on its second derivative is zero. A smoothing spline is the same object with a positive penalty. It minimises
 \begin{equation}
-\label{eq:secant}
-s_i
-\;=\;
-\frac{P(K_{i+1})-P(K_i)}{K_{i+1}-K_i},
-\qquad
-m_i
-\;=\;
-\frac{K_i+K_{i+1}}{2}.
+\label{eq:smooth-penalty}
+\sum_i\bigl(P(K_i)-f(K_i)\bigr)^2
+\;+\;
+c\,F^3\int\bigl(f''(K)\bigr)^2\,\mathrm{d}K
 \end{equation}
-The secant \(s_i\) is the average slope of \(P\) on \([K_i,K_{i+1}]\), and it is placed at the midpoint \(m_i\). The knots are equally spaced from the first midpoint to the last, either \(2h\) apart or \(4h\) apart. Of these two spacings, \(4h\) is the one that puts the noisy integrated squared error below PCA.
+over natural cubics \(f\), with the tail knots of Section~\ref{sec:tails} included. The factor \(F^3\) makes \(c\) dimensionless, so the same grid of \(c\) is used on a forward near \(100\) and on the listed forwards. At \(c=0\) the minimiser is the interpolant, and the thriced density is the estimator in the body. The convolution stays the one in \eqref{eq:cubic} and \eqref{eq:thrice}, because the solution is still a cubic spline.
 
-That regression spline is the slope inside \eqref{eq:cubic}. On each cell the slope is a cubic, so the integrand is a cubic times a Gaussian. The integrals of \(1\), \(u\), \(u^2\), and \(u^3\) against \(\phi\) and \(\Phi\) are elementary, and the density and the call use \eqref{eq:thrice}. A constant-slope tail is attached at each end, with the slope equal to the spline at the junction. The constant of integration of the smoothed level is the mean residual of that level against \(P\) at the quoted strikes. The density does not depend on the constant.
+The level of \(P\) is already smooth after the decreasing-convex projection, so a cross-validation that watches only the residual of \(P\) selects \(c=0\) on the noisy Heston draws as well as on the exact quotes. The noise that thricing amplifies is in the second derivative. The penalty is chosen from that.
 
-The row labelled midpoint spline is an ordinary natural cubic, with one knot at every midpoint. The value at \(m_i\) is \((P(K_i)+P(K_{i+1}))/2\), which is the height of the chord between the two quotes. The tail knots of Section~\ref{sec:tails} are kept, and thricing uses the same \(h\). The spline passes through each of those averaged values. Moving the knots to the midpoints is what averages adjacent quotes before the curve is drawn.
+The candidates are \(c=0\) and sixteen values spaced geometrically from \(10^{-7}\) to \(3\times 10^{-4}\). Let \(c_0\) be the smallest candidate at which the thriced density has one peak on \([0.55F,1.40F]\) and total variation at most \(1.02\). A curve that already meets that test keeps \(c_0\), and on the exact quotes and on SPX December and SPX March that value is zero. Above \(c_0\), the log root-mean-square gap between the fitted calls and the projected quotes is plotted against the log root-mean-square gap between the thriced density and the plain Gaussian convolution, on the same strike window. If the discrete curvature of that curve is at least \(1/2\), the penalty is the corner. A flatter bend keeps \(c_0\).
 
-Listed chains and noisy draws start from the decreasing-convex projection. On the exact model quotes the calls are the model calls. Tables~\ref{tab:app-exact}, \ref{tab:app-noise}, and \ref{tab:app-listed} repeat the columns of the exact, noisy, and listed comparisons. Each table carries the interpolating spline and PCA, so the comparison can be read here.
+Listed chains and noisy draws start from the decreasing-convex projection. On the exact model quotes the calls are the model calls. Tables~\ref{tab:app-exact}, \ref{tab:app-noise}, and \ref{tab:app-listed} use the columns of the exact, noisy, and listed comparisons, with the interpolating spline and PCA in the same table.
 
 \begin{table}[H]
 \centering
-\caption{Integrated squared error on \([60,150]\). Ours is the thriced interpolating spline, at the mesh bandwidth \eqref{eq:h-mesh} and at \eqref{eq:h-d2}. PCA uses its own bandwidth. The midpoint spline and the two regression splines are convolved at \eqref{eq:h-d2}. The regression knots are spaced by \(2h\) or by \(4h\).}
+\caption{Integrated squared error on \([60,150]\). Ours is the thriced interpolating spline, at the mesh bandwidth \eqref{eq:h-mesh} and at \eqref{eq:h-d2}. PCA uses its own bandwidth. The smoothing spline is thriced at \eqref{eq:h-d2}, with the penalty chosen on that chain.}
 \label{tab:app-exact}
 {\scriptsize
-\setlength{\tabcolsep}{3pt}%
+\setlength{\tabcolsep}{4pt}%
 \begin{tabular}{@{}l *{4}{S[table-format=1.2e-1, scientific-notation=true]}@{}}
 \toprule
 \multicolumn{1}{@{}c}{Estimator} &
@@ -736,19 +728,17 @@ Listed chains and noisy draws start from the decreasing-convex projection. On th
 Ours, mesh & 7.12e-12 & 1.14e-6 & 4.90e-6 & 3.00e-4 \\
 Ours, \(n^{-1/9}\) & 2.50e-8 & 9.98e-7 & 1.95e-5 & 5.67e-5 \\
 PCA & 8.55e-8 & 3.39e-4 & 2.05e-4 & 9.29e-3 \\
-Midpoint spline & 7.15e-8 & 3.91e-6 & 2.60e-5 & 1.90e-4 \\
-Regression, knots at \(2h\) & 3.98e-8 & 2.67e-6 & 6.02e-5 & 7.67e-5 \\
-Regression, knots at \(4h\) & 3.48e-6 & 3.68e-6 & 1.85e-4 & 1.36e-3 \\
+Smoothing spline & 2.50e-8 & 9.98e-7 & 1.95e-5 & 5.67e-5 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-On exact quotes the mesh bandwidth of the interpolating spline has the smallest error on dense Heston and on dense variance gamma. The midpoint spline and the regression with knots at \(2h\) stay near the \(n^{-1/9}\) interpolant on dense Heston. Knots at \(4h\) raise that error from \(2.50\times 10^{-8}\) to \(3.48\times 10^{-6}\), and they raise sparse variance gamma from \(5.67\times 10^{-5}\) to \(1.36\times 10^{-3}\).
+On each exact chain the selected penalty is zero, so the integrated squared error is the \(n^{-1/9}\) row of the interpolant.
 
 \begin{table}[H]
 \centering
-\caption{Mean integrated squared error on \([60,150]\) for noisy Heston quotes. Implied volatility receives \(N(0,0.01^{2})\) noise, values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Thirty replications. The bandwidth of Ours is the mesh rule or \eqref{eq:h-d2} of the projected draw. PCA uses its own bandwidth. The midpoint spline and the regression splines use \eqref{eq:h-d2} of that same draw.}
+\caption{Mean integrated squared error on \([60,150]\) for noisy Heston quotes. Implied volatility receives \(N(0,0.01^{2})\) noise, values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Thirty replications. Ours uses the mesh rule or \eqref{eq:h-d2} of the projected draw. PCA uses its own bandwidth. The smoothing spline uses \eqref{eq:h-d2} of that draw, and chooses its penalty on that draw.}
 \label{tab:app-noise}
 {\scriptsize
 \setlength{\tabcolsep}{4pt}%
@@ -759,19 +749,17 @@ On exact quotes the mesh bandwidth of the interpolating spline has the smallest 
 Ours, mesh & 4.07e-2 & 4.25e-3 \\
 Ours, \(n^{-1/9}\) & 5.93e-3 & 5.79e-3 \\
 PCA & 4.36e-4 & 3.61e-4 \\
-Midpoint spline & 5.49e-3 & 3.48e-3 \\
-Regression, knots at \(2h\) & 3.84e-3 & 3.17e-3 \\
-Regression, knots at \(4h\) & 3.89e-4 & 2.37e-4 \\
+Smoothing spline & 2.22e-4 & 2.58e-4 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-With noise in implied volatility, knots at \(4h\) have mean error \(3.89\times 10^{-4}\) on the dense chain and \(2.37\times 10^{-4}\) on the sparse chain. PCA has \(4.36\times 10^{-4}\) and \(3.61\times 10^{-4}\). The midpoint spline and the knots at \(2h\) stay near the thriced interpolant.
+With one volatility point of noise, the smoothing spline has mean error \(2.22\times 10^{-4}\) on the dense chain and \(2.58\times 10^{-4}\) on the sparse chain. PCA has \(4.36\times 10^{-4}\) and \(3.61\times 10^{-4}\). The interpolant at \eqref{eq:h-d2} has \(5.93\times 10^{-3}\) and \(5.79\times 10^{-3}\).
 
 \begin{table}[H]
 \centering
-\caption{Listed repricing for the chains of Table~\ref{tab:listed}. Ours is the interpolating spline at \eqref{eq:h-d2}. PCA uses its pricing bandwidth. The midpoint spline and the regression splines use the same \(h\) as Ours, and the regression knots are spaced by \(2h\) or by \(4h\). OTM is the put root-mean-square error for \(K\le F\) and the call error for \(K>F\). Hold-out refits the projection on each even/odd half and scores the other half. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum. Average is the equal-weight mean of the four chains.}
+\caption{Listed repricing for the chains of Table~\ref{tab:listed}. Ours is the interpolating spline at \eqref{eq:h-d2}. PCA uses its pricing bandwidth. The smoothing spline uses the same \(h\) and the penalty chosen on that chain. OTM is the put root-mean-square error for \(K\le F\) and the call error for \(K>F\). Hold-out refits the projection and the penalty on each even/odd half. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum. Average is the equal-weight mean of the four chains.}
 \label{tab:app-listed}
 {\scriptsize
 \setlength{\tabcolsep}{3pt}%
@@ -787,64 +775,45 @@ SPX Dec & \textbf{Ours}
   & 0.036 & 0.034 & 0.041 & 0.041 & 1.0 & 1.0 \\
 SPX Dec & PCA
   & 0.051 & 0.053 & 0.048 & 0.055 & 1.0 & 1.0 \\
-SPX Dec & Midpoint spline
-  & 0.036 & 0.034 & 0.043 & 0.047 & 1.0 & 1.0 \\
-SPX Dec & Regression, knots at \(2h\)
-  & 0.047 & 0.038 & 0.068 & 0.077 & 1.0 & 1.0 \\
-SPX Dec & Regression, knots at \(4h\)
-  & 0.270 & 0.194 & 0.426 & 0.294 & 1.0 & 1.0 \\
+SPX Dec & Smoothing spline
+  & 0.036 & 0.034 & 0.041 & 0.041 & 1.0 & 1.0 \\
 \midrule
 SPX Mar & \textbf{Ours}
   & 0.056 & 0.052 & 0.067 & 0.066 & 1.0 & 1.0 \\
 SPX Mar & PCA
   & 0.066 & 0.061 & 0.077 & 0.075 & 1.0 & 1.0 \\
-SPX Mar & Midpoint spline
-  & 0.067 & 0.055 & 0.093 & 0.151 & 1.0 & 1.0 \\
-SPX Mar & Regression, knots at \(2h\)
-  & 0.075 & 0.055 & 0.115 & 0.133 & 1.0 & 1.0 \\
-SPX Mar & Regression, knots at \(4h\)
-  & 0.431 & 0.295 & 0.690 & 0.566 & 1.0 & 1.0 \\
+SPX Mar & Smoothing spline
+  & 0.056 & 0.052 & 0.067 & 0.066 & 1.0 & 1.0 \\
 \midrule
 NDX Dec & \textbf{Ours}
   & 1.057 & 1.105 & 0.781 & 1.110 & 1.0 & 1.0 \\
 NDX Dec & PCA
   & 1.151 & 1.117 & 1.304 & 1.324 & 1.0 & 1.3 \\
-NDX Dec & Midpoint spline
-  & 1.073 & 1.105 & 0.903 & 1.347 & 1.0 & 1.0 \\
-NDX Dec & Regression, knots at \(2h\)
-  & 1.143 & 1.189 & 0.886 & 54.686 & 1.0 & 1.0 \\
-NDX Dec & Regression, knots at \(4h\)
-  & 2.341 & 2.342 & 2.341 & 2.218 & 1.0 & 1.0 \\
+NDX Dec & Smoothing spline
+  & 1.065 & 1.113 & 0.792 & 1.109 & 1.0 & 1.0 \\
 \midrule
 RUT Dec & \textbf{Ours}
   & 0.026 & 0.027 & 0.024 & 0.031 & 1.0 & 1.0 \\
 RUT Dec & PCA
   & 0.058 & 0.066 & 0.043 & 0.067 & 1.0 & 1.0 \\
-RUT Dec & Midpoint spline
-  & 0.048 & 0.041 & 0.055 & 0.149 & 1.0 & 1.0 \\
-RUT Dec & Regression, knots at \(2h\)
-  & 0.044 & 0.043 & 0.045 & 0.119 & 1.0 & 1.0 \\
-RUT Dec & Regression, knots at \(4h\)
-  & 0.266 & 0.264 & 0.268 & 0.265 & 1.0 & 1.0 \\
+RUT Dec & Smoothing spline
+  & 0.026 & 0.027 & 0.024 & 0.031 & 1.0 & 1.0 \\
 \midrule
 Average & \textbf{Ours}
   & 0.294 & 0.304 & 0.228 & 0.312 & 1.0 & 1.0 \\
 Average & PCA
   & 0.331 & 0.324 & 0.368 & 0.380 & 1.0 & 1.1 \\
-Average & Midpoint spline
-  & 0.306 & 0.309 & 0.274 & 0.423 & 1.0 & 1.0 \\
-Average & Regression, knots at \(2h\)
-  & 0.327 & 0.331 & 0.279 & 13.754 & 1.0 & 1.0 \\
-Average & Regression, knots at \(4h\)
-  & 0.827 & 0.774 & 0.931 & 0.836 & 1.0 & 1.0 \\
+Average & Smoothing spline
+  & 0.296 & 0.306 & 0.231 & 0.312 & 1.0 & 1.0 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-On the listed chains the midpoint spline has out-of-the-money error \(0.036\), \(0.067\), \(1.073\), and \(0.048\). The interpolating spline has \(0.036\), \(0.056\), \(1.057\), and \(0.026\), and PCA has \(0.051\), \(0.066\), \(1.151\), and \(0.058\). The March hold-out of the midpoint spline is \(0.151\). Knots at \(4h\) have out-of-the-money error \(0.270\), \(0.431\), \(2.341\), and \(0.266\). Knots at \(2h\) have NDX hold-out \(54.686\): on each even/odd half the largest miss is one call past \(1.2F\), priced \(744\) and \(617\) points above the quoted mid. Each midpoint fit and each regression fit has one peak, and mass and total variation print as \(1.0\). The estimator in the body is the interpolating spline at \eqref{eq:h-d2}.
+On SPX December, SPX March, and RUT the selected penalty leaves the listed prices on the interpolant. RUT's penalty is \(10^{-7}\), and the prices still match to the third decimal. On NDX the penalty is \(1.44\times 10^{-6}\). Out-of-the-money error moves from \(1.057\) to \(1.065\), and hold-out from \(1.110\) to \(1.109\). Each smoothing-spline density has one peak, and mass and total variation print as \(1.0\). The estimator reported in the body is the interpolant, which is the fit this rule selects when the thriced density is already unimodal and the corner is flat.
 
 \section*{Code and Data Availability}
+
 
 A Python implementation of \eqref{eq:thrice} and a replication script are available at \url{https://github.com/s-broda/RND}.
 
