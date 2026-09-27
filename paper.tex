@@ -764,7 +764,7 @@ Listed chains and noisy draws start from the decreasing-convex projection. On th
 
 \begin{table}[H]
 \centering
-\caption{Exact-quote integrated squared error on \([60,150]\) for the midpoint-secant spline of \ref{app:mid}, followed by tails and thricing at \eqref{eq:h-d2}. The first row is the interpolating spline at that bandwidth.}
+\caption{Exact-quote integrated squared error on \([60,150]\) for the midpoint pilots of \ref{app:mid}, followed by tails and thricing at \eqref{eq:h-d2}. The first row is the interpolating spline at that bandwidth.}
 \label{tab:app-mid-exact}
 {\scriptsize
 \setlength{\tabcolsep}{3pt}%
@@ -779,6 +779,7 @@ Listed chains and noisy draws start from the decreasing-convex projection. On th
 Thrice & 2.50e-8 & 9.98e-7 & 1.95e-5 & 5.67e-5 \\
 \(2h\) & 4.01e-8 & 1.44e-6 & 6.02e-5 & 8.70e-5 \\
 \(4h\) & 3.46e-6 & 2.30e-6 & 1.85e-4 & 1.33e-3 \\
+Averages & 7.15e-8 & 3.91e-6 & 2.60e-5 & 1.90e-4 \\
 \bottomrule
 \end{tabular}
 }
@@ -788,7 +789,7 @@ On exact quotes, spacing \(4h\) raises the error relative to the thriced interpo
 
 \begin{table}[H]
 \centering
-\caption{Mean integrated squared error on noisy Heston quotes for the midpoint-secant spline. The bandwidth is \eqref{eq:h-d2} of the projected draw. Thirty replications, as in Table~\ref{tab:heston-noise}.}
+\caption{Mean integrated squared error on noisy Heston quotes for the midpoint pilots. The bandwidth is \eqref{eq:h-d2} of the projected draw. Thirty replications, as in Table~\ref{tab:heston-noise}.}
 \label{tab:app-mid-noise}
 {\scriptsize
 \setlength{\tabcolsep}{4pt}%
@@ -798,6 +799,7 @@ On exact quotes, spacing \(4h\) raises the error relative to the thriced interpo
 \midrule
 \(2h\) & 3.84e-3 & 3.14e-3 \\
 \(4h\) & 3.88e-4 & 2.29e-4 \\
+Averages & 5.49e-3 & 3.48e-3 \\
 \bottomrule
 \end{tabular}
 }
@@ -807,7 +809,7 @@ The multiple \(\lambda=4\) is the spacing, of these two, that puts the noisy mea
 
 \begin{table}[H]
 \centering
-\caption{Listed out-of-the-money error and even/odd hold-out for the midpoint-secant spline, at the bandwidth \eqref{eq:h-d2} of the projected calls. The chains are those of Table~\ref{tab:listed}.}
+\caption{Listed out-of-the-money error and even/odd hold-out for the midpoint pilots, at the bandwidth \eqref{eq:h-d2} of the projected calls. The chains are those of Table~\ref{tab:listed}.}
 \label{tab:app-mid-listed}
 {\scriptsize
 \setlength{\tabcolsep}{4pt}%
@@ -821,12 +823,16 @@ The multiple \(\lambda=4\) is the spacing, of these two, that puts the noisy mea
 \(2h\), hold-out & 0.049 & 0.133 & 14.829 & 0.118 \\
 \(4h\), OTM & 0.270 & 0.431 & 2.341 & 0.266 \\
 \(4h\), hold-out & 0.294 & 0.565 & 2.219 & 0.265 \\
+Averages, OTM & 0.036 & 0.067 & 1.073 & 0.048 \\
+Averages, hold-out & 0.047 & 0.151 & 1.347 & 0.149 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
 On the listed chains each of these fits has one peak on \([0.55F,1.40F]\), and mass and total variation print as \(1.0\). At \(\lambda=4\) the out-of-the-money error is \(0.270\), \(0.431\), \(2.341\), and \(0.266\), and the hold-out error is \(0.294\), \(0.565\), \(2.219\), and \(0.265\). The interpolating spline in Table~\ref{tab:listed} has out-of-the-money error \(0.036\), \(0.056\), \(1.057\), and \(0.026\). At \(\lambda=2\) the out-of-the-money error is \(0.047\), \(0.075\), \(1.143\), and \(0.044\). The NDX hold-out at that spacing is \(14.829\): on each even/odd half the largest miss is a call past \(1.2F\), priced \(161\) and \(111\) points above the quoted mid. The estimator in Table~\ref{tab:listed} remains the interpolating spline at \eqref{eq:h-d2}.
+
+The rows labelled averages leave the secant regression out. The natural spline interpolates the midpoints, and the value at \(m_i\) is the average of \(P\) at the two adjacent strikes. Tails and thricing use the same \(h\) as the quotes that were averaged. On exact quotes the integrated squared error is \(7.15\times 10^{-8}\), \(3.91\times 10^{-6}\), \(2.60\times 10^{-5}\), and \(1.90\times 10^{-4}\). On the noisy draws the means fall from the thriced interpolant's \(5.93\times 10^{-3}\) and \(5.79\times 10^{-3}\) to \(5.49\times 10^{-3}\) and \(3.48\times 10^{-3}\). Both remain above the positive convolution and above the \(4h\) row. The listed out-of-the-money error is \(0.036\), \(0.067\), \(1.073\), and \(0.048\), and the hold-out error is \(0.047\), \(0.151\), \(1.347\), and \(0.149\). Each curve has one peak, and mass and total variation print as \(1.0\).
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:thrice} and a replication script are available at \url{https://github.com/s-broda/RND}.

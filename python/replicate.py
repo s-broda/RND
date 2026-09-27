@@ -1070,6 +1070,117 @@ def midpoint_pilot(n_reps=30, seed=20260923, sd=0.01, mults=(2.0, 4.0)):
             )
 
 
+def midpoint_average_calls(K, C, S0, r, T, q):
+    """Calls at the strike midpoints, each the average of the adjacent quotes.
+
+    The natural spline then interpolates these midpoints. Adjacent noise in
+    the complementary cdf is averaged before the spline is built.
+    """
+    K = np.asarray(K, dtype=float)
+    C = np.asarray(C, dtype=float)
+    stock = float(S0) * np.exp(-float(q) * float(T))
+    P = np.clip(1.0 - C / max(stock, 1e-12), 0.0, 1.0)
+    mids = 0.5 * (K[:-1] + K[1:])
+    Pav = 0.5 * (P[:-1] + P[1:])
+    return mids, np.maximum(stock * (1.0 - Pav), 0.0)
+
+
+def _midpoint_average_fit(K, C, S0, r, T, q, K_eval=None, K_price=None):
+    """Spline through midpoint averages, then tails and thricing at the original h."""
+    h = estimate_rnd(K, C, S0, r, T, q, h="deriv")["h"]
+    Km, Cm = midpoint_average_calls(K, C, S0, r, T, q)
+    fit = estimate_rnd(
+        Km, Cm, S0, r, T, q, K_eval=K_eval, K_price=K_price, h=h,
+        tails=True, higher=True,
+    )
+    fit["knots"] = int(Km.size)
+    return fit
+
+
+def _midpoint_average_holdout(sl):
+    errs = []
+    for train, test in _folds(len(sl.K)):
+        Kt = sl.K[train]
+        Ct = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
+        fit = _midpoint_average_fit(
+            Kt, Ct, sl.S0, sl.r, sl.T, sl.q, K_price=sl.K[test],
+        )
+        errs.append(_otm_rmse_slice(sl, fit["C"], test))
+    return float(np.mean(errs))
+
+
+def midpoint_average_pilot(n_reps=30, seed=20260923, sd=0.01):
+    """Natural spline through averaged midpoints, then thrice at the locked h.
+
+    Same noise stream as ``midpoint_pilot``: one Generator, dense then sparse.
+    """
+    print(f"\nMidpoint average  reps={n_reps}  iv sd={sd}  seed={seed}")
+    K_eval = np.linspace(60.0, 150.0, 401)
+    designs = (
+        ("Heston", BCC97,
+         lambda K, p: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc,
+         lambda ev, p: heston_spot_density(ev, p)),
+        ("VG", CM99,
+         lambda K, p: vg_calls(K, p),
+         lambda ev, p: vg_spot_density(ev, p)),
+    )
+    chains = (
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
+    )
+    for label, p, calls, dens in designs:
+        q_true = dens(K_eval, p)
+        print(f"  -- exact {label}")
+        for chain, K in chains:
+            C = np.maximum(calls(K, p), 0.0)
+            fit = _midpoint_average_fit(
+                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+            )
+            print(
+                f"    {chain:7} ISE={_ise(K_eval, fit['q'], q_true):.4e}  "
+                f"h={fit['h']:.4g}  knots={fit['knots']}"
+            )
+    rng = np.random.default_rng(seed)
+    p = BCC97
+    q_true = heston_spot_density(K_eval, p)
+    calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
+    for chain, K in chains:
+        C_true = np.maximum(calls(K), 0.0)
+        acc = []
+        for _rep in range(n_reps):
+            C = _projected_calls(
+                K, _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd),
+                p.r, p.T, p.forward,
+            )
+            fit = _midpoint_average_fit(
+                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+            )
+            acc.append(_ise(K_eval, fit["q"], q_true))
+        print(f"  -- noisy Heston {chain}  ISE={np.mean(acc):.4e}")
+    print("  -- listed")
+    for csv, title in (
+        ("spx_20261218.csv", "SPX Dec"),
+        ("spx_20270319.csv", "SPX Mar"),
+        ("ndx_20261218.csv", "NDX Dec"),
+        ("rut_20261218.csv", "RUT Dec"),
+    ):
+        sl = load_slice(RES / csv)
+        C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
+        s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
+        fit = _midpoint_average_fit(
+            sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K,
+        )
+        o, pu, ca = _otm(sl, fit["C"])
+        mass, peaks = _mass_peaks(sl.F, fit["q"], s)
+        tv = _variation(sl.F, fit["q"], s)
+        ho = _midpoint_average_holdout(sl)
+        print(
+            f"    {title:8} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
+            f"hold {ho:.3f} mass {mass:.1f} peaks {peaks} tv {tv:.1f} "
+            f"h={fit['h']:.2f} knots={fit['knots']}"
+        )
+
+
 def _knot_pilot(K, C, S0, r, T, q, b):
     """Least-squares natural cubic of the complementary cdf, knots spaced by ``b``."""
     from scipy.interpolate import CubicSpline
@@ -1148,6 +1259,7 @@ def main():
     noisy_heston()
     noise_pilots()
     midpoint_pilot()
+    midpoint_average_pilot()
     listed()
     print("DONE")
 
