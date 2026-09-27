@@ -4,7 +4,8 @@ Run from the repository root::
 
     python3 python/replicate.py
 
-Prints the Heston and variance-gamma ISE tables and the listed pricing table,
+Prints the Heston and variance-gamma ISE tables, including the listed
+competitors and a noisy Heston comparison, and the listed pricing table,
 and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
 figures/ccdf_listed.pdf, and figures/ccdf_listed_kern.pdf.
 """
@@ -151,7 +152,34 @@ def _exact(label, p, calls, q_true, K_eval):
             )
             plot.setdefault(chain, {})[{"Quoted spline": "quoted", "Tails": "tails", "Tails+Thrice": "higher"}[name]] = q_m
             plot[chain]["K"] = K
+        for name, h, q in _competitor_rows(K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval):
+            print(f"    {name:22} h={h:.4g} ISE={_ise(K_eval, q, q_true):.4e}")
     return rec, plot, K_eval, q_true
+
+
+def _competitor_rows(K, C, S0, r, T, q, F, K_eval):
+    """Listed competitors on one chain, each at the bandwidth its paper specifies."""
+    C = _projected_calls(K, np.maximum(np.asarray(C, float), 0.0), r, T, F)
+    rows = []
+    h = pca_cv_bandwidth(K, C, S0, r, T, q, F)
+    _, qhat, *_ = pca_fit(K, C, r, T, F, h, K[:1], K_eval)
+    rows.append(("PCA", h, qhat))
+    sig = _iv_on_calls(K, C, S0, r, T, q)
+    h_i = ghs_loo_bandwidth(K, sig)
+    for name, hh in (("GHS IV, 2×", 2.0 * h_i), ("GHS IV, CV", h_i)):
+        _, qhat = ghs_iv_fit(K, C, S0, r, T, q, F, K[:1], K_eval, hh)
+        rows.append((name, hh, qhat))
+    h = asd_bandwidth(K, C, r, T, F)
+    _, qhat, _ = asd_fit(K, C, S0, r, T, q, F, K[:1], K_eval, h)
+    rows.append(("Aït-Sahalia–Duarte", h, qhat))
+    h_c = ghs_loo_bandwidth(K, C)
+    for name, hh in (("GHS call, 2×", 2.0 * h_c), ("GHS call, CV", h_c)):
+        _, qhat = ghs_call_fit(K, C, S0, r, T, q, F, K[:1], K_eval, hh)
+        rows.append((name, hh, qhat))
+    h = asl_bandwidth(K, F)
+    _, qhat = asl_fit(K, C, S0, r, T, q, F, K[:1], K_eval, h)
+    rows.append(("Aït-Sahalia–Lo", h, qhat))
+    return rows
 
 
 def _figure_exact(path, K_eval, q_true, plot, title):
@@ -632,6 +660,8 @@ def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
         C_true = np.maximum(calls(K), 0.0)
         acc = {name: {rule: [] for rule in rules} for name, _, _ in specs}
         hs = {name: {rule: [] for rule in rules} for name, _, _ in specs}
+        comp = {}
+        comp_h = {}
         for _rep in range(n_reps):
             C_obs = _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd)
             C_proj = _projected_calls(K, C_obs, p.r, p.T, p.forward)
@@ -643,6 +673,11 @@ def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
                     )
                     acc[name][rule].append(_ise(K_eval, fit["q"], q_true))
                     hs[name][rule].append(fit["h"])
+            for name, h, q in _competitor_rows(
+                K, C_obs, p.S0, p.r, p.T, p.q, p.forward, K_eval
+            ):
+                comp.setdefault(name, []).append(_ise(K_eval, q, q_true))
+                comp_h.setdefault(name, []).append(h)
         print(f"  -- {chain}")
         for name, _, _ in specs:
             bits = []
@@ -651,7 +686,12 @@ def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
                     f"{rule} h={np.mean(hs[name][rule]):.3g} "
                     f"ISE={np.mean(acc[name][rule]):.4e}"
                 )
-            print(f"    {name:16} " + "  ".join(bits))
+            print(f"    {name:22} " + "  ".join(bits))
+        for name in comp:
+            print(
+                f"    {name:22} h={np.mean(comp_h[name]):.4g} "
+                f"ISE={np.mean(comp[name]):.4e}"
+            )
 
 
 def _kernel_stats(x, q):
@@ -893,6 +933,7 @@ def main():
     v = CM99
     rec_v, plot_v, _, qv = _exact("VG", v, lambda K: vg_calls(K, v), vg_spot_density(K_eval, v), K_eval)
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
+    noisy_heston()
     listed()
     print("DONE")
 
