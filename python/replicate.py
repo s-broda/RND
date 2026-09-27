@@ -6,8 +6,8 @@ Run from the repository root::
 
 Prints the Heston and variance-gamma ISE tables, including the listed
 competitors and a noisy Heston comparison, the listed pricing table, and
-the appendix pilots (including the midpoint-secant regression spline),
-and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
+the appendix scores for the midpoint spline and the direct regression
+splines, and writes figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
 figures/ccdf_listed.pdf, and figures/ccdf_listed_kern.pdf.
 """
 
@@ -922,15 +922,6 @@ def _holdout_kernel(sl, kind, which):
     return float(np.mean(errs))
 
 
-def _nw_prefilter(K, C, S0, r, T, q, b):
-    """Gaussian average of the complementary cdf, at bandwidth ``b``."""
-    stock = float(S0) * np.exp(-float(q) * float(T))
-    P = np.clip(1.0 - np.asarray(C, float) / max(stock, 1e-12), 0.0, 1.0)
-    d = (K[:, None] - K[None, :]) / max(float(b), 1e-8)
-    w = np.exp(-0.5 * d * d)
-    Ps = w @ P / np.maximum(w.sum(axis=1), 1e-12)
-    return stock * (1.0 - Ps)
-
 
 def _secant_spline(K, C, S0, r, T, q, h, mult):
     """Least-squares natural cubic of the midpoint secants of P.
@@ -959,17 +950,6 @@ def _secant_spline(K, C, S0, r, T, q, h, mult):
     coef = np.linalg.lstsq(B, sec, rcond=None)[0]
     return stock, P, knots, CubicSpline(knots, coef, bc_type="natural")
 
-
-def midpoint_secant_calls(K, C, S0, r, T, q, h, mult):
-    """Calls from the integrated midpoint-secant spline, mean-anchored against P."""
-    stock, P, knots, spl = _secant_spline(K, C, S0, r, T, q, h, mult)
-    K = np.asarray(K, dtype=float)
-    incr = np.zeros(K.size, dtype=float)
-    for i in range(1, K.size):
-        incr[i] = incr[i - 1] + float(spl.integrate(K[i - 1], K[i]))
-    level = float(np.mean(P - incr))
-    G = np.clip(level + incr, 0.0, 1.0)
-    return np.maximum(stock * (1.0 - G), 0.0), int(knots.size)
 
 
 def _J0(u):
@@ -1233,108 +1213,6 @@ def direct_secant_pilot(n_reps=30, seed=20260923, sd=0.01, mults=(2.0, 4.0)):
             )
 
 
-def _midpoint_fit(K, C, S0, r, T, q, mult, K_eval=None, K_price=None):
-    """Secant regression, then tails and thricing at the deriv bandwidth of C."""
-    h = estimate_rnd(K, C, S0, r, T, q, h="deriv")["h"]
-    Cc, n_knots = midpoint_secant_calls(K, C, S0, r, T, q, h, mult)
-    fit = estimate_rnd(
-        K, Cc, S0, r, T, q, K_eval=K_eval, K_price=K_price, h=h,
-        tails=True, higher=True,
-    )
-    fit["knots"] = n_knots
-    return fit
-
-
-def _midpoint_holdout(sl, mult):
-    errs = []
-    for train, test in _folds(len(sl.K)):
-        Kt = sl.K[train]
-        Ct = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
-        fit = _midpoint_fit(
-            Kt, Ct, sl.S0, sl.r, sl.T, sl.q, mult, K_price=sl.K[test],
-        )
-        errs.append(_otm_rmse_slice(sl, fit["C"], test))
-    return float(np.mean(errs))
-
-
-def midpoint_pilot(n_reps=30, seed=20260923, sd=0.01, mults=(2.0, 4.0)):
-    """Appendix: midpoint-secant spline, then thrice at the locked deriv width.
-
-    The noise stream is one Generator, dense chain then sparse, matching
-    ``noisy_heston`` and ``noise_pilots``.
-    """
-    print(f"\nMidpoint secant  reps={n_reps}  iv sd={sd}  seed={seed}")
-    K_eval = np.linspace(60.0, 150.0, 401)
-    designs = (
-        ("Heston", BCC97,
-         lambda K, p: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc,
-         lambda ev, p: heston_spot_density(ev, p)),
-        ("VG", CM99,
-         lambda K, p: vg_calls(K, p),
-         lambda ev, p: vg_spot_density(ev, p)),
-    )
-    chains = (
-        ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 32)),
-    )
-    for label, p, calls, dens in designs:
-        q_true = dens(K_eval, p)
-        print(f"  -- exact {label}")
-        for chain, K in chains:
-            C = np.maximum(calls(K, p), 0.0)
-            for mult in mults:
-                fit = _midpoint_fit(
-                    K, C, p.S0, p.r, p.T, p.q, mult, K_eval=K_eval,
-                )
-                ise = _ise(K_eval, fit["q"], q_true)
-                print(
-                    f"    {chain:7} {mult:g}h  ISE={ise:.4e}  "
-                    f"h={fit['h']:.4g}  knots={fit['knots']}"
-                )
-    rng = np.random.default_rng(seed)
-    p = BCC97
-    q_true = heston_spot_density(K_eval, p)
-    calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
-    for chain, K in chains:
-        C_true = np.maximum(calls(K), 0.0)
-        acc = {mult: [] for mult in mults}
-        for _rep in range(n_reps):
-            C = _projected_calls(
-                K, _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd),
-                p.r, p.T, p.forward,
-            )
-            for mult in mults:
-                fit = _midpoint_fit(
-                    K, C, p.S0, p.r, p.T, p.q, mult, K_eval=K_eval,
-                )
-                acc[mult].append(_ise(K_eval, fit["q"], q_true))
-        print(f"  -- noisy Heston {chain}")
-        for mult in mults:
-            print(f"    {mult:g}h  ISE={np.mean(acc[mult]):.4e}")
-    print("  -- listed")
-    for csv, title in (
-        ("spx_20261218.csv", "SPX Dec"),
-        ("spx_20270319.csv", "SPX Mar"),
-        ("ndx_20261218.csv", "NDX Dec"),
-        ("rut_20261218.csv", "RUT Dec"),
-    ):
-        sl = load_slice(RES / csv)
-        C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
-        s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
-        for mult in mults:
-            fit = _midpoint_fit(
-                sl.K, C, sl.S0, sl.r, sl.T, sl.q, mult, K_eval=s, K_price=sl.K,
-            )
-            o, pu, ca = _otm(sl, fit["C"])
-            mass, peaks = _mass_peaks(sl.F, fit["q"], s)
-            tv = _variation(sl.F, fit["q"], s)
-            ho = _midpoint_holdout(sl, mult)
-            print(
-                f"    {title:8} {mult:g}h  OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
-                f"hold {ho:.3f} mass {mass:.1f} peaks {peaks} tv {tv:.1f} "
-                f"h={fit['h']:.2f} knots={fit['knots']}"
-            )
-
 
 def midpoint_average_calls(K, C, S0, r, T, q):
     """Calls at the strike midpoints, each the average of the adjacent quotes.
@@ -1447,68 +1325,6 @@ def midpoint_average_pilot(n_reps=30, seed=20260923, sd=0.01):
         )
 
 
-def _knot_pilot(K, C, S0, r, T, q, b):
-    """Least-squares natural cubic of the complementary cdf, knots spaced by ``b``."""
-    from scipy.interpolate import CubicSpline
-
-    stock = float(S0) * np.exp(-float(q) * float(T))
-    P = np.clip(1.0 - np.asarray(C, float) / max(stock, 1e-12), 0.0, 1.0)
-    idx = [0]
-    for i in range(1, len(K) - 1):
-        if K[i] - K[idx[-1]] >= b:
-            idx.append(i)
-    if idx[-1] != len(K) - 1:
-        idx.append(len(K) - 1)
-    knots = K[np.array(idx)]
-    eye = np.eye(len(knots))
-    A = np.column_stack([
-        CubicSpline(knots, eye[j], bc_type="natural")(K) for j in range(len(knots))
-    ])
-    coef = np.linalg.lstsq(A, P, rcond=None)[0]
-    return stock * (1.0 - CubicSpline(knots, coef, bc_type="natural")(K))
-
-
-def noise_pilots(n_reps=30, seed=20260923, sd=0.01):
-    """Appendix pilots. The convolution bandwidth stays the deriv rule."""
-    print(f"\nNoise pilots  reps={n_reps}  iv sd={sd}  seed={seed}")
-    rng = np.random.default_rng(seed)
-    p = BCC97
-    K_eval = np.linspace(60.0, 150.0, 401)
-    q_true = heston_spot_density(K_eval, p)
-    calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
-    specs = (
-        ("Thrice", True, None),
-        ("No thrice", False, None),
-        ("NW at h/4, then thrice", True, "nw"),
-        ("Knots at h, then thrice", True, "knot"),
-    )
-    for chain, K in (
-        ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 32)),
-    ):
-        C_true = np.maximum(calls(K), 0.0)
-        acc = {name: [] for name, _, _ in specs}
-        for _rep in range(n_reps):
-            C = _projected_calls(
-                K, _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd),
-                p.r, p.T, p.forward,
-            )
-            h = estimate_rnd(K, C, p.S0, p.r, p.T, p.q, h="deriv")["h"]
-            for name, higher, kind in specs:
-                Cc = C
-                if kind == "nw":
-                    Cc = _nw_prefilter(K, C, p.S0, p.r, p.T, p.q, h / 4.0)
-                elif kind == "knot":
-                    Cc = _knot_pilot(K, C, p.S0, p.r, p.T, p.q, h)
-                fit = estimate_rnd(
-                    K, Cc, p.S0, p.r, p.T, p.q, K_eval=K_eval, h=h,
-                    tails=True, higher=higher,
-                )
-                acc[name].append(_ise(K_eval, fit["q"], q_true))
-        print(f"  -- {chain}")
-        for name, _, _ in specs:
-            print(f"    {name:26} ISE={np.mean(acc[name]):.4e}")
-
 
 def main():
     K_eval = np.linspace(60.0, 150.0, 401)
@@ -1523,8 +1339,6 @@ def main():
     rec_v, plot_v, _, qv = _exact("VG", v, lambda K: vg_calls(K, v), vg_spot_density(K_eval, v), K_eval)
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
     noisy_heston()
-    noise_pilots()
-    midpoint_pilot()
     midpoint_average_pilot()
     direct_secant_pilot()
     listed()
