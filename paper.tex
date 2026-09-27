@@ -486,11 +486,11 @@ PCA & 8.55e-8 & 3.39e-4 & 2.05e-4 & 9.29e-3 \\
 }
 \end{table}
 
-The same designs are repeated with noise in the quotes. Black--Scholes implied volatility receives independent \(N(0,0.01^{2})\) noise. Values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Each replication starts from the projection of those calls, and the penalty is chosen on that draw. Table~\ref{tab:heston-noise} reports the mean integrated squared error over thirty replications of the Heston chains. The smoothing spline has mean \(2.22\times 10^{-4}\) on the dense chain and \(2.58\times 10^{-4}\) on the sparse chain. The positive convolution is \(4.36\times 10^{-4}\) and \(3.61\times 10^{-4}\).
+The same designs are repeated with noise in the quotes. Black--Scholes implied volatility receives independent \(N(0,0.01^{2})\) noise. Values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Each replication starts from the projection of those calls, and the penalty of Section~\ref{sec:penalty} is chosen on that draw. Table~\ref{tab:heston-noise} is that comparison. Ours is the smoothing spline. The same spline with the penalty switched off, the interpolant at \(c=0\), has mean integrated squared error \(5.93\times 10^{-3}\) on the dense chain and \(5.79\times 10^{-3}\) on the sparse chain. With the penalty chosen as in Section~\ref{sec:penalty}, the means are \(2.22\times 10^{-4}\) and \(2.58\times 10^{-4}\). The positive convolution is \(4.36\times 10^{-4}\) and \(3.61\times 10^{-4}\). Every other row in the table is larger.
 
 \begin{table}[H]
 \centering
-\caption{Mean integrated squared error on \([60,150]\) for noisy Heston quotes. Implied volatility is perturbed by \(N(0,0.01^{2})\) noise. Thirty replications. Ours chooses the penalty of Section~\ref{sec:penalty} on each draw, at the bandwidth \eqref{eq:h-d2}. Each other row uses that estimator's bandwidth from Section~\ref{sec:emp}.}
+\caption{Mean integrated squared error on \([60,150]\) for noisy Heston quotes. Implied volatility is perturbed by \(N(0,0.01^{2})\) noise. Thirty replications. Ours is the smoothing spline of Section~\ref{sec:penalty}, at the bandwidth \eqref{eq:h-d2}, with the penalty chosen on each draw. The interpolant is that spline at \(c=0\). Each other row uses that estimator's bandwidth from Section~\ref{sec:emp}.}
 \label{tab:heston-noise}
 {\scriptsize
 \setlength{\tabcolsep}{4pt}%
@@ -499,7 +499,8 @@ The same designs are repeated with noise in the quotes. Black--Scholes implied v
 \multicolumn{1}{@{}c}{Estimator} &
   \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
 \midrule
-Ours & 2.22e-4 & 2.58e-4 \\
+\textbf{Ours} & 2.22e-4 & 2.58e-4 \\
+Interpolant, \(c=0\) & 5.93e-3 & 5.79e-3 \\
 PCA & 4.36e-4 & 3.61e-4 \\
 \citeauthor{grith2012}, IV, \(2\times\) & 2.56e-3 & 1.20e-1 \\
 \citeauthor{grith2012}, IV, CV & 1.56e-2 & 3.55e-2 \\
