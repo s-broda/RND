@@ -26,7 +26,7 @@ PY = Path(__file__).resolve().parent
 ROOT = PY.parent
 sys.path.insert(0, str(PY))
 
-from rnd import estimate_rnd
+from rnd import _Phi, _knots, _phi, _right_wing, _smooth, estimate_rnd
 from src import black_scholes as bs
 from src.competitors import (
     asd_bandwidth,
@@ -932,13 +932,12 @@ def _nw_prefilter(K, C, S0, r, T, q, b):
     return stock * (1.0 - Ps)
 
 
-def midpoint_secant_calls(K, C, S0, r, T, q, h, mult):
-    """Calls from a least-squares natural cubic of the midpoint secants of P.
+def _secant_spline(K, C, S0, r, T, q, h, mult):
+    """Least-squares natural cubic of the midpoint secants of P.
 
-    The secant of the complementary cdf between two strikes is the average
-    slope on that interval, so the observation sits at the midpoint. Knots
-    are equally spaced by ``mult * h``. The cubic is integrated back to a
-    complementary cdf and anchored by the mean residual against P.
+    The secant between two strikes is the average slope on that interval, so
+    the observation sits at the midpoint. Knots are equally spaced by
+    ``mult * h``.
     """
     from scipy.interpolate import CubicSpline
 
@@ -958,13 +957,280 @@ def midpoint_secant_calls(K, C, S0, r, T, q, h, mult):
         CubicSpline(knots, eye[j], bc_type="natural")(mids) for j in range(knots.size)
     ])
     coef = np.linalg.lstsq(B, sec, rcond=None)[0]
-    spl = CubicSpline(knots, coef, bc_type="natural")
+    return stock, P, knots, CubicSpline(knots, coef, bc_type="natural")
+
+
+def midpoint_secant_calls(K, C, S0, r, T, q, h, mult):
+    """Calls from the integrated midpoint-secant spline, mean-anchored against P."""
+    stock, P, knots, spl = _secant_spline(K, C, S0, r, T, q, h, mult)
+    K = np.asarray(K, dtype=float)
     incr = np.zeros(K.size, dtype=float)
     for i in range(1, K.size):
         incr[i] = incr[i - 1] + float(spl.integrate(K[i - 1], K[i]))
     level = float(np.mean(P - incr))
     G = np.clip(level + incr, 0.0, 1.0)
     return np.maximum(stock * (1.0 - G), 0.0), int(knots.size)
+
+
+def _J0(u):
+    return u * _Phi(u) + _phi(u)
+
+
+def _J1(u):
+    return 0.5 * u * u * _Phi(u) + 0.5 * u * _phi(u) - 0.5 * _Phi(u)
+
+
+def _J2(u):
+    return u ** 3 * _Phi(u) / 3.0 + u * u * _phi(u) / 3.0 + 2.0 * _phi(u) / 3.0
+
+
+def _J3(u):
+    return (
+        u ** 4 * _Phi(u) / 4.0
+        + u ** 3 * _phi(u) / 4.0
+        + 0.75 * u * _phi(u)
+        - 0.75 * _Phi(u)
+    )
+
+
+def _convolve_slope(x, cells, h):
+    """Closed form of ``(g * κ_h)'`` and ``g * K_h`` for a piecewise-cubic slope.
+
+    On a cell, ``g(y) = a + b(y-L) + c(y-L)^2 + d(y-L)^3``. A quadratic cell
+    (``d = 0``) is the integrand in the cubic-spline formula. The ``u^3``
+    integrals are elementary, so a cubic cell stays closed form.
+    """
+    x = np.atleast_1d(np.asarray(x, dtype=float))
+    h = max(float(h), 1e-6)
+    dconv = np.zeros(x.shape, dtype=float)
+    level = np.zeros(x.shape, dtype=float)
+    for L, R, a, b, c, d in cells:
+        uL = (x - L) / h
+        uR = (x - R) / h
+        hu = h * uL
+        A0 = a + b * hu + c * hu ** 2 + d * hu ** 3
+        A1 = -(b * h + 2.0 * c * h * hu + 3.0 * d * h * hu ** 2)
+        A2 = c * h * h + 3.0 * d * h * h * hu
+        A3 = -d * h ** 3
+        I0 = _Phi(uL) - _Phi(uR)
+        I1 = -_phi(uL) + _phi(uR)
+        I2 = (-uL * _phi(uL) + _Phi(uL)) - (-uR * _phi(uR) + _Phi(uR))
+        I3 = -(uL ** 2 + 2.0) * _phi(uL) + (uR ** 2 + 2.0) * _phi(uR)
+        dA0 = b + 2.0 * c * hu + 3.0 * d * hu ** 2
+        dA1 = -(2.0 * c * h + 6.0 * d * h * hu)
+        dA2 = 3.0 * d * h * h
+        dI0 = (_phi(uL) - _phi(uR)) / h
+        dI1 = (uL * _phi(uL) - uR * _phi(uR)) / h
+        dI2 = (uL ** 2 * _phi(uL) - uR ** 2 * _phi(uR)) / h
+        dI3 = (uL ** 3 * _phi(uL) - uR ** 3 * _phi(uR)) / h
+        dconv += (
+            dA0 * I0 + A0 * dI0 + dA1 * I1 + A1 * dI1
+            + dA2 * I2 + A2 * dI2 + A3 * dI3
+        )
+        level += h * (
+            A0 * (_J0(uL) - _J0(uR))
+            + A1 * (_J1(uL) - _J1(uR))
+            + A2 * (_J2(uL) - _J2(uR))
+            + A3 * (_J3(uL) - _J3(uR))
+        )
+    return dconv, level
+
+
+def _slope_cells(K, C, r, T, F, knots, spl):
+    """Pieces of the secant spline, with constant-slope tails matched at the ends."""
+    cells = []
+    k0 = float(knots[0])
+    if k0 > 1e-8:
+        cells.append((0.0, k0, float(spl(k0)), 0.0, 0.0, 0.0))
+    for L, R in zip(knots[:-1], knots[1:]):
+        cells.append((
+            float(L), float(R),
+            float(spl(L, 0)), float(spl(L, 1)),
+            0.5 * float(spl(L, 2)), float(spl(L, 3)) / 6.0,
+        ))
+    disc = float(np.exp(-float(r) * float(T)))
+    spec = _right_wing(K, C, F, disc)
+    k1 = float(knots[-1])
+    if spec is not None and float(spec[3]) > k1 + 1e-6:
+        cells.append((k1, float(spec[3]), float(spl(k1)), 0.0, 0.0, 0.0))
+    return cells
+
+
+def _check_slope_closed_form():
+    """Quadratic cells match ``_smooth``. A cubic cell matches a trapezoidal integral."""
+    from scipy.interpolate import CubicSpline
+
+    K = np.linspace(70.0, 140.0, 32)
+    p = BCC97
+    C = np.maximum(
+        carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc, 0.0,
+    )
+    stock = p.S0 * np.exp(-p.q * p.T)
+    Ks, Ps = _knots(K, C, stock, p.forward, p.disc, tails=True)
+    spl = CubicSpline(Ks, Ps, bc_type="natural")
+    cells = [
+        (
+            float(L), float(R),
+            float(spl(L, 1)), float(spl(L, 2)), 0.5 * float(spl(L, 3)), 0.0,
+        )
+        for L, R in zip(Ks[:-1], Ks[1:])
+    ]
+    x = np.linspace(60.0, 150.0, 81)
+    h = 2.5
+    d_new, G_new = _convolve_slope(x, cells, h)
+    d_old, G_old, _ = _smooth(x, Ks, spl, h)
+    err_d = float(np.max(np.abs(d_new - d_old)))
+    err_G = float(np.max(np.abs(G_new - G_old)))
+    A, B, Cc, D = 0.01, 1.2e-4, -1.5e-7, 3e-10
+    y = np.linspace(0.0, 160.0, 20001)
+    gy = A + B * y + Cc * y ** 2 + D * y ** 3
+    xs = np.array([40.0, 80.0, 120.0])
+    d_hat, G_hat = _convolve_slope(xs, [(0.0, 160.0, A, B, Cc, D)], h)
+    eps = 1e-2
+    def _conv_at(z):
+        kap = np.exp(-0.5 * ((z - y) / h) ** 2) / (h * np.sqrt(2.0 * np.pi))
+        return float(np.trapezoid(gy * kap, y))
+    d_num = np.array([(_conv_at(z + eps) - _conv_at(z - eps)) / (2.0 * eps) for z in xs])
+    level = np.array([
+        float(np.trapezoid(gy * _Phi((z - y) / h), y)) for z in xs
+    ])
+    err_dnum = float(np.max(np.abs(d_hat - d_num)))
+    err_level = float(np.max(np.abs(G_hat - level)))
+    print(
+        f"  closed form  vs spline formula  d={err_d:.2e} G={err_G:.2e}  "
+        f"vs trapezoid  d={err_dnum:.2e} level={err_level:.2e}"
+    )
+    if max(err_d, err_G, err_dnum, err_level) > 1e-5:
+        raise RuntimeError("slope convolution does not match the closed form")
+    return err_d, err_G, err_dnum, err_level
+
+
+def _direct_secant_fit(K, C, S0, r, T, q, mult, K_eval=None, K_price=None):
+    """Thrice the midpoint-secant spline directly. No second interpolant.
+
+    The spline is the slope in the closed-form convolution. The level's
+    constant of integration is the mean residual against P at the quoted
+    strikes; the density does not depend on it.
+    """
+    K = np.asarray(K, dtype=float)
+    C = np.asarray(C, dtype=float)
+    h = estimate_rnd(K, C, S0, r, T, q, h="deriv")["h"]
+    stock, P, knots, spl = _secant_spline(K, C, S0, r, T, q, h, mult)
+    F = float(S0) * np.exp((float(r) - float(q)) * float(T))
+    cells = _slope_cells(K, C, r, T, F, knots, spl)
+    weights = ((1.0, 8.0 / 3.0), (np.sqrt(2.0), -2.0), (2.0, 1.0 / 3.0))
+    targets = []
+    if K_eval is not None:
+        targets.append(np.asarray(K_eval, dtype=float))
+    targets.append(K)
+    if K_price is not None:
+        targets.append(np.asarray(K_price, dtype=float))
+    grid = np.unique(np.concatenate(targets))
+    d_tot = np.zeros(grid.size, dtype=float)
+    G_tot = np.zeros(grid.size, dtype=float)
+    for fac, w in weights:
+        d_one, G_one = _convolve_slope(grid, cells, h * fac)
+        d_tot += w * d_one
+        G_tot += w * G_one
+    anchor = float(np.mean(P - np.interp(K, grid, G_tot)))
+    G_tot = G_tot + anchor
+    out = {"h": float(h), "knots": int(knots.size), "q": None, "C": None}
+    if K_eval is not None:
+        out["q"] = -F * np.interp(np.asarray(K_eval, dtype=float), grid, d_tot)
+    if K_price is not None:
+        G = np.clip(np.interp(np.asarray(K_price, dtype=float), grid, G_tot), 0.0, 1.0)
+        out["C"] = np.maximum(stock * (1.0 - G), 0.0)
+    return out
+
+
+def _direct_secant_holdout(sl, mult):
+    errs = []
+    for train, test in _folds(len(sl.K)):
+        Kt = sl.K[train]
+        Ct = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
+        fit = _direct_secant_fit(
+            Kt, Ct, sl.S0, sl.r, sl.T, sl.q, mult, K_price=sl.K[test],
+        )
+        errs.append(_otm_rmse_slice(sl, fit["C"], test))
+    return float(np.mean(errs))
+
+
+def direct_secant_pilot(n_reps=30, seed=20260923, sd=0.01, mults=(2.0, 4.0)):
+    """Appendix: convolve the midpoint-secant spline itself, at the locked h.
+
+    Same noise stream as the other pilots: one Generator, dense then sparse.
+    """
+    print(f"\nDirect secant  reps={n_reps}  iv sd={sd}  seed={seed}")
+    _check_slope_closed_form()
+    K_eval = np.linspace(60.0, 150.0, 401)
+    designs = (
+        ("Heston", BCC97,
+         lambda K, p: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc,
+         lambda ev, p: heston_spot_density(ev, p)),
+        ("VG", CM99,
+         lambda K, p: vg_calls(K, p),
+         lambda ev, p: vg_spot_density(ev, p)),
+    )
+    chains = (
+        ("dense", np.linspace(30.0, 220.0, 256)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
+    )
+    for label, p, calls, dens in designs:
+        q_true = dens(K_eval, p)
+        print(f"  -- exact {label}")
+        for chain, K in chains:
+            C = np.maximum(calls(K, p), 0.0)
+            for mult in mults:
+                fit = _direct_secant_fit(
+                    K, C, p.S0, p.r, p.T, p.q, mult, K_eval=K_eval,
+                )
+                print(
+                    f"    {chain:7} {mult:g}h  ISE={_ise(K_eval, fit['q'], q_true):.4e}  "
+                    f"h={fit['h']:.4g}  knots={fit['knots']}"
+                )
+    rng = np.random.default_rng(seed)
+    p = BCC97
+    q_true = heston_spot_density(K_eval, p)
+    calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
+    for chain, K in chains:
+        C_true = np.maximum(calls(K), 0.0)
+        acc = {mult: [] for mult in mults}
+        for _rep in range(n_reps):
+            C = _projected_calls(
+                K, _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd),
+                p.r, p.T, p.forward,
+            )
+            for mult in mults:
+                fit = _direct_secant_fit(
+                    K, C, p.S0, p.r, p.T, p.q, mult, K_eval=K_eval,
+                )
+                acc[mult].append(_ise(K_eval, fit["q"], q_true))
+        print(f"  -- noisy Heston {chain}")
+        for mult in mults:
+            print(f"    {mult:g}h  ISE={np.mean(acc[mult]):.4e}")
+    print("  -- listed")
+    for csv, title in (
+        ("spx_20261218.csv", "SPX Dec"),
+        ("spx_20270319.csv", "SPX Mar"),
+        ("ndx_20261218.csv", "NDX Dec"),
+        ("rut_20261218.csv", "RUT Dec"),
+    ):
+        sl = load_slice(RES / csv)
+        C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
+        s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
+        for mult in mults:
+            fit = _direct_secant_fit(
+                sl.K, C, sl.S0, sl.r, sl.T, sl.q, mult, K_eval=s, K_price=sl.K,
+            )
+            o, pu, ca = _otm(sl, fit["C"])
+            mass, peaks = _mass_peaks(sl.F, fit["q"], s)
+            tv = _variation(sl.F, fit["q"], s)
+            ho = _direct_secant_holdout(sl, mult)
+            print(
+                f"    {title:8} {mult:g}h  OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
+                f"hold {ho:.3f} mass {mass:.1f} peaks {peaks} tv {tv:.1f} "
+                f"h={fit['h']:.2f} knots={fit['knots']}"
+            )
 
 
 def _midpoint_fit(K, C, S0, r, T, q, mult, K_eval=None, K_price=None):
@@ -1260,6 +1526,7 @@ def main():
     noise_pilots()
     midpoint_pilot()
     midpoint_average_pilot()
+    direct_secant_pilot()
     listed()
     print("DONE")
 
