@@ -54,7 +54,7 @@ This paper uses one bandwidth for both objects, that rate with a short constant,
 
 We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{yatchew2006} replace the quoted calls by the nearest decreasing convex list; the second differences of that list are a discrete nonnegative measure, not a curve, so that projection is not in the comparison below. \citet{aitsahalia2003} smooth the same constrained list with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}. The interpolant can lie below the \citeauthor{yatchew2006} floor because it is not required to be convex. 
 
-The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency for exact quotes and for noisy quotes. Section~\ref{sec:h} chooses bandwidths that meet those conditions and compares them on exact Heston and variance-gamma quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
+The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency for exact quotes and for noisy quotes. Section~\ref{sec:h} chooses bandwidths that meet those conditions and compares the spline with the estimators of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
 
 \section{Related Work}
 \label{sec:lit}
@@ -446,6 +446,65 @@ Sparse & Tails+Thrice
 
 On the dense chain the wings again do not move the digits. Thricing cuts the mesh error from \(5.08\times 10^{-5}\) to \(4.90\times 10^{-6}\), against an oracle \(4.04\times 10^{-7}\). At \eqref{eq:h-d2} the thriced error is \(1.43\times 10^{-5}\) (\(h=1.18\)). The density of \(S_T\) is more peaked than under Heston, and the absolute errors are larger. On the sparse chain the quoted spline without tails has mesh error \(0.105\). Tails bring the plain mesh error to \(1.25\times 10^{-3}\), and thricing lowers it to \(3.00\times 10^{-4}\) at the mesh and \(4.67\times 10^{-5}\) at \eqref{eq:h-d2} (\(h=1.46\)), against an oracle \(3.13\times 10^{-5}\). Here the mesh bandwidth \(h=2.71\) is the wider of the two. Figure~\ref{fig:vg-rnd} plots the three estimators at the mesh bandwidth.
 
+Table~\ref{tab:sim-comp} scores the estimators of Section~\ref{sec:emp} on the same four chains. Each of those fits starts from the decreasing-convex projection and uses the bandwidth rule of that section, recomputed on the chain. The thriced spline is reported at both rules of this section. On dense Heston the mesh bandwidth has integrated squared error \(7.12\times 10^{-12}\). The cross-validated implied-volatility cubic is next among the single-bandwidth rows, at \(6.24\times 10^{-9}\), and it is the smallest error on sparse Heston, \(5.66\times 10^{-7}\), against \(9.35\times 10^{-7}\) for the thriced spline at \eqref{eq:h-d2}. On dense variance gamma the mesh error \(4.90\times 10^{-6}\) is below that cubic's \(2.16\times 10^{-5}\). On sparse variance gamma the thriced spline at \eqref{eq:h-d2} has error \(4.67\times 10^{-5}\), below the cubic's \(2.53\times 10^{-4}\). The Appendix~A bandwidth of \citeauthor{aitsahalia1998} and the plug-in local linear of \citeauthor{aitsahalia2003} are larger on every chain. The leave-one-out call cubic is between the two.
+
+\begin{table}[H]
+\centering
+\caption{Integrated squared error on \([60,150]\) for the estimators of Section~\ref{sec:emp}. The thriced spline is shown at \eqref{eq:h-mesh} and at \eqref{eq:h-d2}. Each other row uses that estimator's bandwidth from Section~\ref{sec:emp}. \citeauthor{grith2012} is shown at the leave-one-out width and at twice that width.}
+\label{tab:sim-comp}
+{\scriptsize
+\setlength{\tabcolsep}{4pt}%
+\begin{tabular}{@{}l *{4}{S[table-format=1.2e-1, scientific-notation=true]}@{}}
+\toprule
+\multicolumn{1}{@{}c}{Estimator} &
+  \multicolumn{1}{c}{Heston dense} & \multicolumn{1}{c}{Heston sparse} &
+  \multicolumn{1}{c}{VG dense} & \multicolumn{1}{c}{VG sparse} \\
+\midrule
+Tails+Thrice, mesh & 7.12e-12 & 1.14e-6 & 4.90e-6 & 3.00e-4 \\
+Tails+Thrice, \(n^{-1/9}\) & 1.16e-8 & 9.35e-7 & 1.43e-5 & 4.67e-5 \\
+PCA & 8.55e-8 & 3.39e-4 & 2.05e-4 & 9.29e-3 \\
+\citeauthor{grith2012}, IV, \(2\times\) & 9.27e-8 & 4.34e-6 & 1.15e-4 & 7.03e-4 \\
+\citeauthor{grith2012}, IV, CV & 6.24e-9 & 5.66e-7 & 2.16e-5 & 2.53e-4 \\
+\citeauthor{aitsahalia2003} & 6.13e-4 & 2.32e-5 & 6.47e-3 & 1.13e-3 \\
+\citeauthor{grith2012}, call, \(2\times\) & 1.14e-5 & 6.32e-4 & 4.45e-4 & 6.25e-3 \\
+\citeauthor{grith2012}, call, CV & 7.52e-7 & 5.59e-5 & 5.39e-5 & 1.36e-3 \\
+\citeauthor{aitsahalia1998} & 1.11e-3 & 1.09e-3 & 1.05e-2 & 6.78e-3 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+The same designs are repeated with noise in the quotes. Black--Scholes implied volatility receives independent \(N(0,0.01^{2})\) noise. Values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Each replication starts from the projection of those calls. Table~\ref{tab:heston-noise} reports the mean integrated squared error over thirty replications of the Heston chains. On the dense chain the quoted spline and the tailed spline coincide. On the sparse chain the quoted spline remains near \(10^{-1}\). Thricing raises the error relative to the tailed spline at both bandwidths: on the dense chain, \(4.07\times 10^{-2}\) against \(1.69\times 10^{-2}\) at the mesh and \(7.65\times 10^{-3}\) against \(2.37\times 10^{-3}\) at \eqref{eq:h-d2}. The positive convolution has the smallest mean on both chains, \(4.36\times 10^{-4}\) dense and \(3.61\times 10^{-4}\) sparse.
+
+\begin{table}[H]
+\centering
+\caption{Mean integrated squared error on \([60,150]\) for noisy Heston quotes. Implied volatility is perturbed by \(N(0,0.01^{2})\) noise. Thirty replications. Bandwidth rules as in Table~\ref{tab:sim-comp}.}
+\label{tab:heston-noise}
+{\scriptsize
+\setlength{\tabcolsep}{4pt}%
+\begin{tabular}{@{}l *{2}{S[table-format=1.2e-1, scientific-notation=true]}@{}}
+\toprule
+\multicolumn{1}{@{}c}{Estimator} &
+  \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
+\midrule
+Quoted spline, mesh & 1.69e-2 & 1.05e-1 \\
+Quoted spline, \(n^{-1/9}\) & 2.37e-3 & 1.24e-1 \\
+Tails, mesh & 1.69e-2 & 1.21e-3 \\
+Tails, \(n^{-1/9}\) & 2.37e-3 & 2.27e-3 \\
+Tails+Thrice, mesh & 4.07e-2 & 4.25e-3 \\
+Tails+Thrice, \(n^{-1/9}\) & 7.65e-3 & 7.71e-3 \\
+PCA & 4.36e-4 & 3.61e-4 \\
+\citeauthor{grith2012}, IV, \(2\times\) & 2.56e-3 & 1.20e-1 \\
+\citeauthor{grith2012}, IV, CV & 1.56e-2 & 3.55e-2 \\
+\citeauthor{aitsahalia2003} & 5.95e-4 & 2.99e-3 \\
+\citeauthor{grith2012}, call, \(2\times\) & 2.17e-3 & 1.43e-3 \\
+\citeauthor{grith2012}, call, CV & 1.54e-2 & 1.08e-3 \\
+\citeauthor{aitsahalia1998} & 1.61e-3 & 1.11e-3 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
 \section{Empirical Applications}
 \label{sec:emp}
 
@@ -633,7 +692,7 @@ The average out-of-the-money hold-out error is \(0.306\) for the estimator of th
 \section{Conclusion}
 \label{sec:conc}
 
-The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. The Appendix A bandwidth of the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} leaves one peak and mass \(1.0\), with out-of-the-money error \(31.225\), \(75.231\), \(179.751\), and \(12.871\). The constrained local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth has error \(4.272\), \(7.837\), \(16.023\), and \(2.224\). The leave-one-out call cubic of \citeauthor{grith2012} reprices in sample, and twice that width is the curve in their comparison figure; neither width holds out on the far wing. On the four listed chains the spline has one peak and mass \(1.0\), and its out-of-the-money error is below the mixture on each chain. PCA remains a mixture of normals of fixed bandwidth.
+The estimator is a kernel smooth of one expiry at the second-derivative bandwidth \eqref{eq:h-d2}. \citet{aitsahalia1998}, \citet{aitsahalia2003}, \citet{grith2012}, \citet{jackwerth2004}, and \citet{figlewski2018} warn that a kernel density on one expiry is unimodal only after the bandwidth is widened further, and that the bandwidth which prices leaves the peaks. The Appendix A bandwidth of the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} leaves one peak and mass \(1.0\), with out-of-the-money error \(31.225\), \(75.231\), \(179.751\), and \(12.871\). The constrained local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth has error \(4.272\), \(7.837\), \(16.023\), and \(2.224\). The leave-one-out call cubic of \citeauthor{grith2012} reprices in sample, and twice that width is the curve in their comparison figure; neither width holds out on the far wing. On exact quotes the thriced spline at the mesh bandwidth has the smallest integrated squared error on dense Heston and on dense variance gamma, and at \eqref{eq:h-d2} on sparse variance gamma. On sparse Heston the cross-validated implied-volatility cubic is smaller. With noise in implied volatility the positive convolution has the smaller mean integrated squared error, and thricing raises the spline's error relative to the tailed spline. On the four listed chains the spline has one peak and mass \(1.0\), and its out-of-the-money error is below the mixture on each chain. PCA remains a mixture of normals of fixed bandwidth.
 
 \section*{Code and Data Availability}
 A Python implementation of \eqref{eq:thrice} and a replication script are available at \url{https://github.com/s-broda/RND}.
