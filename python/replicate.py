@@ -109,7 +109,7 @@ def _exact(label, p, calls, q_true, K_eval):
     plot = {}
     for chain, K in (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 32)),
+        ("sparse", np.linspace(70.0, 140.0, 16)),
     ):
         C = np.maximum(calls(K), 0.0)
         delta = float(np.median(np.diff(K)))
@@ -241,7 +241,7 @@ def _figure_exact(path, K_eval, q_true, plot, title):
         ax.set_xlim(60, 150)
         ax.set_ylim(0.0, 1.18 * float(np.nanmax(q_true)))
         ax.set_xlabel(r"Strike $K$")
-        ax.set_title("Dense, $m=256$" if chain == "dense" else "Sparse, $m=32$")
+        ax.set_title("Dense, $m=256$" if chain == "dense" else "Sparse, $m=16$")
         ax.legend(frameon=False)
     axes[0].set_ylabel(r"$f_{\mathbb{Q}}(K)$")
     fig.tight_layout(w_pad=2.4)
@@ -696,7 +696,7 @@ def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
     rules = ("mesh", "deriv")
     for chain, K in (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 32)),
+        ("sparse", np.linspace(70.0, 140.0, 16)),
     ):
         C_true = np.maximum(calls(K), 0.0)
         acc = {name: {rule: [] for rule in rules} for name, _, _ in specs}
@@ -833,7 +833,7 @@ def literature():
         q_true = np.asarray(q_true, float)
         for chain, K in (
             ("dense", np.linspace(30.0, 220.0, 256)),
-            ("sparse", np.linspace(70.0, 140.0, 32)),
+            ("sparse", np.linspace(70.0, 140.0, 16)),
         ):
             C = np.maximum(calls(K), 0.0)
             F = float(model.forward)
@@ -847,7 +847,7 @@ def literature():
     names = ("AS-Lo", "GHS call", "GHS IV", "ASD", "Ours mesh", "Ours deriv")
     for chain, K in (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 32)),
+        ("sparse", np.linspace(70.0, 140.0, 16)),
     ):
         C_true = np.maximum(calls(K), 0.0)
         acc = {name: [] for name in names}
@@ -1080,7 +1080,7 @@ def _check_slope_closed_form():
     """Quadratic cells match ``_smooth``. A cubic cell matches a trapezoidal integral."""
     from scipy.interpolate import CubicSpline
 
-    K = np.linspace(70.0, 140.0, 32)
+    K = np.linspace(70.0, 140.0, 16)
     p = BCC97
     C = np.maximum(
         carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc, 0.0,
@@ -1193,7 +1193,7 @@ def direct_secant_pilot(n_reps=30, seed=20260923, sd=0.01, mults=(2.0, 4.0)):
     )
     chains = (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 32)),
+        ("sparse", np.linspace(70.0, 140.0, 16)),
     )
     for label, p, calls, dens in designs:
         q_true = dens(K_eval, p)
@@ -1310,7 +1310,7 @@ def midpoint_average_pilot(n_reps=30, seed=20260923, sd=0.01):
     )
     chains = (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 32)),
+        ("sparse", np.linspace(70.0, 140.0, 16)),
     )
     for label, p, calls, dens in designs:
         q_true = dens(K_eval, p)
@@ -1491,7 +1491,7 @@ def smoothing_spline_pilot(n_reps=30, seed=20260923, sd=0.01):
     )
     chains = (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 32)),
+        ("sparse", np.linspace(70.0, 140.0, 16)),
     )
     for label, p, calls, dens in designs:
         q_true = dens(K_eval, p)
