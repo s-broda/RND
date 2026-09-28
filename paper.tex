@@ -47,7 +47,7 @@ risk-neutral density \sep option prices \sep kernel estimation \sep in-fill cons
 
 \citet{breeden1978} identified the risk-neutral density of the underlying at a fixed expiry with the second strike derivative of the corresponding European call, scaled by a discount factor. The identity assumes a twice differentiable price curve. A market supplies a finite ordered list of strikes and a quote at each knot. Numerical second differentiation of that list is ill-posed: interpolants oscillate, change sign, and depend on the interpolating scheme. The literature responds with parametric mixtures and Gram--Charlier expansions, implied-volatility interpolants, local polynomials of the call, and \citet{bondarenko2003}'s positive convolution approximation, which forces the density to be a mixture of a positive kernel with a discrete probability fitted to prices. Section~\ref{sec:lit} reviews these approaches.
 
-This paper estimates that density from the empirical measure of a single maturity. The calls are rescaled to a complementary distribution, which records the risk-neutral jumps in strike. A smoothing spline fits the measure: a natural cubic, with a penalty on the second derivative that is zero when the thriced density is already unimodal and positive when that derivative is noisy. A Gaussian damping of the characteristic function of the spline inverts in closed form. The same smoothing is the density and, after one integration, the call. Tails complete the unquoted wings, and thricing raises the order of the kernel. With those pieces in place, the estimator converges to the true density on the interior of a compact interval as the strike mesh fills that interval and the bandwidth tends to zero, and the same limit holds for noisy quotes when \(nh^{5}\to\infty\). The consistency argument is proved for the interpolating spline. On the exact designs below the selected penalty is zero, so the reported fit is that spline.
+This paper estimates that density from the empirical measure of a single maturity. The calls are rescaled to a complementary distribution, which records the risk-neutral jumps in strike. A smoothing spline fits the measure: a natural cubic, with a penalty on the second derivative that is zero when the thriced density is already unimodal and positive when that derivative is noisy. A Gaussian damping of the characteristic function of the spline inverts in closed form. The same smoothing is the density and, after one integration, the call. Tails complete the unquoted wings, and thricing raises the order of the kernel. With those pieces in place, the estimator converges to the true density on the interior of a compact interval as the strike mesh fills that interval and the bandwidth tends to zero, and the same limit holds for noisy quotes when \(nh^{5}\to\infty\). The exact-quote argument is proved for the interpolating spline. On the exact designs below the selected penalty is zero, so the reported fit is that spline. The noise argument extends to a penalty chosen from any fixed finite grid of \(c\), which is the rule of Section~\ref{sec:penalty}.
 
 We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{aitsahalia2003} smooth a decreasing-convex projection of the calls with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. \citet{aitsahalia1998} smooth implied volatility, and \citet{grith2012} use a local cubic of the call and of implied volatility. On the listed chains of Section~\ref{sec:emp} the out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}, and on noisy Heston quotes the mean integrated squared error is below it as well.
 
@@ -329,14 +329,37 @@ uniformly for \(K\) in a compact subset of \((A,B)\). The hypothesis \(n_m h_m^5
 Thricing replaces \(L\) by a fixed linear combination of three such kernels and does not change the order of the variance. The bias expansion remains the one in the proof of Theorem~\ref{thm:ifc}.
 \end{proof}
 
+\begin{theorem}
+\label{thm:noise-pen}
+Keep the assumptions of Theorem~\ref{thm:noise}. Let the penalty \(c\) in \eqref{eq:smooth-penalty} be any random variable taking values in a fixed finite set \(\mathcal{C}\subset[0,\infty)\), and let \(F\) stay fixed along the sequence. Form the smoothing spline, the tails, and \eqref{eq:thrice} from the noisy knots. Then \(\hat f_{\Q}^{\mathrm{th}}\) converges in probability to \(f_{\Q}\), uniformly on every compact subset of \((A,B)\).
+\end{theorem}
+
+\begin{proof}
+A maximum over the finite set \(\mathcal{C}\) of terms that converge to zero in probability still converges to zero. It is therefore enough to fix \(c\in\mathcal{C}\) and to write \(\lambda=c F^3\), a constant. At \(c=0\) the claim is Theorem~\ref{thm:noise}. The smoothing spline is linear in the knot values for this fixed \(\lambda\), so the fitted function is the spline of the true knots plus the spline of \((\eta_i^{(m)})\).
+
+On the true knots, let \(P^{\mathrm{cs}}\) be the interpolant and \(P_{\lambda}\) the smoothing spline. The variational inequality gives
+\[
+\sum_i\bigl(P(K_i)-P_{\lambda}(K_i)\bigr)^2
+\;\le\;
+\lambda\int (P^{\mathrm{cs}\prime\prime})^2,
+\]
+and the integral stays bounded because \(P\) is \(C^4\) and \(P^{\mathrm{cs}\prime\prime}\) converges to \(P''\) on the interior of the grid. The difference \(P^{\mathrm{cs}}-P_{\lambda}\) is the interpolating spline of these residuals. Once \(h_m/\delta_m\to\infty\), its contribution to \((\,\cdot\,'\ast\kappa_{h_m})'\) is within \(o(1)\) of
+\[
+\sum_i r_i\,\delta_i\,h_m^{-3}L\bigl((K-K_i)/h_m\bigr).
+\]
+Cauchy--Schwarz and the same counting as in Theorem~\ref{thm:noise} bound the sum by a constant times \((\lambda/(n_m h_m^5))^{1/2}\). The hypothesis \(n_m h_m^5\to\infty\) sends it to zero, uniformly on compact subsets of \((A,B)\). The interpolant \(P^{\mathrm{cs}}\) is covered by Theorem~\ref{thm:ifc}, so the penalized spline of the true knots has the same limit.
+
+On the noise, the Demmler--Reinsch basis diagonalizes both the empirical inner product and the penalty. The smoothing spline multiplies the coefficient of the \(j\)th basis function by \((1+\lambda\rho_j)^{-1}\) with \(\rho_j\ge 0\). Every linear functional of the fitted spline therefore has variance at most its variance at \(\lambda=0\). The map from the knots to \((S_\eta'\ast\kappa_{h_m})'(K)\) is such a functional, and at \(\lambda=0\) its variance is the \(O(1/(n_m h_m^5))\) bound in the proof of Theorem~\ref{thm:noise}. The noise piece is therefore \(o_p(1)\), uniformly on those compacts, by the same Chebyshev and Lipschitz argument. Thricing again replaces the kernel by a fixed linear combination and does not change the order.
+\end{proof}
+
 \begin{remark}
-Theorem~\ref{thm:ifc} is a statement about exact quotes. Theorem~\ref{thm:noise} is the corresponding statement about additive noise in \(P\). Neither is a statement about the far tails outside \([A,B]\). The equivalent kernel of \eqref{eq:thrice} takes negative values, so the thriced estimator is not necessarily a density. The empirical section fits the spline to the decreasing-convex projection of the quoted calls. When the true call lies in the interior of that cone, the projection changes the knots by an amount of the same stochastic order as \(\eta_i\), and the bandwidth condition of Theorem~\ref{thm:noise} still applies.
+Theorem~\ref{thm:ifc} is a statement about exact quotes. Theorems~\ref{thm:noise} and \ref{thm:noise-pen} are the corresponding statements about additive noise in \(P\). None of the three is a statement about the far tails outside \([A,B]\). The equivalent kernel of \eqref{eq:thrice} takes negative values, so the thriced estimator is not necessarily a density. The empirical section fits the spline to the decreasing-convex projection of the quoted calls. When the true call lies in the interior of that cone, the projection changes the knots by an amount of the same stochastic order as \(\eta_i\), and the bandwidth condition of Theorem~\ref{thm:noise} still applies.
 \end{remark}
 
 \section{Choice of Bandwidth}
 \label{sec:h}
 
-The width \(h\) is the only tuning constant in \eqref{eq:thrice}. Two rules are used below. Each is checked against Theorems~\ref{thm:ifc} and \ref{thm:noise}.
+The width \(h\) is the bandwidth in \eqref{eq:thrice}. Two rules are used below. Each is checked against Theorems~\ref{thm:ifc} and \ref{thm:noise}. The penalty \(c\) is chosen from a fixed finite grid, and Theorem~\ref{thm:noise-pen} gives the same limit for every choice on that grid.
 
 With exact quotes the bias is the usual \(O(h^2)\) kernel bias, or \(O(h^6)\) after thricing, and the spline error vanishes with the mesh. For a Gaussian it is enough that \(h\) be a small multiple of the typical quoted gap. Write \(\delta\) for the median of \(\{K_i-K_{i-1}\}\) on the quoted strikes, not on the filled wings, and take
 \begin{equation}
