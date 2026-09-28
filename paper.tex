@@ -261,7 +261,7 @@ which is the Fourier transform of \(\tfrac83\kappa_h-2\kappa_{h\sqrt{2}}+\tfrac1
 \end{equation}
 and the same combination is applied to \(\hat P\) in \eqref{eq:cubic}. The equivalent kernel takes negative values, so \(\hat f_{\Q}^{\mathrm{th}}\) is not a density. The call is \(S_0e^{-qT}(1-\hat P^{\mathrm{th}})\), with \(\hat P^{\mathrm{th}}\) clipped to \([0,1]\) and both premiums floored at zero.
 
-Thricing a truncated distribution amplifies leakage from the missing tails, so it is applied only after Section~\ref{sec:tails}.
+The correction is large because a call is an integral of \(f_{\Q}\). Thus \(P\) is smoother than the density by two derivatives, and the bias expansion is the expansion of that integral against a Gaussian. A bandwidth of order \(n^{-1/9}\) balances an \(O(h^2)\) bias against a variance of order \(1/(nh^5)\), so on exact quotes that bias is the leading error. Twicing cancels it, and thricing cancels the \(O(h^4)\) term that replaces it. The negative sidelobes have width proportional to \(h\). On the quoted strikes alone the natural spline sets \(P''=0\) at the extreme quotes, inside the window the density is read from. The knots of Section~\ref{sec:tails} move that boundary to \(0\) and to \(K_{\mathrm{end}}\), so the sidelobes integrate the completed tails. On a truncated strip the same kernel amplifies the missing mass, which is why thricing is applied only after that completion.
 
 \section{In-Fill Consistency}
 \label{sec:ifc}
