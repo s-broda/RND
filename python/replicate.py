@@ -539,6 +539,7 @@ def _plot_listed(scored):
     for row, (title, sl, bundle) in enumerate(x for x in scored if x[0] in want):
         fit, h, s = bundle["fit"], bundle["h"], bundle["s"]
         q_asd, q_pca, q_ghs_c = bundle["q_asd"], bundle["q_pca"], bundle["q_ghs_c"]
+        q_asl = bundle["q_asl"]
         C_pca, C_ghs_c = bundle["C_pca"], bundle["C_ghs_c"]
         C_asl = bundle["C_asl"]
         print(
@@ -547,20 +548,23 @@ def _plot_listed(scored):
         )
         ax = axes[row, 0]
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
-        ymax = 1.15 * np.nanmax(np.maximum(fit["q"][core], 0))
+        ymax = 1.15 * np.nanmax(np.maximum(np.concatenate([
+            fit["q"][core], q_asl[core],
+        ]), 0))
         h_ours, = ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.5, label="Ours", zorder=5)
         h_pca, = ax.plot(s, np.maximum(q_pca, 0), color="#2ca02c", lw=1.15, ls="-.", label="PCA", zorder=4)
         h_ghs_c, = ax.plot(s, np.maximum(q_ghs_c, 0), color="#ff7f0e", lw=1.15, label="GHS, call, 2×", zorder=4)
         h_asd, = ax.plot(s, np.maximum(q_asd, 0), color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte", zorder=3)
+        h_asl_d, = ax.plot(s, np.maximum(q_asl, 0), color="#d62728", lw=1.05, ls=":", label="Aït-Sahalia–Lo", zorder=4)
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlim(0.55 * sl.F, 1.40 * sl.F)
         ax.set_ylim(0, ymax)
         ax.set_title(title)
         ax.set_xlabel(r"Strike $K$")
         ax.legend(
-            [h_ours, h_pca, h_ghs_c, h_asd],
-            ["Ours", "PCA", "GHS, call, 2×", "Aït-Sahalia–Duarte"],
-            frameon=False, fontsize=7.5, loc="upper right",
+            [h_ours, h_pca, h_ghs_c, h_asd, h_asl_d],
+            ["Ours", "PCA", "GHS, call, 2×", "Aït-Sahalia–Duarte", "Aït-Sahalia–Lo"],
+            frameon=False, fontsize=7.0, loc="upper right",
         )
         if row == 0:
             ax.set_ylabel(r"$f_{\mathbb{Q}}(K)$")
@@ -608,7 +612,6 @@ def _plot_listed(scored):
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
         ymax = 1.15 * np.nanmax(np.maximum(fit["q"][core], 0))
         ax = axes[row, 0]
-        ax.plot(s, np.maximum(bundle["q_asl"], 0), color="#d62728", lw=1.0, ls="--", label="Aït-Sahalia–Lo")
         ax.plot(s, np.maximum(bundle["q_ghs_cv"], 0), color="#ff7f0e", lw=1.0, ls=":", label="GHS call, CV")
         ax.plot(s, np.maximum(bundle["q_ghs_iv_cv"], 0), color="#17becf", lw=1.0, ls="--", label="GHS IV, CV")
         ax.plot(s, np.maximum(bundle["q_ghs_i"], 0), color="#17becf", lw=1.15, ls="-.", label="GHS IV, 2×")
@@ -621,11 +624,9 @@ def _plot_listed(scored):
         if row == 0:
             ax.set_ylabel(r"$f_{\mathbb{Q}}(K)$")
 
-        P_asl, C_asl = _parity(sl, bundle["C_asl"])
         P_cv, C_cv = _parity(sl, bundle["C_ghs_cv"])
         P_iv, C_iv = _parity(sl, bundle["C_ghs_iv_cv"])
         P_ghs_i, C_ghs_i = _parity(sl, bundle["C_ghs_i"])
-        iv_asl = _otm_iv(sl, P_asl, C_asl)
         iv_cv = _otm_iv(sl, P_cv, C_cv)
         iv_iv = _otm_iv(sl, P_iv, C_iv)
         iv_ghs_i = _otm_iv(sl, P_ghs_i, C_ghs_i)
@@ -633,11 +634,10 @@ def _plot_listed(scored):
         lo, hi = 0.55 * sl.F, 1.40 * sl.F
         show = np.isfinite(iv_m) & (sl.K >= lo) & (sl.K <= hi)
         ax = axes[row, 1]
-        y1, y2 = _iv_ylim([iv_m[show], iv_asl[show], iv_cv[show], iv_iv[show], iv_ghs_i[show]])
+        y1, y2 = _iv_ylim([iv_m[show], iv_cv[show], iv_iv[show], iv_ghs_i[show]])
         ax.set_xlim(lo, hi)
         ax.set_ylim(y1, y2)
         ax.plot(sl.K[show], iv_m[show], "k.", ms=2.6, alpha=0.40, label="Market", zorder=2)
-        ax.plot(sl.K[show], iv_asl[show], color="#d62728", lw=1.05, ls="--", label="Aït-Sahalia–Lo", zorder=4)
         ax.plot(sl.K[show], iv_cv[show], color="#ff7f0e", lw=1.0, ls=":", label="GHS call, CV", zorder=4)
         ax.plot(sl.K[show], iv_iv[show], color="#17becf", lw=1.0, ls="--", label="GHS IV, CV", zorder=5)
         ax.plot(sl.K[show], iv_ghs_i[show], color="#17becf", lw=1.15, ls="-.", label="GHS IV, 2×", zorder=5)
