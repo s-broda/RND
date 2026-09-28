@@ -1328,10 +1328,10 @@ def midpoint_average_pilot(n_reps=30, seed=20260923, sd=0.01):
 _SMOOTH_C = np.array([0.0, *np.geomspace(1e-7, 3e-4, 16)])
 
 
-def _smoothing_base(K, C, S0, r, T, q):
+def _smoothing_base(K, C, S0, r, T, q, h_rule="deriv"):
     K = np.asarray(K, float)
     C = np.asarray(C, float)
-    h = estimate_rnd(K, C, S0, r, T, q, h="deriv")["h"]
+    h = estimate_rnd(K, C, S0, r, T, q, h=h_rule)["h"]
     disc = float(np.exp(-float(r) * float(T)))
     stock = float(S0) * np.exp(-float(q) * float(T))
     F = float(S0) * np.exp((float(r) - float(q)) * float(T))
@@ -1415,20 +1415,21 @@ def _smoothing_fit_at(base, c, K_eval=None, K_price=None):
     return out
 
 
-def smoothing_spline_fit(K, C, S0, r, T, q, K_eval=None, K_price=None):
+def smoothing_spline_fit(K, C, S0, r, T, q, K_eval=None, K_price=None, h_rule="deriv"):
     """Thriced smoothing spline of P. The penalty is chosen on this chain."""
-    base = _smoothing_base(K, C, S0, r, T, q)
+    base = _smoothing_base(K, C, S0, r, T, q, h_rule=h_rule)
     rows = [_score_smoothing_c(base, c) for c in _SMOOTH_C]
     c = _choose_smoothing_c(rows)
     return _smoothing_fit_at(base, c, K_eval=K_eval, K_price=K_price)
 
 
-def _smoothing_holdout(sl):
+def _smoothing_holdout(sl, h_rule="deriv"):
     errs = []
     for train, test in _folds(len(sl.K)):
         Ct = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
         fit = smoothing_spline_fit(
             sl.K[train], Ct, sl.S0, sl.r, sl.T, sl.q, K_price=sl.K[test],
+            h_rule=h_rule,
         )
         errs.append(_otm_rmse_slice(sl, fit["C"], test))
     return float(np.mean(errs))

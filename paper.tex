@@ -595,7 +595,7 @@ Hold-out refits the projection and every tuned method on the training strikes on
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=98.6\), \(165.9\), \(606.0\), \(59.0\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. \citeauthor{aitsahalia1998} uses the Appendix A bandwidth, in moneyness units \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. The bold method name is the spline.}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the cubic-spline inversion at \eqref{eq:h-d2} (\(h=98.6\), \(165.9\), \(606.0\), \(59.0\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. \citeauthor{aitsahalia1998} uses the Appendix A bandwidth, in moneyness units \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. The bold method name is the spline at \eqref{eq:h-d2}. The mesh row uses the same smoothing spline at \eqref{eq:h-mesh}, with widths \(h=12.0\), \(30.0\), \(120.0\), and \(12.0\).}
 \label{tab:listed}
 {\scriptsize
 \setlength{\tabcolsep}{3pt}%
@@ -609,6 +609,8 @@ Hold-out refits the projection and every tuned method on the training strikes on
 \midrule
 SPX Dec & \textbf{Ours}
   & 0.036 & 0.034 & 0.041 & 0.041 & 1.0 & 1.0 \\
+SPX Dec & Ours, mesh
+  & 0.037 & 0.033 & 0.048 & 1.419 & 1.0 & 1.0 \\
 SPX Dec & PCA
   & 0.051 & 0.053 & 0.048 & 0.055 & 1.0 & 1.0 \\
 SPX Dec & \citeauthor{grith2012}, IV, \(2\times\)
@@ -626,6 +628,8 @@ SPX Dec & \citeauthor{aitsahalia1998}
 \midrule
 SPX Mar & \textbf{Ours}
   & 0.056 & 0.052 & 0.067 & 0.066 & 1.0 & 1.0 \\
+SPX Mar & Ours, mesh
+  & 0.066 & 0.054 & 0.092 & 0.054 & 1.0 & 1.0 \\
 SPX Mar & PCA
   & 0.066 & 0.061 & 0.077 & 0.075 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{grith2012}, IV, \(2\times\)
@@ -643,6 +647,8 @@ SPX Mar & \citeauthor{aitsahalia1998}
 \midrule
 NDX Dec & \textbf{Ours}
   & 1.065 & 1.113 & 0.792 & 1.109 & 1.0 & 1.0 \\
+NDX Dec & Ours, mesh
+  & 1.441 & 1.219 & 2.228 & 1.291 & 1.0 & 1.0 \\
 NDX Dec & PCA
   & 1.151 & 1.117 & 1.304 & 1.324 & 1.0 & 1.3 \\
 NDX Dec & \citeauthor{grith2012}, IV, \(2\times\)
@@ -660,6 +666,8 @@ NDX Dec & \citeauthor{aitsahalia1998}
 \midrule
 RUT Dec & \textbf{Ours}
   & 0.026 & 0.027 & 0.024 & 0.031 & 1.0 & 1.0 \\
+RUT Dec & Ours, mesh
+  & 0.029 & 0.027 & 0.031 & 0.536 & 1.0 & 1.0 \\
 RUT Dec & PCA
   & 0.058 & 0.066 & 0.043 & 0.067 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV, \(2\times\)
@@ -677,6 +685,8 @@ RUT Dec & \citeauthor{aitsahalia1998}
 \midrule
 Average & \textbf{Ours}
   & 0.296 & 0.306 & 0.231 & 0.312 & 1.0 & 1.0 \\
+Average & Ours, mesh
+  & 0.393 & 0.333 & 0.600 & 0.825 & 1.0 & 1.0 \\
 Average & PCA
   & 0.331 & 0.324 & 0.368 & 0.380 & 1.0 & 1.1 \\
 Average & \citeauthor{grith2012}, IV, \(2\times\)
@@ -698,7 +708,7 @@ Average & \citeauthor{aitsahalia1998}
 
 On SPX December the quoted calls sit \(0.022\) from the decreasing-convex cone, so a fit that stays inside the cone cannot undercut that error. The local linear of \citeauthor{aitsahalia2003} at the plug-in bandwidth is \(4.272\), \(7.837\), \(16.023\), and \(2.224\). With a Gaussian kernel on the spot and a width chosen by pricing error, PCA out-of-the-money error is \(0.051\) on SPX December, \(0.066\) on SPX March, \(1.151\) on NDX December, and \(0.058\) on RUT December. The NDX density has four peaks.
 
-The estimator of this paper is the smoothing spline of \(P\) in \eqref{eq:smooth-penalty}, with tails and thricing, at \eqref{eq:h-d2}. The pricing error is \(0.036\), \(0.056\), \(1.065\), and \(0.026\). The hold-out error is \(0.041\), \(0.066\), \(1.109\), and \(0.031\). Each of the four curves has one peak on \([0.55F,1.40F]\) and mass \(1.0\). On SPX December, SPX March, and RUT the selected penalty leaves the prices on the interpolant. On NDX the penalty is \(1.44\times 10^{-6}\).
+The estimator of this paper is the smoothing spline of \(P\) in \eqref{eq:smooth-penalty}, with tails and thricing, at \eqref{eq:h-d2}. The pricing error is \(0.036\), \(0.056\), \(1.065\), and \(0.026\). The hold-out error is \(0.041\), \(0.066\), \(1.109\), and \(0.031\). Each of the four curves has one peak on \([0.55F,1.40F]\) and mass \(1.0\). On SPX December, SPX March, and RUT the selected penalty leaves the prices on the interpolant. On NDX the penalty is \(1.44\times 10^{-6}\). At the mesh bandwidth the same spline has out-of-the-money error \(0.037\), \(0.066\), \(1.441\), and \(0.029\), and hold-out \(1.419\), \(0.054\), \(1.291\), and \(0.536\). Each mesh density still has one peak, and mass and total variation print as \(1.0\).
 
 \citeauthor{aitsahalia1998}, at the Appendix A bandwidth, has error \(31.225\), \(75.231\), \(179.751\), and \(12.871\), with one peak on each chain and mass \(1.0\). The cross-validated call cubic of \citeauthor{grith2012} prices at \(0.029\), \(0.042\), \(0.867\), and \(0.022\), and the doubled width at \(0.031\), \(0.152\), \(0.946\), and \(0.056\). The cross-validated implied-volatility cubic prices at \(0.031\), \(0.051\), \(0.867\), and \(0.026\), and the doubled width at \(0.032\), \(0.165\), \(0.946\), and \(0.042\). The call cubic's hold-out is \(14.653\), \(18.635\), \(79.411\), and \(7.026\) at the cross-validated width, and \(9.964\), \(1.339\), \(40.791\), and \(0.432\) at twice that width. Those errors sit in the far wing, where a one-sided local cubic on the held-out strikes misses the put.
 
