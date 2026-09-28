@@ -119,31 +119,43 @@ def _exact(label, p, calls, q_true, K_eval):
         specs = (
             ("Quoted spline", False, False),
             ("Tails", True, False),
+            ("Tails+Twice", True, "twice"),
             ("Tails+Thrice", True, True),
         )
         for name, tails, higher in specs:
+            def _q(h, tails=tails, higher=higher):
+                if higher == "twice":
+                    q1 = estimate_rnd(
+                        K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+                        h=float(h), tails=True, higher=False,
+                    )["q"]
+                    q2 = estimate_rnd(
+                        K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+                        h=float(h) * np.sqrt(2.0), tails=True, higher=False,
+                    )["q"]
+                    return 2.0 * q1 - q2
+                return estimate_rnd(
+                    K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
+                    h=h, tails=tails, higher=higher,
+                )["q"]
             best, best_h = np.inf, hs[len(hs) // 2]
             for h in hs:
-                q = estimate_rnd(
-                    K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                    h=float(h), tails=tails, higher=higher,
-                )["q"]
-                err = _ise(K_eval, q, q_true)
+                err = _ise(K_eval, _q(float(h)), q_true)
                 if err < best:
                     best, best_h = err, float(h)
-            fit_m = estimate_rnd(
-                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                h="mesh", tails=tails, higher=higher,
-            )
-            fit_9 = estimate_rnd(
-                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                h="deriv", tails=tails, higher=higher,
-            )
-            q_m, q_9 = fit_m["q"], fit_9["q"]
+            h_mesh = estimate_rnd(
+                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval[:1],
+                h="mesh", tails=tails, higher=False,
+            )["h"]
+            h_9 = estimate_rnd(
+                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval[:1],
+                h="deriv", tails=tails, higher=False,
+            )["h"]
+            q_m, q_9 = _q(h_mesh), _q(h_9)
             rec[chain][name] = dict(
                 h_star=best_h, ise_star=best,
-                h_mesh=fit_m["h"], ise_mesh=_ise(K_eval, q_m, q_true),
-                h_9=fit_9["h"], ise_9=_ise(K_eval, q_9, q_true),
+                h_mesh=h_mesh, ise_mesh=_ise(K_eval, q_m, q_true),
+                h_9=h_9, ise_9=_ise(K_eval, q_9, q_true),
             )
             row = rec[chain][name]
             print(
@@ -151,8 +163,10 @@ def _exact(label, p, calls, q_true, K_eval):
                 f"mesh {row['h_mesh']:.4g} {row['ise_mesh']:.4e}  "
                 f"n^-1/9 {row['h_9']:.4g} {row['ise_9']:.4e}"
             )
-            plot.setdefault(chain, {})[{"Quoted spline": "quoted", "Tails": "tails", "Tails+Thrice": "higher"}[name]] = q_m
-            plot[chain]["K"] = K
+            key = {"Quoted spline": "quoted", "Tails": "tails", "Tails+Thrice": "higher"}.get(name)
+            if key is not None:
+                plot.setdefault(chain, {})[key] = q_m
+            plot.setdefault(chain, {})["K"] = K
         for name, h, q in _competitor_rows(K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval):
             print(f"    {name:22} h={h:.4g} ISE={_ise(K_eval, q, q_true):.4e}")
     return rec, plot, K_eval, q_true
