@@ -384,11 +384,11 @@ Sparse & Tails+Thrice
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/ccdf_heston_rnd.pdf}
-\caption{Heston density of \(S_T\) on \([60,150]\). Quoted spline, tails, and tails plus thrice from Table~\ref{tab:heston-tail}, each at the mesh bandwidth \eqref{eq:h-mesh}. Sparse quoted strikes are marked on the true density. Curves are truncated at zero, and the vertical scale is that of the true density.}
+\caption{Heston density of \(S_T\) on \([60,150]\). Quoted spline, tails, tails plus twice, and tails plus thrice from Table~\ref{tab:heston-tail}, each at the mesh bandwidth \eqref{eq:h-mesh}. Sparse quoted strikes are marked on the true density. Curves are truncated at zero, and the vertical scale is that of the true density.}
 \label{fig:heston-rnd}
 \end{figure}
 
-On the dense grid the first strike lies left of the window and the last call is already zero, so the wings do not move the error. Twicing lowers the mesh error, and thricing lowers it further, close to its oracle. The bandwidth \eqref{eq:h-d2} is wider than the mesh, and the error is larger. On the sparse grid the quoted spline without tails misses the window. The left line \eqref{eq:left} restores it, and each of the two higher-order kernels then reduces the error. Figure~\ref{fig:heston-rnd} plots the quoted spline, the tails, and tails plus thrice at the mesh bandwidth.
+On the dense grid the first strike lies left of the window and the last call is already zero, so the wings do not move the error. Twicing lowers the mesh error, and thricing lowers it further, close to its oracle. The bandwidth \eqref{eq:h-d2} is wider than the mesh, and the error is larger. On the sparse grid the quoted spline without tails misses the window. The left line \eqref{eq:left} restores it, and each of the two higher-order kernels then reduces the error. Figure~\ref{fig:heston-rnd} plots the quoted spline, tails, tails plus twice, and tails plus thrice at the mesh bandwidth.
 
 Table~\ref{tab:vg-tail} repeats the design for the variance-gamma process of \citet{madan1998}. The process parameters are those of \citet{carrmadan1999}: \(\sigma=0.12\), \(\nu=0.2\), \(\theta=-0.14\). Spot, rate, dividend yield, and maturity are as above, as are the two strike grids and the ISE window. Variance gamma is a pure-jump L\'evy process. The true density of \(\log S_T\) is a modified Bessel function \citep{madan1998}; the density of \(S_T\) is that formula times \(1/K\). Calls are the discounted payoff of that density, evaluated by the trapezoidal rule.
 
@@ -433,11 +433,11 @@ Sparse & Tails+Thrice
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/ccdf_vg_rnd.pdf}
-\caption{Variance-gamma density of \(S_T\) on \([60,150]\). Quoted spline, tails, and tails plus thrice from Table~\ref{tab:vg-tail}, each at the mesh bandwidth \eqref{eq:h-mesh}. Sparse quoted strikes are marked on the true density. Curves are truncated at zero, and the vertical scale is that of the true density.}
+\caption{Variance-gamma density of \(S_T\) on \([60,150]\). Quoted spline, tails, tails plus twice, and tails plus thrice from Table~\ref{tab:vg-tail}, each at the mesh bandwidth \eqref{eq:h-mesh}. Sparse quoted strikes are marked on the true density. Curves are truncated at zero, and the vertical scale is that of the true density.}
 \label{fig:vg-rnd}
 \end{figure}
 
-On the dense chain the wings again do not move the error. Twicing lowers it, and thricing lowers it further. The bandwidth \eqref{eq:h-d2} is wider than the mesh, and the error is larger. The density of \(S_T\) is more peaked than under Heston, so the errors are larger than on that design. On the sparse chain the quoted spline without tails misses the window. Tails restore it. Twicing and thricing each lower the error, and thricing at \eqref{eq:h-d2} comes closer to its oracle than the mesh rule, which is the wider of the two on this chain. Figure~\ref{fig:vg-rnd} plots the quoted spline, the tails, and tails plus thrice at the mesh bandwidth.
+On the dense chain the wings again do not move the error. Twicing lowers it, and thricing lowers it further. The bandwidth \eqref{eq:h-d2} is wider than the mesh, and the error is larger. The density of \(S_T\) is more peaked than under Heston, so the errors are larger than on that design. On the sparse chain the quoted spline without tails misses the window. Tails restore it. Twicing and thricing each lower the error, and thricing at \eqref{eq:h-d2} comes closer to its oracle than the mesh rule, which is the wider of the two on this chain. Figure~\ref{fig:vg-rnd} plots the quoted spline, tails, tails plus twice, and tails plus thrice at the mesh bandwidth.
 
 Table~\ref{tab:sim-comp} scores the estimator of Section~\ref{sec:construct} against the methods of Section~\ref{sec:emp} on the same four chains. Each fit starts from the decreasing-convex projection. On these exact quotes the penalty is zero, so the row is the thriced spline at \eqref{eq:h-d2}.
 
@@ -481,7 +481,7 @@ The same designs are repeated with noise in the quotes. Black--Scholes implied v
 \multicolumn{1}{@{}c}{Estimator} &
   \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
 \midrule
-\textbf{Ours} & 2.22e-4 & 2.58e-4 \\
+Ours & 2.22e-4 & 2.58e-4 \\
 PCA & 4.36e-4 & 3.61e-4 \\
 \citeauthor{grith2012}, IV, \(2\times\) & 2.56e-3 & 1.20e-1 \\
 \citeauthor{grith2012}, IV, CV & 1.56e-2 & 3.55e-2 \\
