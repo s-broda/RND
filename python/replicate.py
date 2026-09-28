@@ -170,7 +170,7 @@ def _exact(label, p, calls, q_true, K_eval):
                 "Tails+Thrice": "higher",
             }.get(name)
             if key is not None:
-                plot.setdefault(chain, {})[key] = q_m
+                plot.setdefault(chain, {})[key] = q_9
             plot.setdefault(chain, {})["K"] = K
         for name, h, q in _competitor_rows(K, C, p.S0, p.r, p.T, p.q, p.forward, K_eval):
             print(f"    {name:22} h={h:.4g} ISE={_ise(K_eval, q, q_true):.4e}")
