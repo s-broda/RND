@@ -127,40 +127,31 @@ def _exact(label, p, calls, q_true, K_eval):
                 if higher == "twice":
                     q1 = estimate_rnd(
                         K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                        h=float(h), tails=True, higher=False,
+                        h=float(h), tails=True, higher=False, c=0,
                     )["q"]
                     q2 = estimate_rnd(
                         K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                        h=float(h) * np.sqrt(2.0), tails=True, higher=False,
+                        h=float(h) * np.sqrt(2.0), tails=True, higher=False, c=0,
                     )["q"]
                     return 2.0 * q1 - q2
                 return estimate_rnd(
                     K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                    h=h, tails=tails, higher=higher,
+                    h=h, tails=tails, higher=higher, c=0,
                 )["q"]
             best, best_h = np.inf, hs[len(hs) // 2]
             for h in hs:
                 err = _ise(K_eval, _q(float(h)), q_true)
                 if err < best:
                     best, best_h = err, float(h)
-            h_mesh = estimate_rnd(
-                K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval[:1],
-                h="mesh", tails=tails, higher=False,
-            )["h"]
             h_9 = estimate_rnd(
                 K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval[:1],
-                h="deriv", tails=tails, higher=False,
+                h="deriv", tails=tails, higher=False, c=0,
             )["h"]
-            q_m, q_9 = _q(h_mesh), _q(h_9)
-            rec[chain][name] = dict(
-                h_star=best_h, ise_star=best,
-                h_mesh=h_mesh, ise_mesh=_ise(K_eval, q_m, q_true),
-                h_9=h_9, ise_9=_ise(K_eval, q_9, q_true),
-            )
+            q_9 = _q(h_9)
+            rec[chain][name] = dict(h_star=best_h, ise_star=best, h_9=h_9, ise_9=_ise(K_eval, q_9, q_true))
             row = rec[chain][name]
             print(
                 f"    {name:16} oracle {row['h_star']:.4g} {row['ise_star']:.4e}  "
-                f"mesh {row['h_mesh']:.4g} {row['ise_mesh']:.4e}  "
                 f"n^-1/9 {row['h_9']:.4g} {row['ise_9']:.4e}"
             )
             key = {
@@ -681,58 +672,35 @@ def _iv_noise(K, C, S0, r, T, q, rng, sd=0.01):
 
 
 def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
-    """Mean ISE on Heston quotes with N(0, sd^2) noise in implied volatility."""
+    """Mean ISE on Heston quotes with N(0, sd^2) noise in implied volatility.
+
+    One generator, dense chain then the 16-strike chain, so the two columns
+    share the noise stream in the paper.
+    """
     print(f"\nNoisy Heston  reps={n_reps}  iv sd={sd}  seed={seed}")
     rng = np.random.default_rng(seed)
     p = BCC97
     K_eval = np.linspace(60.0, 150.0, 401)
     q_true = heston_spot_density(K_eval, p)
     calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
-    specs = (
-        ("Quoted spline", False, False),
-        ("Tails", True, False),
-        ("Tails+Thrice", True, True),
-    )
-    rules = ("mesh", "deriv")
     for chain, K in (
         ("dense", np.linspace(30.0, 220.0, 256)),
         ("sparse", np.linspace(70.0, 140.0, 16)),
     ):
         C_true = np.maximum(calls(K), 0.0)
-        acc = {name: {rule: [] for rule in rules} for name, _, _ in specs}
-        hs = {name: {rule: [] for rule in rules} for name, _, _ in specs}
-        comp = {}
-        comp_h = {}
+        acc = {}
         for _rep in range(n_reps):
             C_obs = _iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd=sd)
             C_proj = _projected_calls(K, C_obs, p.r, p.T, p.forward)
-            for name, tails, higher in specs:
-                for rule in rules:
-                    fit = estimate_rnd(
-                        K, C_proj, p.S0, p.r, p.T, p.q, K_eval=K_eval,
-                        h=rule, tails=tails, higher=higher,
-                    )
-                    acc[name][rule].append(_ise(K_eval, fit["q"], q_true))
-                    hs[name][rule].append(fit["h"])
-            for name, h, q in _competitor_rows(
-                K, C_obs, p.S0, p.r, p.T, p.q, p.forward, K_eval
+            fit = estimate_rnd(K, C_proj, p.S0, p.r, p.T, p.q, K_eval=K_eval)
+            acc.setdefault("Ours", []).append(_ise(K_eval, fit["q"], q_true))
+            for name, _h, q in _competitor_rows(
+                K, C_proj, p.S0, p.r, p.T, p.q, p.forward, K_eval
             ):
-                comp.setdefault(name, []).append(_ise(K_eval, q, q_true))
-                comp_h.setdefault(name, []).append(h)
+                acc.setdefault(name, []).append(_ise(K_eval, q, q_true))
         print(f"  -- {chain}")
-        for name, _, _ in specs:
-            bits = []
-            for rule in rules:
-                bits.append(
-                    f"{rule} h={np.mean(hs[name][rule]):.3g} "
-                    f"ISE={np.mean(acc[name][rule]):.4e}"
-                )
-            print(f"    {name:22} " + "  ".join(bits))
-        for name in comp:
-            print(
-                f"    {name:22} h={np.mean(comp_h[name]):.4g} "
-                f"ISE={np.mean(comp[name]):.4e}"
-            )
+        for name, vals in acc.items():
+            print(f"    {name:22} {np.mean(vals):.4e}")
 
 
 def _kernel_stats(x, q):
@@ -1458,11 +1426,10 @@ def _smoothing_fit_at(base, c, K_eval=None, K_price=None):
 
 
 def smoothing_spline_fit(K, C, S0, r, T, q, K_eval=None, K_price=None, h_rule="deriv"):
-    """Thriced smoothing spline of P. The penalty is chosen on this chain."""
-    base = _smoothing_base(K, C, S0, r, T, q, h_rule=h_rule)
-    rows = [_score_smoothing_c(base, c) for c in _SMOOTH_C]
-    c = _choose_smoothing_c(rows)
-    return _smoothing_fit_at(base, c, K_eval=K_eval, K_price=K_price)
+    """The paper's estimator. ``estimate_rnd`` with its default penalty rule."""
+    return estimate_rnd(
+        K, C, S0, r, T, q, K_eval=K_eval, K_price=K_price, h=h_rule,
+    )
 
 
 def _smoothing_holdout(sl, h_rule="deriv"):
@@ -1554,7 +1521,6 @@ def main():
     rec_v, plot_v, _, qv = _exact("VG", v, lambda K: vg_calls(K, v), vg_spot_density(K_eval, v), K_eval)
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
     noisy_heston()
-    smoothing_spline_pilot()
     listed()
     print("DONE")
 

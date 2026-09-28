@@ -4,7 +4,7 @@ Replication code for
 
 > Simon A. Broda, *Thricing Is All You Need: Identifying Risk-Neutral Densities from an Empirical Measure of Listed Quotes*.
 
-The headline estimator rescales European calls to a complementary cdf, fits that measure with a smoothing spline, completes the unquoted tails, and applies a Gaussian convolution with the three-bandwidth jackknife \(\tfrac83 f_h-2f_{h\sqrt{2}}+\tfrac13 f_{2h}\). The convolution is closed form. The penalty is zero when the thriced density is already unimodal. The bandwidth is \(0.38 F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\). `estimate_rnd` in `python/rnd.py` evaluates that convolution. The replication script chooses the penalty.
+The headline estimator rescales European calls to a complementary cdf, fits that measure with a smoothing spline, completes the unquoted tails, and applies a Gaussian convolution with the three-bandwidth jackknife \(\tfrac83 f_h-2f_{h\sqrt{2}}+\tfrac13 f_{2h}\). The convolution is closed form. The penalty is zero when the thriced density is already unimodal. The bandwidth is \(0.38 F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\). `estimate_rnd` in `python/rnd.py` is that estimator. The defaults are thricing, tails, the `n^{-1/9}` bandwidth, and the penalty rule. Pass `c=0` for the cubic through the knots, `kernel="twice"` or `kernel="plain"` for the other convolutions, `tails=False` to drop the endpoint knots, and `h` or `deriv_c` to change the bandwidth.
 
 ## Run
 
