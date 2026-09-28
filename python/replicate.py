@@ -158,6 +158,28 @@ def _exact(label, p, calls, q_true, K_eval):
     return rec, plot, K_eval, q_true
 
 
+_ASL_H = np.geomspace(0.01, 0.40, 21)
+
+
+def asl_shape_bandwidth(K, C, S0, r, T, q, F):
+    """Smallest moneyness bandwidth that leaves one peak and TV at most 1.05.
+
+    Not the Aït-Sahalia–Lo Appendix A rule. That rule is about one moneyness
+    standard deviation on these chains and flattens the smile.
+    """
+    K = np.asarray(K, float)
+    s = np.linspace(max(50.0, 0.2 * float(F)), 2.4 * float(F), 501)
+    chosen = float(_ASL_H[-1])
+    for h in _ASL_H:
+        _, qhat = asl_fit(K, C, S0, r, T, q, F, K[:1], s, float(h))
+        _, peaks = _mass_peaks(F, qhat, s)
+        tv = _variation(F, qhat, s)
+        if peaks <= 1 and tv <= 1.05:
+            chosen = float(h)
+            break
+    return chosen
+
+
 def _competitor_rows(K, C, S0, r, T, q, F, K_eval):
     """Listed competitors on one chain, each at the bandwidth its paper specifies."""
     C = _projected_calls(K, np.maximum(np.asarray(C, float), 0.0), r, T, F)
@@ -177,7 +199,7 @@ def _competitor_rows(K, C, S0, r, T, q, F, K_eval):
     for name, hh in (("GHS call, 2×", 2.0 * h_c), ("GHS call, CV", h_c)):
         _, qhat = ghs_call_fit(K, C, S0, r, T, q, F, K[:1], K_eval, hh)
         rows.append((name, hh, qhat))
-    h = asl_bandwidth(K, F)
+    h = asl_shape_bandwidth(K, C, S0, r, T, q, F)
     _, qhat = asl_fit(K, C, S0, r, T, q, F, K[:1], K_eval, h)
     rows.append(("Aït-Sahalia–Lo", h, qhat))
     return rows
@@ -287,7 +309,7 @@ def _holdout_method(sl, method):
                 Kt, Ct, sl.S0, sl.r, sl.T, Ke, q=sl.q, h=h, return_call=True
             )
         elif method == "asl":
-            h = asl_bandwidth(Kt, sl.F)
+            h = asl_shape_bandwidth(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F)
             C_te, _ = asl_fit(Kt, Ct, sl.S0, sl.r, sl.T, sl.q, sl.F, Ke, Ke[:1], h)
         elif method in ("ghs_call_cv", "ghs_call_2", "ghs_iv_cv", "ghs_iv_2"):
             if method.startswith("ghs_call"):
@@ -377,7 +399,7 @@ def _chain_scores(sl):
     )
     h_pca = pca_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
     C_pca, q_pca, _, _, _ = pca_fit(sl.K, C, sl.r, sl.T, sl.F, h_pca, sl.K, s)
-    h_asl = asl_bandwidth(sl.K, sl.F)
+    h_asl = asl_shape_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
     C_asl, q_asl = asl_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_asl)
     h_ghs_c = ghs_loo_bandwidth(sl.K, C)
     C_ghs_cv, q_ghs_cv = ghs_call_fit(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F, sl.K, s, h_ghs_c)
@@ -521,7 +543,7 @@ def _plot_listed(scored):
         C_asl = bundle["C_asl"]
         print(
             f"  fig {title}: ASD h={bundle['h_asd']:.1f}  PCA h={bundle['h_pca']:.4f}  "
-            f"ASL h={bundle['h_asl']:.1f}  GHS IV h={bundle['h_ghs_i']:.1f}"
+            f"ASL h={bundle['h_asl']:.3f}  GHS IV h={bundle['h_ghs_i']:.1f}"
         )
         ax = axes[row, 0]
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
