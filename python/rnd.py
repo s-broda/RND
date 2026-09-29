@@ -4,8 +4,11 @@ The public entry point is ``estimate_rnd``. Copy this file: it is self-contained
 apart from NumPy and SciPy. The estimator rescales calls to a complementary
 cdf, fits that function with a smoothing spline, completes the unquoted tails,
 and convolves the spline with a Gaussian by a fast Fourier transform.
-Thricing and the penalty rule are on by default. The default bandwidth is
-``0.38 F σ_ATM √T n^{-1/9}``.
+Thricing and the penalty rule are on by default. The penalty is
+``((t - 1.02)_+ / (v_* - 1)) h^4 / (δ F^3)``: ``t`` is the clipped total
+variation of the thriced interpolant on ``[0.55F, 1.40F]``, ``v_* - 1`` is
+the excess variation of that kernel, and ``δ`` is the median knot spacing.
+The default bandwidth is ``0.38 F σ_ATM √T n^{-1/9}``.
 
 Pass ``c=0`` for the cubic through the knots, ``kernel="twice"`` or
 ``kernel="plain"`` for the other convolutions, and ``tails=False`` to drop
@@ -22,8 +25,9 @@ from scipy.stats import norm
 
 DERIV_C = 0.38
 
-# Dimensionless penalty in λ = c F^3 ∫(f'')^2. Zero passes through the knots.
-SMOOTH_C = np.array([0.0, *np.geomspace(1e-7, 3e-4, 16)])
+# A unimodal curve scores 1. The penalty stays off until the clipped total
+# variation exceeds this fixed allowance.
+TV_ALLOW = 1.02
 
 
 def _kernel_weights(kernel):
@@ -57,7 +61,7 @@ def estimate_rnd(
 
     The default is the estimator in the paper: tails, thricing, bandwidth
     ``deriv_c F σ_ATM √T n^{-1/9}`` with ``deriv_c=0.38``, and the penalty
-    chosen from ``SMOOTH_C``.
+    ``((t - 1.02)_+ / (v_* - 1)) h^4 / (δ F^3)``.
 
     Parameters
     ----------
@@ -81,8 +85,9 @@ def estimate_rnd(
         Thricing is ``(8/3) f_h − 2 f_{h√2} + (1/3) f_{2h}``. Twicing is
         ``2 f_h − f_{h√2}``. ``"plain"`` is one Gaussian.
     c : "rule" or float
-        ``"rule"`` picks the penalty from ``SMOOTH_C``. A number, including
-        ``0``, is used as given. Zero is the natural cubic through the knots.
+        ``"rule"`` is ``((t - 1.02)_+ / (v_* - 1)) h^4 / (δ F^3)``. A number,
+        including ``0``, is used as given. Zero is the natural cubic through
+        the knots.
     higher : bool or str, optional
         Alias of ``kernel`` kept for older calls. ``True`` is thricing,
         ``False`` is one Gaussian, ``"twice"`` is twicing.
@@ -115,7 +120,7 @@ def estimate_rnd(
         h_use = float(h)
     Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
     if c == "rule":
-        c_use = _choose_penalty(K, C, Ks, Ps, h_use, stock, F, weights)
+        c_use = _choose_penalty(Ks, Ps, h_use, F, weights)
         spl = _rule_spline(Ks, Ps, c_use, F)
     else:
         c_use = float(c)
@@ -282,49 +287,52 @@ def _rule_spline(Ks, Ps, c, F):
     return make_smoothing_spline(Ks, Ps, lam=lam)
 
 
-def _shape_scores(q, q_plain, F, s):
+def _kernel_excess(weights):
+    """Excess signed variation of the equivalent kernel, ``∫|L| - 1``.
+
+    ``L`` is the kernel on the bandwidth scale, so the integral does not
+    depend on ``h``. A nonnegative kernel has excess zero; one extra mode
+    is then one unit of the penalty.
+    """
+    z = np.linspace(-40.0, 40.0, 80001)
+    L = np.zeros_like(z)
+    for fac, w in weights:
+        fac = float(fac)
+        L += float(w) * norm.pdf(z / fac) / fac
+    excess = float(np.trapezoid(np.abs(L), z) - 1.0)
+    if excess < 1e-8:
+        return 1.0
+    return excess
+
+
+def _clipped_variation(q, F, s):
+    """Total variation of the positive part on ``[0.55F, 1.40F]``, over twice the max."""
     m = (s >= 0.55 * F) & (s <= 1.40 * F)
-    corr = float(np.sqrt(np.mean((q[m] - q_plain[m]) ** 2)))
-    p = np.maximum(np.nan_to_num(np.asarray(q, float)), 0.0)
-    core = p[m]
+    core = np.maximum(np.nan_to_num(np.asarray(q, float)), 0.0)[m]
     if core.size < 3 or float(core.max()) <= 0.0:
-        tv = float("nan")
-    else:
-        tv = float(np.sum(np.abs(np.diff(core))) / (2.0 * float(core.max())))
-    peaks = 0
-    if core.size > 4 and np.nanmax(core) > 0:
-        peaks = int(np.sum(
-            (core[1:-1] > core[:-2]) & (core[1:-1] > core[2:]) & (core[1:-1] > 0.2 * core.max())
-        ))
-    return tv, peaks, corr
+        return float("nan")
+    return float(np.sum(np.abs(np.diff(core))) / (2.0 * float(core.max())))
 
 
-def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5):
-    """Smallest unimodal penalty, then the corner when the bend is sharp."""
-    s = np.linspace(max(50.0, 0.2 * F), 2.4 * F, 700)
-    rows = []
-    for c in SMOOTH_C:
-        spl = _rule_spline(Ks, Ps, c, F)
-        q, G, q_plain = _convolve(spl, Ks, h, F, s, weights, level_at=K, with_plain=True)
-        tv, peaks, corr = _shape_scores(q, q_plain, F, s)
-        Cf = np.maximum(stock * (1.0 - np.clip(G, 0.0, 1.0)), 0.0)
-        price = float(np.sqrt(np.mean((Cf - C) ** 2)))
-        rows.append(dict(c=float(c), tv=tv, peaks=peaks, price=price, corr=corr))
-    uni = [r for r in rows if r["peaks"] <= 1 and r["tv"] <= 1.02]
-    c0 = uni[0]["c"] if uni else rows[-1]["c"]
-    sub = [r for r in rows if r["c"] + 1e-15 >= c0 and r["price"] > 1e-8 and r["corr"] > 0.0]
-    if len(sub) < 5:
-        return c0
-    x = np.log([r["price"] for r in sub])
-    y = np.log([r["corr"] for r in sub])
-    dx, dy = np.gradient(x), np.gradient(y)
-    ddx, ddy = np.gradient(dx), np.gradient(dy)
-    kap = np.abs(dx * ddy - dy * ddx) / np.maximum((dx * dx + dy * dy) ** 1.5, 1e-18)
-    kap[0] = kap[-1] = -1.0
-    i = int(np.argmax(kap))
-    if float(kap[i]) >= curv_min:
-        return sub[i]["c"]
-    return c0
+def _choose_penalty(Ks, Ps, h, F, weights):
+    """``((t - 1.02)_+ / (v_* - 1)) h^4 / (δ F^3)`` from one interpolant.
+
+    ``t`` is the clipped total variation of the thriced interpolant. ``δ``
+    is the median knot spacing, the gap in the smoothing-spline damper
+    ``1/(1 + λ δ ω^4)``. The frequency ``ω = 1/h`` turns an excess count
+    ``ρ`` into ``λ δ = ρ h^4``.
+    """
+    s = np.linspace(max(50.0, 0.2 * float(F)), 2.4 * float(F), 700)
+    q, _G = _convolve(_rule_spline(Ks, Ps, 0.0, F), Ks, h, F, s, weights)
+    t = _clipped_variation(q, F, s)
+    gaps = np.diff(np.asarray(Ks, float))
+    gaps = gaps[gaps > 1e-12]
+    delta = float(np.median(gaps)) if gaps.size else float(h)
+    excess = _kernel_excess(weights)
+    if not np.isfinite(t) or delta <= 0.0 or float(F) == 0.0:
+        return 0.0
+    rho = max(t - TV_ALLOW, 0.0) / excess
+    return float(rho * (float(h) ** 4) / (delta * float(F) ** 3))
 
 
 def _right_wing(K, C, F, disc, k_max=None):
