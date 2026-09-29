@@ -1,10 +1,11 @@
-"""Closed-form risk-neutral density from a single-maturity call strip.
+"""Risk-neutral density from a single-maturity call strip.
 
 The public entry point is ``estimate_rnd``. Copy this file: it is self-contained
 apart from NumPy and SciPy. The estimator rescales calls to a complementary
 cdf, fits that function with a smoothing spline, completes the unquoted tails,
-and convolves the spline with a Gaussian. Thricing and the penalty rule are
-on by default. The default bandwidth is ``0.38 F σ_ATM √T n^{-1/9}``.
+and convolves the spline with a Gaussian by a fast Fourier transform.
+Thricing and the penalty rule are on by default. The default bandwidth is
+``0.38 F σ_ATM √T n^{-1/9}``.
 
 Pass ``c=0`` for the cubic through the knots, ``kernel="twice"`` or
 ``kernel="plain"`` for the other convolutions, and ``tails=False`` to drop
@@ -14,6 +15,7 @@ the endpoint knots. ``h`` accepts a number or ``"deriv"``.
 from __future__ import annotations
 
 import numpy as np
+from scipy.fft import irfft, next_fast_len, rfft, rfftfreq
 from scipy.interpolate import CubicSpline
 from scipy.special import erf
 from scipy.stats import norm
@@ -143,53 +145,73 @@ def _knots(K, C, stock, F, disc, tails=True):
     return Ks[keep], Ps[keep]
 
 
+def _conv_dx(Ks, h):
+    """Step for the sampled convolution. Finer than the knots and than h."""
+    gaps = np.diff(np.asarray(Ks, dtype=float))
+    gaps = gaps[gaps > 1e-12]
+    gap = float(np.median(gaps)) if gaps.size else float(h)
+    return max(min(gap, float(h)) / 64.0, 1e-4)
+
+
+def _transfer(omega, h):
+    """Fourier multiplier of a Gaussian of width ``h``."""
+    return np.exp(-0.5 * (omega * max(float(h), 1e-6)) ** 2)
+
+
+def _fft_grid(Ks, spl, h, factors, cover):
+    """Real FFT of the spline, held flat outside the knots.
+
+    Equation (10) convolves the slope. That slope is the derivative of this
+    extension, so one transform of the sampled spline feeds every bandwidth:
+    multiplication by ``iω`` is the slope, and the Gaussian multiplier is the
+    convolution. ``cover`` is every strike the result is read at. The grid
+    keeps ten bandwidths of the widest kernel beyond those strikes, which is
+    where a circular convolution would otherwise wrap.
+    """
+    h = max(float(h), 1e-6)
+    facs = np.asarray(list(factors), dtype=float)
+    dx = _conv_dx(Ks, h * float(facs.min()))
+    pad = 10.0 * h * float(facs.max())
+    cover = np.asarray(cover, dtype=float).ravel()
+    cover = cover[np.isfinite(cover)]
+    lo = float(Ks[0])
+    hi = float(Ks[-1])
+    if cover.size:
+        lo = min(lo, float(cover.min()))
+        hi = max(hi, float(cover.max()))
+    lo -= pad
+    hi += pad
+    n = int(next_fast_len(int(np.ceil((hi - lo) / dx)) + 1))
+    grid = lo + dx * np.arange(n)
+    values = np.empty(n)
+    left = float(spl(float(Ks[0])))
+    right = float(spl(float(Ks[-1])))
+    values[:] = right
+    values[grid < Ks[0]] = left
+    inside = (grid >= Ks[0]) & (grid <= Ks[-1])
+    if np.any(inside):
+        values[inside] = np.asarray(spl(grid[inside]), dtype=float)
+    omega = 2.0 * np.pi * rfftfreq(n, d=dx)
+    return grid, omega, rfft(values), left
+
+
 def _smooth(x, Ks, spl, h):
-    """Gaussian convolution of a cubic spline.
+    """Gaussian convolution of a cubic spline, by one real FFT.
 
     Returns the smoothed second derivative, the smoothed level, and the
     smoothed first derivative. The call density is ``-F`` times the first
-    of these.
+    of these. The level is equation (10): the convolved extension minus the
+    value at the left knot, which is the slope convolved with the Gaussian cdf.
     """
     x = np.atleast_1d(np.asarray(x, dtype=float))
-    h = max(float(h), 1e-6)
-    gprime = np.zeros_like(x)
-    G = np.zeros_like(x)
-    gfirst = np.zeros_like(x)
-    for L, R in zip(Ks[:-1], Ks[1:]):
-        alpha = float(spl(L, 1))
-        beta = float(spl(L, 2))
-        gamma = 0.5 * float(spl(L, 3))
-        uL = (x - L) / h
-        uR = (x - R) / h
-        A0 = alpha + beta * h * uL + gamma * (h * uL) ** 2
-        A1 = -beta * h - 2.0 * gamma * h * h * uL
-        A2 = gamma * h * h
-        I0 = _Phi(uL) - _Phi(uR)
-        I1 = -_phi(uL) + _phi(uR)
-        I2 = (-uL * _phi(uL) + _Phi(uL)) - (-uR * _phi(uR) + _Phi(uR))
-        dA0 = beta + 2.0 * gamma * h * uL
-        dA1 = -2.0 * gamma * h
-        dI0 = (_phi(uL) - _phi(uR)) / h
-        dI1 = (uL * _phi(uL) - uR * _phi(uR)) / h
-        dI2 = (uL * uL * _phi(uL) - uR * uR * _phi(uR)) / h
-        gprime += dA0 * I0 + A0 * dI0 + dA1 * I1 + A1 * dI1 + A2 * dI2
-        gfirst += A0 * I0 + A1 * I1 + A2 * I2
-
-        def J0(u):
-            return u * _Phi(u) + _phi(u)
-
-        def J1(u):
-            return 0.5 * u * u * _Phi(u) + 0.5 * u * _phi(u) - 0.5 * _Phi(u)
-
-        def J2(u):
-            return u ** 3 * _Phi(u) / 3.0 + u * u * _phi(u) / 3.0 + 2.0 * _phi(u) / 3.0
-
-        G += h * (
-            A0 * (J0(uL) - J0(uR))
-            + A1 * (J1(uL) - J1(uR))
-            + A2 * (J2(uL) - J2(uR))
-        )
-    return gprime, G, gfirst
+    grid, omega, spec, left = _fft_grid(Ks, spl, h, (1.0,), x)
+    n = grid.size
+    damped = spec * _transfer(omega, h)
+    iw = 1j * omega
+    g2 = irfft(damped * iw * iw, n=n)
+    g1 = irfft(damped * iw, n=n)
+    level = irfft(damped, n=n) - left
+    return np.interp(x, grid, g2), np.interp(x, grid, level), np.interp(x, grid, g1)
 
 
 def _Phi(u):
@@ -219,17 +241,38 @@ def _bandwidth(K, C, S0, r, T, q, F, deriv_c=None):
     return float(const * F * sig * np.sqrt(T) * n ** (-1.0 / 9.0))
 
 
-def _convolve(spl, Ks, h, F, x, weights, level_at=None):
-    """Density and, if requested, the smoothed complementary cdf."""
+def _convolve(spl, Ks, h, F, x, weights, level_at=None, with_plain=False):
+    """Density and, if requested, the smoothed complementary cdf.
+
+    One FFT of the spline. Thricing is the multiplier
+    ``(8/3) e^{-h^2 ω^2/2} - 2 e^{-h^2 ω^2} + (1/3) e^{-2 h^2 ω^2}``
+    applied to that transform. ``with_plain`` also returns the untwiced
+    density, from the same transform, for the penalty rule.
+    """
     x = np.asarray(x, dtype=float)
-    q = np.zeros(x.shape, dtype=float)
-    G = None if level_at is None else np.zeros(np.shape(level_at), dtype=float)
+    cover = x.ravel()
+    if level_at is not None:
+        cover = np.concatenate([cover, np.asarray(level_at, dtype=float).ravel()])
+    facs = [float(f) for f, _ in weights]
+    if with_plain:
+        facs.append(1.0)
+    grid, omega, spec, left = _fft_grid(Ks, spl, h, facs, cover)
+    n = grid.size
+    iw2 = (1j * omega) ** 2
+    transfer = np.zeros(omega.shape, dtype=float)
     for fac, w in weights:
-        g2, _, _ = _smooth(x, Ks, spl, h * fac)
-        q += w * (-float(F) * g2)
-        if level_at is not None:
-            G += w * _smooth(level_at, Ks, spl, h * fac)[1]
-    return q, G
+        transfer += float(w) * _transfer(omega, h * float(fac))
+    g2 = irfft(spec * transfer * iw2, n=n)
+    q = -float(F) * np.interp(x, grid, g2)
+    G = None
+    if level_at is not None:
+        # The weights sum to one, so the left endpoint is subtracted once.
+        level = irfft(spec * transfer, n=n) - left * float(sum(w for _, w in weights))
+        G = np.interp(np.asarray(level_at, dtype=float), grid, level)
+    if not with_plain:
+        return q, G
+    g2_plain = irfft(spec * _transfer(omega, h) * iw2, n=n)
+    return q, G, -float(F) * np.interp(x, grid, g2_plain)
 
 
 def _rule_spline(Ks, Ps, c, F):
@@ -262,8 +305,7 @@ def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5):
     rows = []
     for c in SMOOTH_C:
         spl = _rule_spline(Ks, Ps, c, F)
-        q, G = _convolve(spl, Ks, h, F, s, weights, level_at=K)
-        q_plain = -F * _smooth(s, Ks, spl, h)[0]
+        q, G, q_plain = _convolve(spl, Ks, h, F, s, weights, level_at=K, with_plain=True)
         tv, peaks, corr = _shape_scores(q, q_plain, F, s)
         Cf = np.maximum(stock * (1.0 - np.clip(G, 0.0, 1.0)), 0.0)
         price = float(np.sqrt(np.mean((Cf - C) ** 2)))

@@ -52,7 +52,7 @@ This paper estimates that density from the empirical measure of a single maturit
 
 We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{aitsahalia2003} smooth a decreasing-convex projection of the calls with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. \citet{aitsahalia1998} smooth implied volatility, and \citet{grith2012} use a local cubic of the call and of implied volatility. On the listed chains of Section~\ref{sec:emp} the even/odd hold-out error is smaller than each of these methods on every chain, and the fitted density has one peak, mass \(1.0\), and total variation \(1.0\). The out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}, and on noisy Heston quotes the mean integrated squared error is below it as well.
 
-The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency of the estimator and states the bandwidth used below. Section~\ref{sec:heston} compares that estimator with those of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
+The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency of the estimator and states the bandwidth used below. Section~\ref{sec:compute} evaluates the convolution by a fast Fourier transform and records the speedup against the naive cell integrals. Section~\ref{sec:heston} compares that estimator with those of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
 
 \section{Related Work}
 \label{sec:lit}
@@ -211,7 +211,7 @@ The factor \(e^{-h^2 s^2/2}\) is convolution against \(\kappa_h\), and multiplic
 \;=\;
 (P^{\mathrm{cs}\prime}\ast\mathcal{K}_h)(K).
 \end{equation}
-On each cell the integrand is a quadratic times a Gaussian. The integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary, so \eqref{eq:cubic} is closed form. Calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). Section~\ref{sec:tails} adds the endpoints that complete the distribution, and those knots enter the sum in \eqref{eq:smooth-penalty}.
+On each cell the integrand is a quadratic times a Gaussian. The integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary, so \eqref{eq:cubic} is closed form. Section~\ref{sec:compute} evaluates the same convolution from \eqref{eq:phi-hat} with a fast Fourier transform. Calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). Section~\ref{sec:tails} adds the endpoints that complete the distribution, and those knots enter the sum in \eqref{eq:smooth-penalty}.
 \label{sec:closed}
 
 \section{Two Refinements}
@@ -313,6 +313,38 @@ h
 0.38\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/9},
 \end{equation}
 with \(n\) the number of quoted strikes. This \(0.38\) is the bandwidth constant. The penalty in \eqref{eq:smooth-penalty} is a different constant, chosen later. This is the bandwidth used below.
+
+\section{Computational concerns}
+\label{sec:compute}
+
+The product in \eqref{eq:phi-hat} is the convolution \eqref{eq:cubic}. The factor \(e^{-h^2 s^2/2}\) damps the characteristic function of the spline slope, multiplication by \(\mathrm{i}s\) differentiates that slope, and division by \(\mathrm{i}s\) integrates it. Thricing replaces the damping by \eqref{eq:phi-thrice}. Each step multiplies one transform, so a single discrete Fourier transform evaluates the plain convolution and the thriced combination together.
+
+The completed spline is sampled on a uniform grid and held at its endpoint values outside the knots. The slope in \eqref{eq:cubic} is the derivative of that extension, so the transform of the slope is \(\mathrm{i}s\) times the transform of the samples. The grid step is one sixty-fourth of the smaller of the median knot spacing and the bandwidth. The grid runs ten widths of the widest kernel past every strike at which the density or the call is read, which keeps the periodic transform from wrapping into that window. The level in \eqref{eq:cubic} is the damped transform with the left endpoint removed.
+
+The same convolution is the sum, over the cells of the spline, of the elementary integrals in Section~\ref{sec:construct}. On the exact, noisy, and listed designs below, the Fourier evaluation reproduces the printed integrated squared errors, the selected penalties, and the listed out-of-the-money errors. Table~\ref{tab:fft} records the wall-clock time of one fit at \eqref{eq:h-d2}, the search over the penalty grid included. Against that naive sum over cells, the Fourier evaluation is between \(15.5\) and \(103.3\) times as fast.
+
+\begin{table}[H]
+\centering
+\caption{Wall-clock seconds for one fit of the estimator. Naive is the sum of the closed-form cell integrals. FFT is the discrete Fourier evaluation of \eqref{eq:phi-hat} and \eqref{eq:phi-thrice}. The speedup is the ratio of those times.}
+\label{tab:fft}
+\begin{tabular}{l
+  S[table-format=1.3]
+  S[table-format=1.3]
+  S[table-format=3.1]}
+\toprule
+\multicolumn{1}{c}{Design} & \multicolumn{1}{c}{Naive} & \multicolumn{1}{c}{FFT} & \multicolumn{1}{c}{Speedup} \\
+\midrule
+Heston, dense & 4.612 & 0.049 & 94.1 \\
+Heston, sparse & 0.285 & 0.013 & 21.9 \\
+Variance gamma, dense & 4.545 & 0.044 & 103.3 \\
+Variance gamma, sparse & 0.279 & 0.018 & 15.5 \\
+SPX 18 Dec 2026 & 8.908 & 0.121 & 73.6 \\
+SPX 19 Mar 2027 & 4.091 & 0.071 & 57.6 \\
+NDX 18 Dec 2026 & 6.012 & 0.070 & 85.9 \\
+RUT 18 Dec 2026 & 1.731 & 0.059 & 29.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Numerical Illustration}
 \label{sec:heston}
