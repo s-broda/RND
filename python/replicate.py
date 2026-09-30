@@ -7,9 +7,9 @@ Run from the repository root::
 Prints the Heston and variance-gamma ISE tables, including the listed
 competitors and a noisy Heston comparison, the listed pricing table, and
 the appendix scores for the smoothing spline. The estimator evaluates the
-convolution in equation (10) of the paper by the expansion in
-density_closed.c, and by one real FFT of the sampled spline when that
-file cannot be compiled. The script writes
+convolution in equation (10) of the paper by one FFT of the shared box
+moments in density_closed.c, with thricing as one multiplier, and by one
+real FFT of the sampled spline when that file cannot be compiled. The script writes
 figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
 figures/ccdf_listed.pdf, and figures/ccdf_listed_kern.pdf.
 """

@@ -211,7 +211,7 @@ The factor \(e^{-h^2 s^2/2}\) is convolution against \(\kappa_h\), and multiplic
 \;=\;
 (P^{\mathrm{cs}\prime}\ast\mathcal{K}_h)(K).
 \end{equation}
-On each cell the integrand is a quadratic times a Gaussian. The integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary, so \eqref{eq:cubic} is closed form. Section~\ref{sec:compute} evaluates that closed form by a Taylor expansion of the kernel on boxes one bandwidth wide. Calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). Section~\ref{sec:tails} adds the endpoints that complete the distribution, and those knots enter the sum in \eqref{eq:smooth-penalty}.
+On each cell the integrand is a quadratic times a Gaussian. The integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary, so \eqref{eq:cubic} is closed form. Section~\ref{sec:compute} evaluates that closed form by a Taylor expansion on boxes one bandwidth wide, summed as one transform of the shared moments. Calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). Section~\ref{sec:tails} adds the endpoints that complete the distribution, and those knots enter the sum in \eqref{eq:smooth-penalty}.
 \label{sec:closed}
 
 \section{Two Refinements}
@@ -319,11 +319,11 @@ with \(n\) the number of quoted strikes. This \(0.38\) is the bandwidth constant
 
 The product in \eqref{eq:phi-hat} is the convolution \eqref{eq:cubic}. On each cell the integrand is a polynomial times a Gaussian, and the integrals of those powers against \(\phi\) and \(\Phi\) are elementary. Summing the cells at every strike is the naive column of Table~\ref{tab:fft}.
 
-The same integrals admit a short expansion. The second derivative of the completed spline is piecewise linear, and it jumps where each flat tail meets the spline. The knots are partitioned into boxes no wider than the narrow bandwidth, with the last edge on the last knot. On a box, the moments of that linear piece against powers of the distance from the box centre are exact, so the three widths in \eqref{eq:phi-thrice} share them. The Taylor expansion of the Gaussian about the centre converts each moment into one term, through degree eight. Boxes more than five standard deviations from the evaluation point are omitted. The endpoint jumps are added as the kernel itself, outside the series. The call is the same expansion of the cubic, and each flat tail contributes a Gaussian cdf. On the exact, noisy, and listed designs below, this evaluation reproduces the printed integrated squared errors, the selected penalties, and the listed out-of-the-money errors.
+The same integrals admit a short expansion. The second derivative of the completed spline is piecewise linear, and it jumps where each flat tail meets the spline. The knots are partitioned into boxes no wider than the narrow bandwidth, with the last edge on the last knot. On a box, the moments of that linear piece and of the cubic itself, against powers of the distance from the box centre, are exact through degree eight, so the three widths in \eqref{eq:phi-thrice} share them. The centres are equally spaced, and the sum over boxes is one discrete Fourier transform. Multiplication by \((-i\omega)^k/k!\) is the Taylor term, and \eqref{eq:phi-thrice} is a single multiplier on that transform, so the three bandwidths are evaluated together. Strikes are read from the transform by cubic Hermite interpolation. The endpoint jumps are added as the kernel itself, and each flat tail contributes a Gaussian cdf. If the transform does not fit, the same series is summed inside a window of five standard deviations. On the exact, noisy, and listed designs below, this evaluation reproduces the printed integrated squared errors, the selected penalties, and the listed out-of-the-money errors.
 
-The convolution is also one real discrete Fourier transform of the spline, held at its endpoint values outside the knots. The samples sit on a uniform grid whose step is one sixty-fourth of the smaller of the median knot spacing and the bandwidth, running ten widths of the widest kernel past every strike at which the density or the call is read. The replication uses that transform when the expansion cannot be compiled. On the designs below the two agree past the printed precision.
+When that expansion cannot be compiled, the convolution is one real discrete Fourier transform of the spline, held at its endpoint values outside the knots. The samples sit on a uniform grid whose step is one sixty-fourth of the smaller of the median knot spacing and the bandwidth, running ten widths of the widest kernel past every strike at which the density or the call is read. On the designs below the two agree past the printed precision.
 
-Table~\ref{tab:fft} records the wall-clock time of one fit at \eqref{eq:h-d2}, the search over the penalty grid included. Against the naive sum over cells, the expansion is between \(25.0\) and \(188.5\) times as fast.
+Table~\ref{tab:fft} records the wall-clock time of one fit at \eqref{eq:h-d2}, the search over the penalty grid included. Against the naive sum over cells, the expansion is between \(25.9\) and \(203.9\) times as fast.
 
 \begin{table}[H]
 \centering
@@ -336,14 +336,14 @@ Table~\ref{tab:fft} records the wall-clock time of one fit at \eqref{eq:h-d2}, t
 \toprule
 \multicolumn{1}{c}{Design} & \multicolumn{1}{c}{Naive} & \multicolumn{1}{c}{Expansion} & \multicolumn{1}{c}{Speedup} \\
 \midrule
-Heston, dense & 4.336 & 0.031 & 140.0 \\
-Heston, sparse & 0.243 & 0.010 & 25.1 \\
-Variance gamma, dense & 4.209 & 0.031 & 135.3 \\
-Variance gamma, sparse & 0.240 & 0.010 & 25.0 \\
-SPX 18 Dec 2026 & 8.505 & 0.045 & 188.5 \\
-SPX 19 Mar 2027 & 3.650 & 0.027 & 135.0 \\
-NDX 18 Dec 2026 & 5.469 & 0.034 & 159.4 \\
-RUT 18 Dec 2026 & 1.494 & 0.016 & 91.4 \\
+Heston, dense & 4.310 & 0.029 & 150.0 \\
+Heston, sparse & 0.243 & 0.009 & 28.5 \\
+Variance gamma, dense & 4.224 & 0.028 & 150.4 \\
+Variance gamma, sparse & 0.240 & 0.009 & 25.9 \\
+SPX 18 Dec 2026 & 8.549 & 0.042 & 203.9 \\
+SPX 19 Mar 2027 & 3.649 & 0.024 & 149.1 \\
+NDX 18 Dec 2026 & 5.520 & 0.032 & 174.5 \\
+RUT 18 Dec 2026 & 1.521 & 0.016 & 97.4 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -576,87 +576,87 @@ Hold-out refits the projection and every tuned method on the training strikes on
 SPX Dec & Ours
   & 0.041 & 0.036 & 0.034 & 0.041 & 1.0 & 1.0 & 1.0 \\
 SPX Dec & PCA
-  & 0.055 & 0.051 & 0.053 & 0.048 & 1.0 & 1.0 & 147.1 \\
+  & 0.055 & 0.051 & 0.053 & 0.048 & 1.0 & 1.0 & 249.9 \\
 SPX Dec & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.055 & 0.032 & 0.031 & 0.037 & 1.0 & 1.1 & 36.4 \\
+  & 0.055 & 0.032 & 0.031 & 0.037 & 1.0 & 1.1 & 62.2 \\
 SPX Dec & \citeauthor{grith2012}, IV, CV
-  & 0.074 & 0.031 & 0.030 & 0.035 & 1.0 & 1.3 & 34.6 \\
+  & 0.074 & 0.031 & 0.030 & 0.035 & 1.0 & 1.3 & 58.9 \\
 SPX Dec & \citeauthor{aitsahalia1998}
-  & 4.626 & 4.626 & 3.442 & 7.124 & 1.0 & 1.0 & 9.2 \\
+  & 4.626 & 4.626 & 3.442 & 7.124 & 1.0 & 1.0 & 16.4 \\
 SPX Dec & \citeauthor{aitsahalia2003}
-  & 5.385 & 4.272 & 3.263 & 6.450 & 1.0 & 1.0 & 6.4 \\
+  & 5.385 & 4.272 & 3.263 & 6.450 & 1.0 & 1.0 & 10.7 \\
 SPX Dec & \citeauthor{grith2012}, call, \(2\times\)
-  & 9.964 & 0.031 & 0.030 & 0.036 & 1.0 & 1.1 & 30.1 \\
+  & 9.964 & 0.031 & 0.030 & 0.036 & 1.0 & 1.1 & 50.2 \\
 SPX Dec & \citeauthor{grith2012}, call, CV
-  & 14.653 & 0.029 & 0.029 & 0.032 & 1.0 & 3.4 & 29.7 \\
+  & 14.653 & 0.029 & 0.029 & 0.032 & 1.0 & 3.4 & 49.8 \\
 \midrule
 SPX Mar & Ours
   & 0.066 & 0.056 & 0.052 & 0.067 & 1.0 & 1.0 & 1.0 \\
 SPX Mar & PCA
-  & 0.075 & 0.066 & 0.061 & 0.077 & 1.0 & 1.0 & 87.6 \\
+  & 0.075 & 0.066 & 0.061 & 0.077 & 1.0 & 1.0 & 117.5 \\
 SPX Mar & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.282 & 0.165 & 0.143 & 0.215 & 1.0 & 1.0 & 31.8 \\
+  & 0.282 & 0.165 & 0.143 & 0.215 & 1.0 & 1.0 & 45.8 \\
 SPX Mar & \citeauthor{grith2012}, IV, CV
-  & 0.091 & 0.051 & 0.049 & 0.057 & 1.0 & 1.0 & 30.7 \\
+  & 0.091 & 0.051 & 0.049 & 0.057 & 1.0 & 1.0 & 42.3 \\
 SPX Mar & \citeauthor{aitsahalia1998}
-  & 1.312 & 0.910 & 0.609 & 1.474 & 1.0 & 1.1 & 8.7 \\
+  & 1.312 & 0.910 & 0.609 & 1.474 & 1.0 & 1.1 & 12.0 \\
 SPX Mar & \citeauthor{aitsahalia2003}
-  & 9.965 & 7.837 & 5.633 & 12.202 & 1.0 & 1.0 & 2.6 \\
+  & 9.965 & 7.837 & 5.633 & 12.202 & 1.0 & 1.0 & 3.6 \\
 SPX Mar & \citeauthor{grith2012}, call, \(2\times\)
-  & 1.339 & 0.152 & 0.107 & 0.240 & 1.0 & 1.0 & 24.1 \\
+  & 1.339 & 0.152 & 0.107 & 0.240 & 1.0 & 1.0 & 34.9 \\
 SPX Mar & \citeauthor{grith2012}, call, CV
-  & 18.635 & 0.042 & 0.040 & 0.048 & 1.0 & 1.0 & 22.5 \\
+  & 18.635 & 0.042 & 0.040 & 0.048 & 1.0 & 1.0 & 32.3 \\
 \midrule
 NDX Dec & Ours
   & 1.109 & 1.065 & 1.113 & 0.792 & 1.0 & 1.0 & 1.0 \\
 NDX Dec & PCA
-  & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.3 & 47.5 \\
+  & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.3 & 45.4 \\
 NDX Dec & \citeauthor{grith2012}, IV, \(2\times\)
-  & 1.236 & 0.946 & 0.991 & 0.686 & 1.0 & 1.2 & 4.0 \\
+  & 1.236 & 0.946 & 0.991 & 0.686 & 1.0 & 1.2 & 4.3 \\
 NDX Dec & \citeauthor{grith2012}, IV, CV
-  & 1.248 & 0.867 & 0.921 & 0.524 & 1.0 & 3.0 & 3.9 \\
+  & 1.248 & 0.867 & 0.921 & 0.524 & 1.0 & 3.0 & 4.2 \\
 NDX Dec & \citeauthor{aitsahalia1998}
-  & 25.840 & 25.839 & 21.836 & 40.004 & 1.0 & 1.0 & 1.0 \\
+  & 25.840 & 25.839 & 21.836 & 40.004 & 1.0 & 1.0 & 1.1 \\
 NDX Dec & \citeauthor{aitsahalia2003}
   & 19.189 & 16.023 & 14.909 & 20.619 & 1.0 & 1.1 & 0.5 \\
 NDX Dec & \citeauthor{grith2012}, call, \(2\times\)
-  & 40.791 & 0.946 & 0.993 & 0.677 & 1.0 & 1.1 & 3.4 \\
+  & 40.791 & 0.946 & 0.993 & 0.677 & 1.0 & 1.1 & 3.6 \\
 NDX Dec & \citeauthor{grith2012}, call, CV
-  & 79.411 & 0.867 & 0.922 & 0.523 & 0.9 & 2.8 & 3.3 \\
+  & 79.411 & 0.867 & 0.922 & 0.523 & 0.9 & 2.8 & 3.5 \\
 \midrule
 RUT Dec & Ours
   & 0.031 & 0.026 & 0.027 & 0.024 & 1.0 & 1.0 & 1.0 \\
 RUT Dec & PCA
-  & 0.067 & 0.058 & 0.066 & 0.043 & 1.0 & 1.0 & 9.5 \\
+  & 0.067 & 0.058 & 0.066 & 0.043 & 1.0 & 1.0 & 9.6 \\
 RUT Dec & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.116 & 0.042 & 0.047 & 0.033 & 1.3 & 1.0 & 4.0 \\
+  & 0.116 & 0.042 & 0.047 & 0.033 & 1.3 & 1.0 & 4.1 \\
 RUT Dec & \citeauthor{grith2012}, IV, CV
-  & 0.039 & 0.026 & 0.027 & 0.025 & 1.0 & 1.1 & 3.9 \\
+  & 0.039 & 0.026 & 0.027 & 0.025 & 1.0 & 1.1 & 4.1 \\
 RUT Dec & \citeauthor{aitsahalia1998}
-  & 1.117 & 1.117 & 1.262 & 0.870 & 1.0 & 1.0 & 1.5 \\
+  & 1.117 & 1.117 & 1.262 & 0.870 & 1.0 & 1.0 & 1.6 \\
 RUT Dec & \citeauthor{aitsahalia2003}
   & 2.834 & 2.224 & 1.968 & 2.544 & 1.0 & 1.1 & 0.2 \\
 RUT Dec & \citeauthor{grith2012}, call, \(2\times\)
-  & 0.432 & 0.056 & 0.051 & 0.063 & 1.0 & 1.0 & 2.5 \\
+  & 0.432 & 0.056 & 0.051 & 0.063 & 1.0 & 1.0 & 2.6 \\
 RUT Dec & \citeauthor{grith2012}, call, CV
   & 7.026 & 0.022 & 0.022 & 0.023 & 1.0 & 1.1 & 2.5 \\
 \midrule
 Average & Ours
   & 0.312 & 0.296 & 0.306 & 0.231 & 1.0 & 1.0 & 1.0 \\
 Average & PCA
-  & 0.380 & 0.331 & 0.324 & 0.368 & 1.0 & 1.1 & 72.9 \\
+  & 0.380 & 0.331 & 0.324 & 0.368 & 1.0 & 1.1 & 105.6 \\
 Average & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.422 & 0.296 & 0.303 & 0.243 & 1.1 & 1.1 & 19.0 \\
+  & 0.422 & 0.296 & 0.303 & 0.243 & 1.1 & 1.1 & 29.1 \\
 Average & \citeauthor{grith2012}, IV, CV
-  & 0.363 & 0.244 & 0.257 & 0.160 & 1.0 & 1.6 & 18.3 \\
+  & 0.363 & 0.244 & 0.257 & 0.160 & 1.0 & 1.6 & 27.4 \\
 Average & \citeauthor{aitsahalia1998}
-  & 8.224 & 8.123 & 6.787 & 12.368 & 1.0 & 1.0 & 5.1 \\
+  & 8.224 & 8.123 & 6.787 & 12.368 & 1.0 & 1.0 & 7.8 \\
 Average & \citeauthor{aitsahalia2003}
-  & 9.343 & 7.589 & 6.443 & 10.454 & 1.0 & 1.0 & 2.4 \\
+  & 9.343 & 7.589 & 6.443 & 10.454 & 1.0 & 1.0 & 3.8 \\
 Average & \citeauthor{grith2012}, call, \(2\times\)
-  & 13.131 & 0.297 & 0.295 & 0.254 & 1.0 & 1.1 & 15.0 \\
+  & 13.131 & 0.297 & 0.295 & 0.254 & 1.0 & 1.1 & 22.8 \\
 Average & \citeauthor{grith2012}, call, CV
-  & 29.932 & 0.240 & 0.253 & 0.156 & 1.0 & 2.1 & 14.5 \\
+  & 29.932 & 0.240 & 0.253 & 0.156 & 1.0 & 2.1 & 22.0 \\
 \bottomrule
 \end{tabular}
 }
@@ -664,7 +664,7 @@ Average & \citeauthor{grith2012}, call, CV
 
 A fit inside the decreasing-convex cone cannot undercut the gap between the quoted calls and that cone. The plug-in local linear of \citeauthor{aitsahalia2003} remains far from the quotes. The positive convolution tracks them much more closely, and its NDX density has four peaks.
 
-The estimator of this paper has the smallest hold-out in Table~\ref{tab:listed} on each chain, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. On three chains the selected penalty is zero; on NDX it is positive. In sample the estimator is below the positive convolution on each chain. The cross-validated cubics of \citeauthor{grith2012} are as tight or tighter in sample, and the hold-out reverses that ranking. The call cubic fails in the far wing, where a one-sided fit on the held-out strikes misses the put. \citeauthor{aitsahalia1998} keeps one peak, with a larger pricing error. Once the tuning constants are known, this estimator prices both S\&P~500 chains in the least time. The plug-in local linear is faster on the Nasdaq and Russell chains. The smile matches this estimator to a tenth on Nasdaq and is slower on the other three chains. The positive convolution is slower on each chain. The local polynomials are slower on each chain.
+The estimator of this paper has the smallest hold-out in Table~\ref{tab:listed} on each chain, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. On three chains the selected penalty is zero; on NDX it is positive. In sample the estimator is below the positive convolution on each chain. The cross-validated cubics of \citeauthor{grith2012} are as tight or tighter in sample, and the hold-out reverses that ranking. The call cubic fails in the far wing, where a one-sided fit on the held-out strikes misses the put. \citeauthor{aitsahalia1998} keeps one peak, with a larger pricing error. Once the tuning constants are known, this estimator prices both S\&P~500 chains in the least time. The plug-in local linear is faster on the Nasdaq and Russell chains. The smile is a tenth slower on Nasdaq and slower on the other three chains. The positive convolution is slower on each chain. The local polynomials are slower on each chain.
 
 Total variation, defined in the caption of Table~\ref{tab:listed}, charges an extra oscillation by its height relative to the mode. The cross-validated cubics oscillate. They are drawn in \ref{app:wiggly} rather than on the axes of Figure~\ref{fig:listed}. The doubled call cubic, the plug-in local linear, and \citeauthor{aitsahalia1998} are on the left of that figure.
 

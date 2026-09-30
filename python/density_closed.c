@@ -5,8 +5,13 @@
 /* Gaussian convolution of a flat-extended cubic spline.
    P'' is piecewise linear between the knots, with a slope jump where the
    flat tails meet the spline. Cells are gathered into boxes one narrow
-   bandwidth wide. On each box the kernel is the order-8 Hermite expansion
-   of the Gaussian, and thricing reuses those moments at the wider widths.
+   bandwidth wide and replaced by their exact moments through degree eight.
+   The box centres are equally spaced, so one FFT of those moments, multiplied
+   by (-iω)^k/k! and by the thriced Gaussian factor, evaluates every bandwidth
+   at once. Strikes are read off that grid by cubic Hermite interpolation.
+   Endpoint slope jumps are added as the kernel itself. If that transform
+   does not fit, the same series is summed in a window of five standard
+   deviations.
    g2 is the second derivative of the convolved extension (the call density
    is -F g2). level is the convolved extension minus the left endpoint.
    g2_plain is the untwiced second derivative. Density and level may be
@@ -14,8 +19,9 @@
    be allocated. */
 
 static const double INV_SQRT_2PI = 0.3989422804014327;
-enum { ORDER = 8, NMOM = ORDER + 1 };
+enum { ORDER = 8, NMOM = ORDER + 1, RBOX = 4 };
 #define WINDOW 5.0
+#define PAD_SIGMA 8.0
 
 /* Cephes exponential. The kernel only evaluates exp(-u^2/2) for |u| of a few
    units, where this rational form is within one ulp of libm and several times
@@ -86,6 +92,343 @@ static void zero_out(double *g2, int n, double *level, int nl, double *g2_plain)
     if (g2_plain) {
         for (i = 0; i < n; i++) g2_plain[i] = 0.0;
     }
+}
+
+static int next_pow2(int n) {
+    int p = 1;
+    if (n < 1) return 1;
+    while (p < n) {
+        if (p > (1 << 20)) return -1;
+        p <<= 1;
+    }
+    return p;
+}
+
+/* In-place radix-2 complex FFT. sign -1 matches the analysis transform. */
+static void fft_radix2(double *re, double *im, int n, int sign) {
+    int i, j, len, half;
+    for (i = 1, j = 0; i < n; i++) {
+        int bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) {
+            double tr = re[i]; re[i] = re[j]; re[j] = tr;
+            tr = im[i]; im[i] = im[j]; im[j] = tr;
+        }
+    }
+    for (len = 2; len <= n; len <<= 1) {
+        double ang = (double)sign * 6.28318530717958647692 / (double)len;
+        double wlen_re = cos(ang), wlen_im = sin(ang);
+        half = len >> 1;
+        for (i = 0; i < n; i += len) {
+            double wr = 1.0, wi = 0.0;
+            for (j = 0; j < half; j++) {
+                int u = i + j, v = u + half;
+                double tr = wr * re[v] - wi * im[v];
+                double ti = wr * im[v] + wi * re[v];
+                double nwr;
+                re[v] = re[u] - tr;
+                im[v] = im[u] - ti;
+                re[u] += tr;
+                im[u] += ti;
+                nwr = wr * wlen_re - wi * wlen_im;
+                wi = wr * wlen_im + wi * wlen_re;
+                wr = nwr;
+            }
+        }
+    }
+    if (sign > 0) {
+        double inv = 1.0 / (double)n;
+        for (i = 0; i < n; i++) {
+            re[i] *= inv;
+            im[i] *= inv;
+        }
+    }
+}
+
+static void hermite_at(
+    const double *grid0, double delta, int ngrid,
+    const double *y, const double *dy, const double *x, int nx, double *out)
+{
+    int i;
+    for (i = 0; i < nx; i++) {
+        double pos = (x[i] - grid0[0]) / delta;
+        int j = (int)floor(pos);
+        double z, y0, y1, m0, m1, z1, h00, h10, h01, h11;
+        if (j < 0) j = 0;
+        if (j > ngrid - 2) j = ngrid - 2;
+        z = pos - (double)j;
+        if (z < 0.0) z = 0.0;
+        if (z > 1.0) z = 1.0;
+        y0 = y[j];
+        y1 = y[j + 1];
+        m0 = dy[j] * delta;
+        m1 = dy[j + 1] * delta;
+        z1 = 1.0 - z;
+        h00 = (1.0 + 2.0 * z) * z1 * z1;
+        h10 = z * z1 * z1;
+        h01 = z * z * (3.0 - 2.0 * z);
+        h11 = z * z * (z - 1.0);
+        out[i] = h00 * y0 + h10 * m0 + h01 * y1 + h11 * m1;
+    }
+}
+
+static void add_endpoints(
+    const double *x, int nx, double t0, double tm, double p1L, double p1R,
+    double left, double right, double h, const double *fac, const double *wt, int nfac,
+    int want_level, double *g2, double *level)
+{
+    int i, f;
+    for (i = 0; i < nx; i++) {
+        double acc = 0.0, lacc = 0.0;
+        for (f = 0; f < nfac; f++) {
+            double hh = h * fac[f];
+            double invh = 1.0 / hh;
+            double u0 = (x[i] - t0) / hh;
+            double u1 = (x[i] - tm) / hh;
+            acc += wt[f] * (p1L * fast_exp(-0.5 * u0 * u0) - p1R * fast_exp(-0.5 * u1 * u1))
+                * INV_SQRT_2PI * invh;
+            if (want_level) {
+                lacc += wt[f] * (-left * ndtr(u0) + right * ndtr(u1));
+            }
+        }
+        if (g2) g2[i] += acc;
+        if (level) level[i] += lacc;
+    }
+}
+
+/* NumPy's fftfreq puts the Nyquist bin on the negative frequency. The Gaussian
+   multiplier is already underflow there; the sign only matters for odd powers. */
+static inline double omega_at(int m, int n, double delta) {
+    int mf = (m < n - m) ? m : m - n;
+    return 6.28318530717958647692 * (double)mf / ((double)n * delta);
+}
+
+static void pk_begin(double *pk_re, double *pk_im, int n) {
+    int m;
+    for (m = 0; m < n; m++) {
+        pk_re[m] = 1.0;
+        pk_im[m] = 0.0;
+    }
+}
+
+static void pk_step(double *pk_re, double *pk_im, int n, double delta, int k) {
+    double inv;
+    int m;
+    if (k >= ORDER) return;
+    inv = 1.0 / (double)(k + 1);
+    for (m = 0; m < n; m++) {
+        double w = omega_at(m, n, delta) * inv;
+        double nr = w * pk_im[m];
+        double ni = -w * pk_re[m];
+        pk_re[m] = nr;
+        pk_im[m] = ni;
+    }
+}
+
+/* Length-M FFT of one real moment sequence placed at short indices j0s+b.
+   M = nfft/RBOX is a power of two, and the full-length bins repeat it. */
+static void accum_one(
+    const double *mom, int nbox, int j0s, int nfft, double delta, int k,
+    double *work_re, double *work_im, double *pk_re, double *pk_im,
+    double *spec_re, double *spec_im)
+{
+    int M = nfft / RBOX;
+    int b, m;
+    for (b = 0; b < M; b++) {
+        work_re[b] = 0.0;
+        work_im[b] = 0.0;
+    }
+    for (b = 0; b < nbox; b++) work_re[j0s + b] = mom[(size_t)b * NMOM + k];
+    fft_radix2(work_re, work_im, M, -1);
+    for (m = 0; m < nfft; m++) {
+        int p = m & (M - 1);
+        double ar = work_re[p], ai = work_im[p];
+        double pr = pk_re[m], pi = pk_im[m];
+        spec_re[m] += ar * pr - ai * pi;
+        spec_im[m] += ar * pi + ai * pr;
+    }
+    pk_step(pk_re, pk_im, nfft, delta, k);
+}
+
+/* mu and nu are real. One complex FFT of mu + i nu returns both. */
+static void accum_both(
+    const double *mu, const double *nu, int nbox, int j0s, int nfft, double delta, int k,
+    double *work_re, double *work_im, double *pk_re, double *pk_im,
+    double *specm_re, double *specm_im, double *specn_re, double *specn_im)
+{
+    int M = nfft / RBOX;
+    int b, m;
+    for (b = 0; b < M; b++) {
+        work_re[b] = 0.0;
+        work_im[b] = 0.0;
+    }
+    for (b = 0; b < nbox; b++) {
+        int s = j0s + b;
+        work_re[s] = mu[(size_t)b * NMOM + k];
+        work_im[s] = nu[(size_t)b * NMOM + k];
+    }
+    fft_radix2(work_re, work_im, M, -1);
+    for (m = 0; m < nfft; m++) {
+        int p = m & (M - 1);
+        int q = (M - p) & (M - 1);
+        double zr = work_re[p], zi = work_im[p];
+        double qr = work_re[q], qi = work_im[q];
+        double ur = 0.5 * (zr + qr), ui = 0.5 * (zi - qi);
+        double vr = 0.5 * (zi + qi), vi = -0.5 * (zr - qr);
+        double pr = pk_re[m], pi = pk_im[m];
+        specm_re[m] += ur * pr - ui * pi;
+        specm_im[m] += ur * pi + ui * pr;
+        specn_re[m] += vr * pr - vi * pi;
+        specn_im[m] += vr * pi + vi * pr;
+    }
+    pk_step(pk_re, pk_im, nfft, delta, k);
+}
+
+/* IFFT of spec * psi/delta. Multiplying by (1 - ω) packs the convolution in
+   the real part and its derivative in the imaginary part, because the
+   derivative's multiplier is iω and i*(iω) = -ω. */
+static void invert_packed(
+    const double *spec_re, const double *spec_im, int nfft, double delta,
+    double h, const double *fac, const double *wt, int nfac,
+    double *re, double *im)
+{
+    int m, f;
+    for (m = 0; m < nfft; m++) {
+        double om = omega_at(m, nfft, delta);
+        double psi = 0.0, scale;
+        for (f = 0; f < nfac; f++) {
+            double hw = h * fac[f] * om;
+            psi += wt[f] * fast_exp(-0.5 * hw * hw);
+        }
+        scale = (psi / delta) * (1.0 - om);
+        re[m] = spec_re[m] * scale;
+        im[m] = spec_im[m] * scale;
+    }
+    re[nfft / 2] = 0.0;
+    im[nfft / 2] = 0.0;
+    fft_radix2(re, im, nfft, 1);
+}
+
+static int fft_eval(
+    const double *x, int n,
+    const double *xl, int nl,
+    const double *t, const double *p1, int m,
+    double h, const double *fac, const double *wt, int nfac,
+    const double *mu, const double *nu, int nbox, double width,
+    double left, double right, int want_level, int want_plain,
+    double *g2, double *level, double *g2_plain)
+{
+    double origin, delta, fac_max, reach, lo, hi, x0;
+    double *block, *work_re, *work_im, *specm_re, *specm_im;
+    double *specn_re, *specn_im, *pk_re, *pk_im;
+    double t0, tm, p1L, p1R, fac1, wt1;
+    int i, f, k, j0, j0s, j_last, j_need, nfft, has_unit;
+    int need_mu, need_nu;
+
+    fac_max = fac[0];
+    has_unit = 0;
+    for (f = 0; f < nfac; f++) {
+        if (fac[f] > fac_max) fac_max = fac[f];
+        if (fac[f] == 1.0) has_unit = 1;
+    }
+    lo = t[0];
+    hi = t[m - 1];
+    for (i = 0; i < n; i++) {
+        if (x[i] < lo) lo = x[i];
+        if (x[i] > hi) hi = x[i];
+    }
+    if (want_level && xl) {
+        for (i = 0; i < nl; i++) {
+            if (xl[i] < lo) lo = xl[i];
+            if (xl[i] > hi) hi = xl[i];
+        }
+    }
+    origin = t[0] + 0.5 * width;
+    delta = width / (double)RBOX;
+    reach = PAD_SIGMA * h * fac_max;
+    j0 = (int)ceil((origin - (lo - reach)) / delta - 1e-12);
+    if (j0 < RBOX) j0 = RBOX;
+    /* Centres sit on multiples of RBOX, so a length-M FFT already includes the shift. */
+    j0 = (j0 + RBOX - 1) / RBOX * RBOX;
+    j0s = j0 / RBOX;
+    x0 = origin - (double)j0 * delta;
+    j_last = j0 + (nbox - 1) * RBOX;
+    j_need = (int)ceil((hi + reach - x0) / delta - 1e-12) + 2;
+    if (j_last + 2 > j_need) j_need = j_last + 2;
+    if ((j0s + nbox) * RBOX > j_need) j_need = (j0s + nbox) * RBOX;
+    nfft = next_pow2(j_need);
+    if (nfft < RBOX || nfft / RBOX < j0s + nbox) return -1;
+
+    block = (double *)calloc((size_t)8 * (size_t)nfft, sizeof(double));
+    if (!block) return -1;
+    work_re = block;
+    work_im = block + nfft;
+    specm_re = block + 2 * nfft;
+    specm_im = block + 3 * nfft;
+    specn_re = block + 4 * nfft;
+    specn_im = block + 5 * nfft;
+    pk_re = block + 6 * nfft;
+    pk_im = block + 7 * nfft;
+
+    need_mu = (g2 && n > 0) || (want_plain && g2_plain && n > 0);
+    need_nu = want_level && level && nl > 0 && nu;
+    pk_begin(pk_re, pk_im, nfft);
+    if (need_mu && need_nu) {
+        for (k = 0; k <= ORDER; k++) {
+            accum_both(
+                mu, nu, nbox, j0s, nfft, delta, k,
+                work_re, work_im, pk_re, pk_im,
+                specm_re, specm_im, specn_re, specn_im);
+        }
+    } else if (need_mu) {
+        for (k = 0; k <= ORDER; k++) {
+            accum_one(
+                mu, nbox, j0s, nfft, delta, k,
+                work_re, work_im, pk_re, pk_im, specm_re, specm_im);
+        }
+    } else if (need_nu) {
+        for (k = 0; k <= ORDER; k++) {
+            accum_one(
+                nu, nbox, j0s, nfft, delta, k,
+                work_re, work_im, pk_re, pk_im, specm_re, specm_im);
+        }
+    }
+
+    t0 = t[0];
+    tm = t[m - 1];
+    p1L = p1[0];
+    p1R = p1[m - 1];
+    fac1 = 1.0;
+    wt1 = 1.0;
+    if (need_mu) {
+        if (g2 && n > 0) {
+            invert_packed(specm_re, specm_im, nfft, delta, h, fac, wt, nfac, work_re, work_im);
+            hermite_at(&x0, delta, nfft, work_re, work_im, x, n, g2);
+            add_endpoints(x, n, t0, tm, p1L, p1R, left, right, h, fac, wt, nfac, 0, g2, NULL);
+        }
+        if (want_plain && g2_plain && n > 0) {
+            if (has_unit) {
+                invert_packed(specm_re, specm_im, nfft, delta, h, &fac1, &wt1, 1, work_re, work_im);
+                hermite_at(&x0, delta, nfft, work_re, work_im, x, n, g2_plain);
+                add_endpoints(
+                    x, n, t0, tm, p1L, p1R, left, right, h, &fac1, &wt1, 1, 0, g2_plain, NULL);
+            } else {
+                for (i = 0; i < n; i++) g2_plain[i] = 0.0;
+            }
+        }
+    } else if (g2_plain && n > 0) {
+        for (i = 0; i < n; i++) g2_plain[i] = 0.0;
+    }
+    if (need_nu) {
+        double *sr = need_mu ? specn_re : specm_re;
+        double *si = need_mu ? specn_im : specm_im;
+        invert_packed(sr, si, nfft, delta, h, fac, wt, nfac, work_re, work_im);
+        hermite_at(&x0, delta, nfft, work_re, work_im, xl, nl, level);
+        add_endpoints(xl, nl, t0, tm, p1L, p1R, left, right, h, fac, wt, nfac, 1, NULL, level);
+    }
+    free(block);
+    return 0;
 }
 
 static inline __attribute__((always_inline)) void one_bandwidth(
@@ -380,20 +723,24 @@ int rnd_conv(
     }
     left = p0[0];
     right = p0[m - 1];
-    if (want_level && xl == x && nl == n) {
-        eval_points(
-            x, n, t, p1, m, h, fac, wt, nfac, mu, nu, nbox, width,
-            left, right, 1, g2_plain != NULL, g2, level, g2_plain);
-    } else {
-        if ((g2 || g2_plain) && n > 0) {
+    if (fft_eval(
+            x, n, xl, nl, t, p1, m, h, fac, wt, nfac, mu, nu, nbox, width,
+            left, right, want_level, g2_plain != NULL, g2, level, g2_plain) != 0) {
+        if (want_level && xl == x && nl == n) {
             eval_points(
-                x, n, t, p1, m, h, fac, wt, nfac, mu, NULL, nbox, width,
-                left, right, 0, g2_plain != NULL, g2, NULL, g2_plain);
-        }
-        if (want_level) {
-            eval_points(
-                xl, nl, t, p1, m, h, fac, wt, nfac, mu, nu, nbox, width,
-                left, right, 1, 0, NULL, level, NULL);
+                x, n, t, p1, m, h, fac, wt, nfac, mu, nu, nbox, width,
+                left, right, 1, g2_plain != NULL, g2, level, g2_plain);
+        } else {
+            if ((g2 || g2_plain) && n > 0) {
+                eval_points(
+                    x, n, t, p1, m, h, fac, wt, nfac, mu, NULL, nbox, width,
+                    left, right, 0, g2_plain != NULL, g2, NULL, g2_plain);
+            }
+            if (want_level) {
+                eval_points(
+                    xl, nl, t, p1, m, h, fac, wt, nfac, mu, nu, nbox, width,
+                    left, right, 1, 0, NULL, level, NULL);
+            }
         }
     }
     free(mu);

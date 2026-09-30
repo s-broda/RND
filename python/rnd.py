@@ -5,8 +5,10 @@ The public entry point is ``estimate_rnd``. Copy this file together with
 C compiler when one is present. It rescales calls to a complementary cdf,
 fits that function with a smoothing spline, completes the unquoted tails, and
 convolves the spline with a Gaussian. That integral is elementary on each
-cell of the cubic. The expansion in ``density_closed.c`` evaluates it; if
-that file cannot be compiled, the same convolution is one real FFT.
+cell of the cubic. The expansion in ``density_closed.c`` evaluates it
+by one FFT of the shared box moments, with thricing as one multiplier;
+if that file cannot be compiled, the same convolution is one real FFT
+of the sampled spline.
 Thricing and the penalty rule are on by default. The default bandwidth is
 ``0.38 F σ_ATM √T n^{-1/9}``.
 
@@ -403,7 +405,7 @@ def _c_ptr(a):
 
 
 def _convolve_series(spl, Ks, h, F, x, weights, level_at=None, with_plain=False):
-    """Density and level from the compiled cell expansion."""
+    """Density and level from one FFT of the order-eight box moments."""
     lib = _closed_library()
     if lib is None:
         raise RuntimeError("closed-form convolution is not compiled")
@@ -451,9 +453,10 @@ def _convolve_series(spl, Ks, h, F, x, weights, level_at=None, with_plain=False)
 def _convolve(spl, Ks, h, F, x, weights, level_at=None, with_plain=False):
     """Density and, if requested, the smoothed complementary cdf.
 
-    Compiled expansion of the cell integrals. The real FFT is the fallback
-    when that expansion cannot be built. ``with_plain`` also returns the
-    untwiced density for the penalty rule.
+    One FFT of the shared box moments, with thricing as one multiplier.
+    The sampled-spline FFT is the fallback when that file cannot be
+    compiled. ``with_plain`` also returns the untwiced density for the
+    penalty rule.
     """
     if _closed_library() is not None:
         return _convolve_series(spl, Ks, h, F, x, weights, level_at=level_at, with_plain=with_plain)
