@@ -7,8 +7,9 @@ Run from the repository root::
 Prints the Heston and variance-gamma ISE tables, including the listed
 competitors and a noisy Heston comparison, the listed pricing table, and
 the appendix scores for the smoothing spline. The estimator evaluates the
-convolution in equation (10) of the paper by one real FFT of the sampled
-spline. The script writes
+convolution in equation (10) of the paper by the expansion in
+density_closed.c, and by one real FFT of the sampled spline when that
+file cannot be compiled. The script writes
 figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
 figures/ccdf_listed.pdf, and figures/ccdf_listed_kern.pdf.
 """
@@ -1352,7 +1353,7 @@ def _smoothing_base(K, C, S0, r, T, q, h_rule="deriv"):
 
 
 def _thrice_from_spline(spl, Ks, h, F, x):
-    """Thriced convolution of a cubic spline of P. One FFT, as in estimate_rnd."""
+    """Thriced convolution of a cubic spline of P, as in estimate_rnd."""
     from rnd import _convolve
 
     x = np.asarray(x, float)
