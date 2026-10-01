@@ -620,11 +620,11 @@ Hold-out refits the projection and every tuned method on the training strikes on
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=98.6\), \(165.9\), \(606.0\), \(59.0\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.025\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Ours is listed first. It has the smallest hold-out on each chain, with one peak and total variation \(1.0\). The other rows follow the SPX December hold-out, smallest first.}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=98.6\), \(165.9\), \(606.0\), \(59.0\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.025\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Ours has the smallest hold-out on each chain, with one peak and total variation \(1.0\).}
 \label{tab:listed}
-{\fontsize{9}{10}\selectfont
-\setlength{\tabcolsep}{3.5pt}%
-\renewcommand{\arraystretch}{0.76}%
+{\fontsize{9.5}{11}\selectfont
+\setlength{\tabcolsep}{4pt}%
+\renewcommand{\arraystretch}{0.68}%
 \begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=2.1] S[table-format=2.1]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} &
