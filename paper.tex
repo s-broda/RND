@@ -52,7 +52,7 @@ This paper estimates that density from the empirical measure of a single maturit
 
 We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{aitsahalia2003} smooth a decreasing-convex projection of the calls with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. \citet{aitsahalia1998} smooth implied volatility, and \citet{grith2012} use a local cubic of the call and of implied volatility. On the listed chains of Section~\ref{sec:emp} the even/odd hold-out error is smaller than each of these methods on every chain, and the fitted density has one peak, mass \(1.0\), and total variation \(1.0\). The out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}, and on noisy Heston quotes the mean integrated squared error is below it as well.
 
-The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency of the estimator and states the bandwidth used below. Section~\ref{sec:compute} evaluates that closed form and records the speedup against the naive cell integrals. Section~\ref{sec:heston} compares that estimator with those of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
+The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency of the estimator and states the bandwidth used below. Section~\ref{sec:compute} evaluates the convolution by a fast Fourier transform and records the speedup against the naive cell integrals. Section~\ref{sec:heston} compares that estimator with those of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
 
 \section{Related Work}
 \label{sec:lit}
@@ -211,7 +211,7 @@ The factor \(e^{-h^2 s^2/2}\) is convolution against \(\kappa_h\), and multiplic
 \;=\;
 (P^{\mathrm{cs}\prime}\ast\mathcal{K}_h)(K).
 \end{equation}
-On each cell the integrand is a quadratic times a Gaussian. The integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary, so \eqref{eq:cubic} is closed form. Section~\ref{sec:compute} evaluates that closed form by a Taylor expansion on boxes one bandwidth wide, summed as one transform of the shared moments. Calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). Section~\ref{sec:tails} adds the endpoints that complete the distribution, and those knots enter the sum in \eqref{eq:smooth-penalty}.
+On each cell the integrand is a quadratic times a Gaussian. The integrals of \(1\), \(u\), and \(u^2\) against \(\phi\) and \(\Phi\) are elementary, so \eqref{eq:cubic} is closed form. Section~\ref{sec:compute} evaluates the same convolution from \eqref{eq:phi-hat} with a fast Fourier transform. Calls are \(\hat C=S_0e^{-qT}(1-\hat P)\). Section~\ref{sec:tails} adds the endpoints that complete the distribution, and those knots enter the sum in \eqref{eq:smooth-penalty}.
 \label{sec:closed}
 
 \section{Two Refinements}
@@ -317,37 +317,31 @@ with \(n\) the number of quoted strikes. This \(0.38\) is the bandwidth constant
 \section{Computational concerns}
 \label{sec:compute}
 
-The product in \eqref{eq:phi-hat} is the convolution \eqref{eq:cubic}. On each cell the integrand is a polynomial times a Gaussian, and the integrals of those powers against \(\phi\) and \(\Phi\) are elementary. Summing the cells at every strike is the naive column of Table~\ref{tab:fft}.
+The product in \eqref{eq:phi-hat} is the convolution \eqref{eq:cubic}. The factor \(e^{-h^2 s^2/2}\) damps the characteristic function of the spline slope, multiplication by \(\mathrm{i}s\) differentiates that slope, and division by \(\mathrm{i}s\) integrates it. Thricing replaces the damping by \eqref{eq:phi-thrice}. Each step multiplies one transform, so a single discrete Fourier transform evaluates the plain convolution and the thriced combination together.
 
-The same integrals admit a short expansion. The second derivative of the completed spline is piecewise linear, and it jumps where each flat tail meets the spline. The knots are partitioned into boxes no wider than the narrow bandwidth, with the last edge on the last knot. On a box, the moments of that linear piece and of the cubic itself, against powers of the distance from the box centre, are exact through degree eight. The three widths in \eqref{eq:phi-thrice} share those moments.
+The completed spline is sampled on a uniform grid and held at its endpoint values outside the knots. The slope in \eqref{eq:cubic} is the derivative of that extension, so the transform of the slope is \(\mathrm{i}s\) times the transform of the samples. The grid step is one sixty-fourth of the smaller of the median knot spacing and the bandwidth. The grid runs ten widths of the widest kernel past every strike at which the density or the call is read, which keeps the periodic transform from wrapping into that window. The level in \eqref{eq:cubic} is the damped transform with the left endpoint removed. Every quoted strike is interpolated from that grid, so one transform of the chosen spline prices the chain.
 
-The centres are equally spaced. Four samples are kept in each box, and the grid runs eight standard deviations of the widest kernel past every knot and every strike at which the density or the call is read. The contribution of the boxes is then a discrete Fourier transform of each moment. Multiplication by \((-i\omega)^k/k!\) is the term of degree \(k\). Equation \eqref{eq:phi-thrice} multiplies that transform once, so the three bandwidths are evaluated together. The second derivative and the cubic share the forward transform. The convolved value and its first derivative are the real and imaginary parts of one inverse transform. Strikes are read from these samples by cubic Hermite interpolation. The endpoint jumps are added as the kernel itself, and each flat tail contributes a Gaussian cdf. If the transform does not fit, the same series is summed inside a window of five standard deviations. On the exact, noisy, and listed designs below, this evaluation reproduces the printed integrated squared errors, the selected penalties, and the listed out-of-the-money errors.
-
-At each strike a direct sum of that series visits the boxes inside five standard deviations. The boxes are one bandwidth wide, so the three windows hold about five, eight, and ten boxes. That count stays fixed as the mesh fills a fixed interval, and each strike then costs a few hundred operations. The transform evaluates the same series on a grid of a few hundred to about a thousand samples. The base-two logarithm of that length is about ten, a constant of the same kind as the window, which is why the gain is a small constant. Timed at the quoted strikes, after the spline is built, the convolution is \(2.1\), \(1.9\), \(2.4\), and \(1.2\) times as fast on the December S\&P~500, the March S\&P~500, the Nasdaq, and the Russell chain. Most of one fit is the spline and the search over the penalty grid, so the ratios in Table~\ref{tab:fft} move by less than the convolution alone.
-
-When that expansion cannot be compiled, the convolution is one real discrete Fourier transform of the spline, held at its endpoint values outside the knots. The samples sit on a uniform grid whose step is one sixty-fourth of the smaller of the median knot spacing and the bandwidth, running ten widths of the widest kernel past every strike at which the density or the call is read. On the designs below the two agree past the printed precision.
-
-Table~\ref{tab:fft} records the wall-clock time of one fit at \eqref{eq:h-d2}, the search over the penalty grid included. Against the naive sum over cells, the expansion is between \(25.9\) and \(203.9\) times as fast.
+The same convolution is the sum, over the cells of the spline, of the elementary integrals in Section~\ref{sec:construct}. On the exact, noisy, and listed designs below, the Fourier evaluation reproduces the printed integrated squared errors, the selected penalties, and the listed out-of-the-money errors. Table~\ref{tab:fft} records the wall-clock time of one fit at \eqref{eq:h-d2}, the search over the penalty grid included. Against that naive sum over cells, the Fourier evaluation is between \(15.5\) and \(103.3\) times as fast.
 
 \begin{table}[H]
 \centering
-\caption{Wall-clock seconds for one fit of the estimator. Naive is the sum of the closed-form cell integrals. Expansion is the evaluation of those integrals described above. The speedup is the ratio of those times.}
+\caption{Wall-clock seconds for one fit of the estimator. Naive is the sum of the closed-form cell integrals. FFT is the discrete Fourier evaluation of \eqref{eq:phi-hat} and \eqref{eq:phi-thrice}. The speedup is the ratio of those times.}
 \label{tab:fft}
 \begin{tabular}{l
   S[table-format=1.3]
   S[table-format=1.3]
   S[table-format=3.1]}
 \toprule
-\multicolumn{1}{c}{Design} & \multicolumn{1}{c}{Naive} & \multicolumn{1}{c}{Expansion} & \multicolumn{1}{c}{Speedup} \\
+\multicolumn{1}{c}{Design} & \multicolumn{1}{c}{Naive} & \multicolumn{1}{c}{FFT} & \multicolumn{1}{c}{Speedup} \\
 \midrule
-Heston, dense & 4.310 & 0.029 & 150.0 \\
-Heston, sparse & 0.243 & 0.009 & 28.5 \\
-Variance gamma, dense & 4.224 & 0.028 & 150.4 \\
-Variance gamma, sparse & 0.240 & 0.009 & 25.9 \\
-SPX 18 Dec 2026 & 8.549 & 0.042 & 203.9 \\
-SPX 19 Mar 2027 & 3.649 & 0.024 & 149.1 \\
-NDX 18 Dec 2026 & 5.520 & 0.032 & 174.5 \\
-RUT 18 Dec 2026 & 1.521 & 0.016 & 97.4 \\
+Heston, dense & 4.612 & 0.049 & 94.1 \\
+Heston, sparse & 0.285 & 0.013 & 21.9 \\
+Variance gamma, dense & 4.545 & 0.044 & 103.3 \\
+Variance gamma, sparse & 0.279 & 0.018 & 15.5 \\
+SPX 18 Dec 2026 & 8.908 & 0.121 & 73.6 \\
+SPX 19 Mar 2027 & 4.091 & 0.071 & 57.6 \\
+NDX 18 Dec 2026 & 6.012 & 0.070 & 85.9 \\
+RUT 18 Dec 2026 & 1.731 & 0.059 & 29.3 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -564,12 +558,12 @@ Hold-out refits the projection and every tuned method on the training strikes on
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=98.6\), \(165.9\), \(606.0\), \(59.0\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.025\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Time is the median wall-clock cost of a call at every quoted strike after the tuning constants are known, divided by Ours. Once the spline is chosen, those prices are the closed-form convolution of that spline. Average is the equal-weight mean of the four chains. Ours is listed first. It has the smallest hold-out on each chain, with one peak and total variation \(1.0\). The other rows follow the SPX December hold-out, smallest first.}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=98.6\), \(165.9\), \(606.0\), \(59.0\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.025\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Time is the wall-clock cost of a call at every quoted strike after the tuning constants are known, divided by Ours. Once the spline is chosen, those prices are read from one Fourier transform. Average is the equal-weight mean of the four chains. Ours is listed first. It has the smallest hold-out on each chain, with one peak and total variation \(1.0\). The other rows follow the SPX December hold-out, smallest first.}
 \label{tab:listed}
 {\scriptsize
 \setlength{\tabcolsep}{3pt}%
 \renewcommand{\arraystretch}{0.82}%
-\begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=2.1] S[table-format=2.1] S[table-format=3.1]}
+\begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=2.1] S[table-format=2.1] S[table-format=2.1]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} &
   \multicolumn{1}{c}{Hold-out} & \multicolumn{1}{c}{RMSE OTM} &
@@ -580,87 +574,87 @@ Hold-out refits the projection and every tuned method on the training strikes on
 SPX Dec & Ours
   & 0.041 & 0.036 & 0.034 & 0.041 & 1.0 & 1.0 & 1.0 \\
 SPX Dec & PCA
-  & 0.055 & 0.051 & 0.053 & 0.048 & 1.0 & 1.0 & 249.9 \\
+  & 0.055 & 0.051 & 0.053 & 0.048 & 1.0 & 1.0 & 13.8 \\
 SPX Dec & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.055 & 0.032 & 0.031 & 0.037 & 1.0 & 1.1 & 62.2 \\
+  & 0.055 & 0.032 & 0.031 & 0.037 & 1.0 & 1.1 & 4.6 \\
 SPX Dec & \citeauthor{grith2012}, IV, CV
-  & 0.074 & 0.031 & 0.030 & 0.035 & 1.0 & 1.3 & 58.9 \\
+  & 0.074 & 0.031 & 0.030 & 0.035 & 1.0 & 1.3 & 2.7 \\
 SPX Dec & \citeauthor{aitsahalia1998}
-  & 4.626 & 4.626 & 3.442 & 7.124 & 1.0 & 1.0 & 16.4 \\
+  & 4.626 & 4.626 & 3.442 & 7.124 & 1.0 & 1.0 & 0.4 \\
 SPX Dec & \citeauthor{aitsahalia2003}
-  & 5.385 & 4.272 & 3.263 & 6.450 & 1.0 & 1.0 & 10.7 \\
+  & 5.385 & 4.272 & 3.263 & 6.450 & 1.0 & 1.0 & 0.6 \\
 SPX Dec & \citeauthor{grith2012}, call, \(2\times\)
-  & 9.964 & 0.031 & 0.030 & 0.036 & 1.0 & 1.1 & 50.2 \\
+  & 9.964 & 0.031 & 0.030 & 0.036 & 1.0 & 1.1 & 2.8 \\
 SPX Dec & \citeauthor{grith2012}, call, CV
-  & 14.653 & 0.029 & 0.029 & 0.032 & 1.0 & 3.4 & 49.8 \\
+  & 14.653 & 0.029 & 0.029 & 0.032 & 1.0 & 3.4 & 2.7 \\
 \midrule
 SPX Mar & Ours
   & 0.066 & 0.056 & 0.052 & 0.067 & 1.0 & 1.0 & 1.0 \\
 SPX Mar & PCA
-  & 0.075 & 0.066 & 0.061 & 0.077 & 1.0 & 1.0 & 117.5 \\
+  & 0.075 & 0.066 & 0.061 & 0.077 & 1.0 & 1.0 & 10.5 \\
 SPX Mar & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.282 & 0.165 & 0.143 & 0.215 & 1.0 & 1.0 & 45.8 \\
+  & 0.282 & 0.165 & 0.143 & 0.215 & 1.0 & 1.0 & 3.1 \\
 SPX Mar & \citeauthor{grith2012}, IV, CV
-  & 0.091 & 0.051 & 0.049 & 0.057 & 1.0 & 1.0 & 42.3 \\
+  & 0.091 & 0.051 & 0.049 & 0.057 & 1.0 & 1.0 & 2.9 \\
 SPX Mar & \citeauthor{aitsahalia1998}
-  & 1.312 & 0.910 & 0.609 & 1.474 & 1.0 & 1.1 & 12.0 \\
+  & 1.312 & 0.910 & 0.609 & 1.474 & 1.0 & 1.1 & 0.3 \\
 SPX Mar & \citeauthor{aitsahalia2003}
-  & 9.965 & 7.837 & 5.633 & 12.202 & 1.0 & 1.0 & 3.6 \\
+  & 9.965 & 7.837 & 5.633 & 12.202 & 1.0 & 1.0 & 0.3 \\
 SPX Mar & \citeauthor{grith2012}, call, \(2\times\)
-  & 1.339 & 0.152 & 0.107 & 0.240 & 1.0 & 1.0 & 34.9 \\
+  & 1.339 & 0.152 & 0.107 & 0.240 & 1.0 & 1.0 & 2.9 \\
 SPX Mar & \citeauthor{grith2012}, call, CV
-  & 18.635 & 0.042 & 0.040 & 0.048 & 1.0 & 1.0 & 32.3 \\
+  & 18.635 & 0.042 & 0.040 & 0.048 & 1.0 & 1.0 & 2.7 \\
 \midrule
 NDX Dec & Ours
   & 1.109 & 1.065 & 1.113 & 0.792 & 1.0 & 1.0 & 1.0 \\
 NDX Dec & PCA
-  & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.3 & 45.4 \\
+  & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.3 & 19.1 \\
 NDX Dec & \citeauthor{grith2012}, IV, \(2\times\)
-  & 1.236 & 0.946 & 0.991 & 0.686 & 1.0 & 1.2 & 4.3 \\
+  & 1.236 & 0.946 & 0.991 & 0.686 & 1.0 & 1.2 & 2.5 \\
 NDX Dec & \citeauthor{grith2012}, IV, CV
-  & 1.248 & 0.867 & 0.921 & 0.524 & 1.0 & 3.0 & 4.2 \\
+  & 1.248 & 0.867 & 0.921 & 0.524 & 1.0 & 3.0 & 1.7 \\
 NDX Dec & \citeauthor{aitsahalia1998}
-  & 25.840 & 25.839 & 21.836 & 40.004 & 1.0 & 1.0 & 1.1 \\
+  & 25.840 & 25.839 & 21.836 & 40.004 & 1.0 & 1.0 & 0.2 \\
 NDX Dec & \citeauthor{aitsahalia2003}
-  & 19.189 & 16.023 & 14.909 & 20.619 & 1.0 & 1.1 & 0.5 \\
+  & 19.189 & 16.023 & 14.909 & 20.619 & 1.0 & 1.1 & 0.3 \\
 NDX Dec & \citeauthor{grith2012}, call, \(2\times\)
-  & 40.791 & 0.946 & 0.993 & 0.677 & 1.0 & 1.1 & 3.6 \\
+  & 40.791 & 0.946 & 0.993 & 0.677 & 1.0 & 1.1 & 1.7 \\
 NDX Dec & \citeauthor{grith2012}, call, CV
-  & 79.411 & 0.867 & 0.922 & 0.523 & 0.9 & 2.8 & 3.5 \\
+  & 79.411 & 0.867 & 0.922 & 0.523 & 0.9 & 2.8 & 1.7 \\
 \midrule
 RUT Dec & Ours
   & 0.031 & 0.026 & 0.027 & 0.024 & 1.0 & 1.0 & 1.0 \\
 RUT Dec & PCA
-  & 0.067 & 0.058 & 0.066 & 0.043 & 1.0 & 1.0 & 9.6 \\
+  & 0.067 & 0.058 & 0.066 & 0.043 & 1.0 & 1.0 & 3.6 \\
 RUT Dec & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.116 & 0.042 & 0.047 & 0.033 & 1.3 & 1.0 & 4.1 \\
+  & 0.116 & 0.042 & 0.047 & 0.033 & 1.3 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV, CV
-  & 0.039 & 0.026 & 0.027 & 0.025 & 1.0 & 1.1 & 4.1 \\
+  & 0.039 & 0.026 & 0.027 & 0.025 & 1.0 & 1.1 & 1.0 \\
 RUT Dec & \citeauthor{aitsahalia1998}
-  & 1.117 & 1.117 & 1.262 & 0.870 & 1.0 & 1.0 & 1.6 \\
+  & 1.117 & 1.117 & 1.262 & 0.870 & 1.0 & 1.0 & 0.1 \\
 RUT Dec & \citeauthor{aitsahalia2003}
-  & 2.834 & 2.224 & 1.968 & 2.544 & 1.0 & 1.1 & 0.2 \\
+  & 2.834 & 2.224 & 1.968 & 2.544 & 1.0 & 1.1 & 0.1 \\
 RUT Dec & \citeauthor{grith2012}, call, \(2\times\)
-  & 0.432 & 0.056 & 0.051 & 0.063 & 1.0 & 1.0 & 2.6 \\
+  & 0.432 & 0.056 & 0.051 & 0.063 & 1.0 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, call, CV
-  & 7.026 & 0.022 & 0.022 & 0.023 & 1.0 & 1.1 & 2.5 \\
+  & 7.026 & 0.022 & 0.022 & 0.023 & 1.0 & 1.1 & 0.9 \\
 \midrule
 Average & Ours
   & 0.312 & 0.296 & 0.306 & 0.231 & 1.0 & 1.0 & 1.0 \\
 Average & PCA
-  & 0.380 & 0.331 & 0.324 & 0.368 & 1.0 & 1.1 & 105.6 \\
+  & 0.380 & 0.331 & 0.324 & 0.368 & 1.0 & 1.1 & 11.7 \\
 Average & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.422 & 0.296 & 0.303 & 0.243 & 1.1 & 1.1 & 29.1 \\
+  & 0.422 & 0.296 & 0.303 & 0.243 & 1.1 & 1.1 & 2.8 \\
 Average & \citeauthor{grith2012}, IV, CV
-  & 0.363 & 0.244 & 0.257 & 0.160 & 1.0 & 1.6 & 27.4 \\
+  & 0.363 & 0.244 & 0.257 & 0.160 & 1.0 & 1.6 & 2.1 \\
 Average & \citeauthor{aitsahalia1998}
-  & 8.224 & 8.123 & 6.787 & 12.368 & 1.0 & 1.0 & 7.8 \\
+  & 8.224 & 8.123 & 6.787 & 12.368 & 1.0 & 1.0 & 0.2 \\
 Average & \citeauthor{aitsahalia2003}
-  & 9.343 & 7.589 & 6.443 & 10.454 & 1.0 & 1.0 & 3.8 \\
+  & 9.343 & 7.589 & 6.443 & 10.454 & 1.0 & 1.0 & 0.3 \\
 Average & \citeauthor{grith2012}, call, \(2\times\)
-  & 13.131 & 0.297 & 0.295 & 0.254 & 1.0 & 1.1 & 22.8 \\
+  & 13.131 & 0.297 & 0.295 & 0.254 & 1.0 & 1.1 & 2.1 \\
 Average & \citeauthor{grith2012}, call, CV
-  & 29.932 & 0.240 & 0.253 & 0.156 & 1.0 & 2.1 & 22.0 \\
+  & 29.932 & 0.240 & 0.253 & 0.156 & 1.0 & 2.1 & 2.0 \\
 \bottomrule
 \end{tabular}
 }
@@ -668,7 +662,7 @@ Average & \citeauthor{grith2012}, call, CV
 
 A fit inside the decreasing-convex cone cannot undercut the gap between the quoted calls and that cone. The plug-in local linear of \citeauthor{aitsahalia2003} remains far from the quotes. The positive convolution tracks them much more closely, and its NDX density has four peaks.
 
-The estimator of this paper has the smallest hold-out in Table~\ref{tab:listed} on each chain, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. On three chains the selected penalty is zero; on NDX it is positive. In sample the estimator is below the positive convolution on each chain. The cross-validated cubics of \citeauthor{grith2012} are as tight or tighter in sample, and the hold-out reverses that ranking. The call cubic fails in the far wing, where a one-sided fit on the held-out strikes misses the put. \citeauthor{aitsahalia1998} keeps one peak, with a larger pricing error. Once the tuning constants are known, this estimator prices both S\&P~500 chains in the least time. The plug-in local linear is faster on the Nasdaq and Russell chains. The smile is a tenth slower on Nasdaq and slower on the other three chains. The positive convolution is slower on each chain. The local polynomials are slower on each chain.
+The estimator of this paper has the smallest hold-out in Table~\ref{tab:listed} on each chain, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. On three chains the selected penalty is zero; on NDX it is positive. In sample the estimator is below the positive convolution on each chain. The cross-validated cubics of \citeauthor{grith2012} are as tight or tighter in sample, and the hold-out reverses that ranking. The call cubic fails in the far wing, where a one-sided fit on the held-out strikes misses the put. \citeauthor{aitsahalia1998} keeps one peak, with a larger pricing error. Once the tuning constants are known, that smile prices the full chain in the least time, and the plug-in local linear is faster than this estimator on each chain. The positive convolution is slower on each chain. The local polynomials take longer on the S\&P~500 and Nasdaq chains. On the Russell chain they match this estimator to a tenth, and the cross-validated call cubic is slightly faster.
 
 Total variation, defined in the caption of Table~\ref{tab:listed}, charges an extra oscillation by its height relative to the mode. The cross-validated cubics oscillate. They are drawn in \ref{app:wiggly} rather than on the axes of Figure~\ref{fig:listed}. The doubled call cubic, the plug-in local linear, and \citeauthor{aitsahalia1998} are on the left of that figure.
 
@@ -700,7 +694,7 @@ The cross-validated call cubic of \citeauthor{grith2012}, and that paper's impli
 \section*{Code and Data Availability}
 
 
-A Python implementation of \eqref{eq:thrice}, the expansion in Section~\ref{sec:compute}, and a replication script are available at \url{https://github.com/s-broda/RND}.
+A Python implementation of \eqref{eq:thrice} and a replication script are available at \url{https://github.com/s-broda/RND}.
 
 \bibliographystyle{elsarticle-harv}
 \bibliography{refs}
