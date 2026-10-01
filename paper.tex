@@ -375,12 +375,12 @@ Summing the series at one strike visits the boxes that lie inside five standard 
 
 \begin{table}[H]
 \centering
-\caption{Wall-clock milliseconds at the bandwidth \eqref{eq:h-d2}, with the penalty fixed at zero. The search over the penalty grid is not included. Each entry builds the natural cubic through the knots and returns the density and the calls at the quoted strikes. Naive sums the cell integrals. FFT is one transform of the sampled spline. FFT+ME is the moment expansion, one transform of the exact box moments through degree eight. One warmup call is discarded and the time is the minimum of five. Each ratio divides the raw naive time by the raw time in that column and is then rounded half up, so it need not equal the ratio of the rounded milliseconds.}
+\caption{Wall-clock seconds at the bandwidth \eqref{eq:h-d2}, with the penalty fixed at zero. The search over the penalty grid is not included. Each entry builds the natural cubic through the knots and returns the density and the calls at the quoted strikes. Naive sums the cell integrals. FFT is one transform of the sampled spline. FFT+ME is the moment expansion, one transform of the exact box moments through degree eight. One warmup call is discarded and the time is the minimum of five. Each ratio divides the raw naive time by the raw time in that column and is then rounded half up, so it need not equal the ratio of the rounded seconds.}
 \label{tab:fft}
 \begin{tabular}{l
-  S[table-format=3.0]
-  S[table-format=1.0]
-  S[table-format=1.0]
+  S[table-format=1.3]
+  S[table-format=1.3]
+  S[table-format=1.3]
   S[table-format=2.1]
   S[table-format=3.1]}
 \toprule
@@ -394,19 +394,19 @@ Summing the series at one strike visits the boxes that lie inside five standard 
   \multicolumn{1}{c}{FFT} &
   \multicolumn{1}{c}{FFT+ME} \\
 \midrule
-Heston, dense & 125 & 3 & 2 & 49.1 & 66.7 \\
-Heston, sparse & 6 & 1 & 1 & 4.3 & 4.7 \\
-Variance gamma, dense & 121 & 3 & 2 & 46.5 & 57.5 \\
-Variance gamma, sparse & 6 & 2 & 1 & 4.1 & 4.6 \\
-SPX 18 Dec 2026 & 273 & 4 & 1 & 65.5 & 193.7 \\
-SPX 19 Mar 2027 & 102 & 3 & 1 & 40.4 & 79.9 \\
-NDX 18 Dec 2026 & 162 & 3 & 1 & 64.5 & 131.3 \\
-RUT 18 Dec 2026 & 36 & 2 & 1 & 18.5 & 32.7 \\
+Heston, dense & 0.125 & 0.003 & 0.002 & 49.1 & 66.7 \\
+Heston, sparse & 0.006 & 0.001 & 0.001 & 4.3 & 4.7 \\
+Variance gamma, dense & 0.121 & 0.003 & 0.002 & 46.5 & 57.5 \\
+Variance gamma, sparse & 0.006 & 0.002 & 0.001 & 4.1 & 4.6 \\
+SPX 18 Dec 2026 & 0.273 & 0.004 & 0.001 & 65.5 & 193.7 \\
+SPX 19 Mar 2027 & 0.102 & 0.003 & 0.001 & 40.4 & 79.9 \\
+NDX 18 Dec 2026 & 0.162 & 0.003 & 0.001 & 64.5 & 131.3 \\
+RUT 18 Dec 2026 & 0.036 & 0.002 & 0.001 & 18.5 & 32.7 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The sampled-spline transform is between \(4.1\) and \(65.5\) times as fast as the cell sum. The moment expansion is between \(4.6\) and \(193.7\) times as fast as the cell sum, and between \(1.1\) and \(3.0\) times as fast as the sampled-spline transform. On the two chains with sixteen strikes the cell sum takes \(6\) milliseconds and both transforms take one or two milliseconds, so each ratio lies between four and five. On the listed chains the cell sum grows with the number of knots, from \(36\) milliseconds on the Russell chain to \(273\) milliseconds on the December S\&P~500 chain. The moment expansion stays between \(1\) and \(2\) milliseconds on every row. The gap between the two transforms is the small constant of the preceding paragraph.
+The sampled-spline transform is between \(4.1\) and \(65.5\) times as fast as the cell sum. The moment expansion is between \(4.6\) and \(193.7\) times as fast as the cell sum, and between \(1.1\) and \(3.0\) times as fast as the sampled-spline transform. On the two chains with sixteen strikes the cell sum takes \(0.006\) seconds and both transforms take one or two milliseconds, so each ratio lies between four and five. On the listed chains the cell sum grows with the number of knots, from \(0.036\) seconds on the Russell chain to \(0.273\) seconds on the December S\&P~500 chain. The moment expansion stays between \(0.001\) and \(0.002\) seconds on every row. The gap between the two transforms is the small constant of the preceding paragraph.
 
 \section{Numerical Illustration}
 \label{sec:heston}
@@ -622,9 +622,9 @@ Hold-out refits the projection and every tuned method on the training strikes on
 \centering
 \caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=98.6\), \(165.9\), \(606.0\), \(59.0\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.025\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Ours is listed first. It has the smallest hold-out on each chain, with one peak and total variation \(1.0\). The other rows follow the SPX December hold-out, smallest first.}
 \label{tab:listed}
-{\scriptsize
-\setlength{\tabcolsep}{3pt}%
-\renewcommand{\arraystretch}{0.82}%
+{\fontsize{9}{10}\selectfont
+\setlength{\tabcolsep}{3.5pt}%
+\renewcommand{\arraystretch}{0.76}%
 \begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=2.1] S[table-format=2.1]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} &

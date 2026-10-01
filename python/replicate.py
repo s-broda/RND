@@ -6,8 +6,8 @@ Run from the repository root::
 
 Prints the Heston and variance-gamma ISE tables, including the listed
 competitors and a noisy Heston comparison, the listed pricing table, the
-wall-clock times of the three convolutions at penalty zero (raw seconds,
-with the paper's half-up milliseconds in parentheses), and the
+wall-clock times of the three convolutions at penalty zero (raw seconds
+and the paper's half-up seconds), and the
 appendix scores for the smoothing spline. ``estimate_rnd(..., method=)``
 selects the convolution: ``"naive"`` sums the closed-form cell integrals,
 ``"fft"`` is one real FFT of the sampled spline, and ``"fast"`` (the
@@ -1488,10 +1488,9 @@ def convolution_times(repeats=5, warmup=1):
     Each timing is ``estimate_rnd(..., c=0, K_price=K)``: the natural cubic
     through the knots, then the density and the calls at the quoted strikes.
     One warmup call is discarded. The recorded time is the minimum of
-    ``repeats``. The parenthetical is that time in milliseconds, half-up
-    to the nearest millisecond, which is the figure in the paper. Ratios
-    use the raw times, then half-up to one decimal. ``fast`` is the
-    FFT+ME column.
+    ``repeats``. The parenthetical is that time in seconds, half-up to
+    three decimals, which is the figure in the paper. Ratios use the raw
+    times, then half-up to one decimal. ``fast`` is the FFT+ME column.
     """
     import time
 
@@ -1519,9 +1518,9 @@ def convolution_times(repeats=5, warmup=1):
             raw[method] = best
         print(
             f"  {name:24} "
-            f"naive {raw['naive']:.6f}s ({_half_up(raw['naive'] * 1000, 0):.0f} ms) "
-            f"fft {raw['fft']:.6f}s ({_half_up(raw['fft'] * 1000, 0):.0f} ms) "
-            f"fast {raw['fast']:.6f}s ({_half_up(raw['fast'] * 1000, 0):.0f} ms) "
+            f"naive {raw['naive']:.6f} ({_half_up(raw['naive'], 3):.3f}) "
+            f"fft {raw['fft']:.6f} ({_half_up(raw['fft'], 3):.3f}) "
+            f"fast {raw['fast']:.6f} ({_half_up(raw['fast'], 3):.3f}) "
             f"fft/naive {_half_up(raw['naive'] / raw['fft'], 1):.1f} "
             f"fast/naive {_half_up(raw['naive'] / raw['fast'], 1):.1f}"
         )
