@@ -340,7 +340,7 @@ The samples lie on a uniform grid. To the left of the first knot the sample equa
 
 Thricing is a single multiplier on this transform, the combination \eqref{eq:phi-thrice}. The three widths do not require three transforms. The density is \(-F\) times the inverse transform of the spectrum times \((\mathrm{i}s)^2\). The level is the inverse transform of the spectrum, minus the value at the left knot. That subtraction is the integrated form in \eqref{eq:cubic}, the convolved extension measured from the left endpoint. A strike that falls between two samples is read by linear interpolation.
 
-Every strike and every bandwidth is then a reading of one transform, and each Gaussian integral has become a multiplication. The grid that makes the samples faithful is much finer than the spline: the step is a sixty-fourth of the knot spacing, and the pad is ten widths of the kernel of width \(2h\). The spline changes on the scale of the knots, and the Gaussian changes on the scale of \(h\). The next evaluation keeps the transform and places the samples on that coarser scale.
+Every strike and every bandwidth is then a reading of one transform, and each Gaussian integral has become a multiplication. The grid that makes the samples faithful is much finer than the spline: the step is a sixty-fourth of the knot spacing, and the pad is ten widths of the kernel of width \(2h\). The spline changes on the scale of the knots, and the Gaussian changes on the scale of \(h\). This is the FFT column of Table~\ref{tab:fft}. The next evaluation keeps the transform and places the samples on that coarser scale.
 
 \paragraph{Moments of boxes one bandwidth wide.}
 Partition the knots into boxes no wider than the narrow bandwidth, with the last edge on the last knot. On a box the second derivative is linear and the spline is cubic. Their moments about the box centre \(\xi\),
@@ -368,42 +368,45 @@ These moments cover the interior boxes only. The jumps where the flat tails meet
 P^{\mathrm{cs}\prime}(t_0)\,\kappa_h(x-t_0)
 - P^{\mathrm{cs}\prime}(t_m)\,\kappa_h(x-t_m),
 \end{equation}
-with \(t_0\) the first knot and \(t_m\) the last, and with the same three weights. Each flat tail contributes a Gaussian cdf to the level. If the transform does not fit in memory, the same series is summed at the strikes, inside a window of five standard deviations of each kernel.
+with \(t_0\) the first knot and \(t_m\) the last, and with the same three weights. Each flat tail contributes a Gaussian cdf to the level. If the transform does not fit in memory, the same series is summed at the strikes, inside a window of five standard deviations of each kernel. This is the FFT+ME column of Table~\ref{tab:fft}.
 
 \paragraph{The second gain is a small constant.}
 Summing the series at one strike visits the boxes that lie inside five standard deviations. The boxes are one bandwidth wide, so the three windows hold about five, eight, and ten boxes. That count stays fixed as further knots fill a fixed interval, and one strike then costs a few hundred operations. The transform evaluates the same series at every strike together. On the designs below its length is a few hundred to about a thousand samples, and the base-two logarithm of that length is about eight to ten. The logarithm and the three windows are constants of the same kind. Folding the three bandwidths into one multiplier, and the value together with the derivative into one inverse, multiplies the cost by a small constant.
 
 \begin{table}[H]
 \centering
-\caption{Wall-clock seconds at the bandwidth \eqref{eq:h-d2}, with the penalty fixed at zero. The search over the penalty grid is not included. Each entry builds the natural cubic through the knots and returns the density and the calls at the quoted strikes. Naive sums the cell integrals. FFT is one transform of the sampled spline. Fast is one transform of the box moments. One warmup call is discarded and the time is the minimum of five. Each ratio divides the raw naive time by the raw time in that column and is then rounded half up, so it need not equal the ratio of the rounded seconds.}
+\caption{Wall-clock milliseconds at the bandwidth \eqref{eq:h-d2}, with the penalty fixed at zero. The search over the penalty grid is not included. Each entry builds the natural cubic through the knots and returns the density and the calls at the quoted strikes. Naive sums the cell integrals. FFT is one transform of the sampled spline. FFT+ME is the moment expansion, one transform of the exact box moments through degree eight. One warmup call is discarded and the time is the minimum of five. Each ratio divides the raw naive time by the raw time in that column and is then rounded half up, so it need not equal the ratio of the rounded milliseconds.}
 \label{tab:fft}
 \begin{tabular}{l
-  S[table-format=1.3]
-  S[table-format=1.3]
-  S[table-format=1.3]
+  S[table-format=3.0]
+  S[table-format=1.0]
+  S[table-format=1.0]
   S[table-format=2.1]
   S[table-format=3.1]}
 \toprule
+\multicolumn{4}{c}{} &
+  \multicolumn{2}{c}{Speedup vs.\ Naive} \\
+\cmidrule(lr){5-6}
 \multicolumn{1}{c}{Design} &
   \multicolumn{1}{c}{Naive} &
   \multicolumn{1}{c}{FFT} &
-  \multicolumn{1}{c}{Fast} &
-  \multicolumn{1}{c}{FFT/naive} &
-  \multicolumn{1}{c}{Fast/naive} \\
+  \multicolumn{1}{c}{FFT+ME} &
+  \multicolumn{1}{c}{FFT} &
+  \multicolumn{1}{c}{FFT+ME} \\
 \midrule
-Heston, dense & 0.125 & 0.003 & 0.002 & 49.1 & 66.7 \\
-Heston, sparse & 0.006 & 0.001 & 0.001 & 4.3 & 4.7 \\
-Variance gamma, dense & 0.121 & 0.003 & 0.002 & 46.5 & 57.5 \\
-Variance gamma, sparse & 0.006 & 0.002 & 0.001 & 4.1 & 4.6 \\
-SPX 18 Dec 2026 & 0.273 & 0.004 & 0.001 & 65.5 & 193.7 \\
-SPX 19 Mar 2027 & 0.102 & 0.003 & 0.001 & 40.4 & 79.9 \\
-NDX 18 Dec 2026 & 0.162 & 0.003 & 0.001 & 64.5 & 131.3 \\
-RUT 18 Dec 2026 & 0.036 & 0.002 & 0.001 & 18.5 & 32.7 \\
+Heston, dense & 125 & 3 & 2 & 49.1 & 66.7 \\
+Heston, sparse & 6 & 1 & 1 & 4.3 & 4.7 \\
+Variance gamma, dense & 121 & 3 & 2 & 46.5 & 57.5 \\
+Variance gamma, sparse & 6 & 2 & 1 & 4.1 & 4.6 \\
+SPX 18 Dec 2026 & 273 & 4 & 1 & 65.5 & 193.7 \\
+SPX 19 Mar 2027 & 102 & 3 & 1 & 40.4 & 79.9 \\
+NDX 18 Dec 2026 & 162 & 3 & 1 & 64.5 & 131.3 \\
+RUT 18 Dec 2026 & 36 & 2 & 1 & 18.5 & 32.7 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The sampled-spline transform is between \(4.1\) and \(65.5\) times as fast as the cell sum. The moment transform is between \(4.6\) and \(193.7\) times as fast as the cell sum, and between \(1.1\) and \(3.0\) times as fast as the sampled-spline transform. On the two chains with sixteen strikes the cell sum takes \(0.006\) seconds and both transforms take one or two milliseconds, so each ratio lies between four and five. On the listed chains the cell sum grows with the number of knots, from \(0.036\) seconds on the Russell chain to \(0.273\) seconds on the December S\&P~500 chain. The moment transform stays between \(0.001\) and \(0.002\) seconds on every row. The gap between the two transforms is the small constant of the preceding paragraph.
+The sampled-spline transform is between \(4.1\) and \(65.5\) times as fast as the cell sum. The moment expansion is between \(4.6\) and \(193.7\) times as fast as the cell sum, and between \(1.1\) and \(3.0\) times as fast as the sampled-spline transform. On the two chains with sixteen strikes the cell sum takes \(6\) milliseconds and both transforms take one or two milliseconds, so each ratio lies between four and five. On the listed chains the cell sum grows with the number of knots, from \(36\) milliseconds on the Russell chain to \(273\) milliseconds on the December S\&P~500 chain. The moment expansion stays between \(1\) and \(2\) milliseconds on every row. The gap between the two transforms is the small constant of the preceding paragraph.
 
 \section{Numerical Illustration}
 \label{sec:heston}
