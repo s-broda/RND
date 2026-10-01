@@ -13,7 +13,12 @@ thricing as one multiplier. ``"fast"`` is the default. If that file cannot
 be compiled, ``"fast"`` uses the sampled-spline FFT; ``"fft"`` and
 ``"naive"`` do not depend on the compiler.
 
-Thricing and the penalty rule are on by default. The default bandwidth is
+Thricing and the closed-form penalty are on by default. That penalty is
+``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``: ``t`` is the clipped total
+variation of the thriced interpolant on ``[0.55F, 1.40F]``, ``v_* - 1`` is
+the excess variation of that kernel, ``δ`` is the median knot spacing, and
+``tv_cap`` defaults to ``1``. ``penalty="search"`` replaces the formula by
+the 17-point grid and the curvature corner. The default bandwidth is
 ``0.38 F σ_ATM √T n^{-1/9}``.
 
 Pass ``c=0`` for the cubic through the knots, ``kernel="twice"`` or
@@ -40,6 +45,10 @@ DERIV_C = 0.38
 
 # Dimensionless penalty in λ = c F^3 ∫(f'')^2. Zero passes through the knots.
 SMOOTH_C = np.array([0.0, *np.geomspace(1e-7, 3e-4, 16)])
+
+# A unimodal curve scores 1. Both selectors stay at zero until the clipped
+# total variation of the thriced density exceeds this allowance.
+TV_CAP = 1.0
 
 
 def _kernel_weights(kernel):
@@ -69,12 +78,14 @@ def estimate_rnd(
     higher=None,
     deriv_c=None,
     method="fast",
+    penalty="closed",
+    tv_cap=TV_CAP,
 ):
     """Risk-neutral density of ``S_T`` from one expiry's calls.
 
     The default is the estimator in the paper: tails, thricing, bandwidth
     ``deriv_c F σ_ATM √T n^{-1/9}`` with ``deriv_c=0.38``, and the penalty
-    chosen from ``SMOOTH_C``.
+    ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)`` with ``tv_cap=1``.
 
     Parameters
     ----------
@@ -98,8 +109,17 @@ def estimate_rnd(
         Thricing is ``(8/3) f_h − 2 f_{h√2} + (1/3) f_{2h}``. Twicing is
         ``2 f_h − f_{h√2}``. ``"plain"`` is one Gaussian.
     c : "rule" or float
-        ``"rule"`` picks the penalty from ``SMOOTH_C``. A number, including
-        ``0``, is used as given. Zero is the natural cubic through the knots.
+        ``"rule"`` selects the penalty according to ``penalty``. A number,
+        including ``0``, is used as given. Zero is the natural cubic through
+        the knots.
+    penalty : {"closed", "rule", "search"}
+        Used when ``c="rule"``. ``"closed"`` (the default) and ``"rule"``
+        are ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``"search"``
+        is the ``SMOOTH_C`` grid and the curvature corner.
+    tv_cap : float
+        Clipped-variation allowance for both selectors. The closed form is
+        zero until the interpolant exceeds it. The search keeps the
+        smallest grid value at or below this cap.
     higher : bool or str, optional
         Alias of ``kernel`` kept for older calls. ``True`` is thricing,
         ``False`` is one Gaussian, ``"twice"`` is twicing.
@@ -120,6 +140,8 @@ def estimate_rnd(
         kernel = higher
     if method not in ("fast", "fft", "naive"):
         raise ValueError("method must be 'naive', 'fft', or 'fast'")
+    if penalty not in ("search", "closed", "rule"):
+        raise ValueError("penalty must be 'search', 'closed', or 'rule'")
     weights = _kernel_weights(kernel)
     K = np.asarray(K, dtype=float)
     C = np.asarray(C, dtype=float)
@@ -138,7 +160,14 @@ def estimate_rnd(
         h_use = float(h)
     Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
     if c == "rule":
-        c_use = _choose_penalty(K, C, Ks, Ps, h_use, stock, F, weights, method=method)
+        if penalty == "search":
+            c_use = _choose_penalty(
+                K, C, Ks, Ps, h_use, stock, F, weights, method=method, tv_cap=tv_cap,
+            )
+        else:
+            c_use = _closed_penalty(
+                Ks, Ps, h_use, F, weights, method=method, tv_cap=tv_cap,
+            )
         spl = _rule_spline(Ks, Ps, c_use, F)
     else:
         c_use = float(c)
@@ -633,7 +662,54 @@ def _shape_scores(q, q_plain, F, s):
     return tv, peaks, corr
 
 
-def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5, method="fast"):
+_EXCESS = {}
+
+
+def _kernel_excess(weights):
+    """Excess signed variation of the equivalent kernel, ``∫|L| - 1``.
+
+    ``L`` is the kernel on the bandwidth scale, so the integral does not
+    depend on ``h``. A nonnegative kernel has excess zero; one extra mode
+    is then one unit of the closed-form penalty.
+    """
+    key = tuple((float(f), float(w)) for f, w in weights)
+    hit = _EXCESS.get(key)
+    if hit is not None:
+        return hit
+    z = np.linspace(-40.0, 40.0, 80001)
+    L = np.zeros_like(z)
+    for fac, w in key:
+        L += w * norm.pdf(z / fac) / fac
+    excess = float(np.trapezoid(np.abs(L), z) - 1.0)
+    if excess < 1e-8:
+        excess = 1.0
+    _EXCESS[key] = excess
+    return excess
+
+
+def _closed_penalty(Ks, Ps, h, F, weights, tv_cap=TV_CAP, method="fast"):
+    """``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)`` from one interpolant.
+
+    ``t`` is the clipped total variation of the thriced interpolant. ``δ``
+    is the median knot spacing, the gap in the smoothing-spline damper
+    ``1/(1 + λ δ ω^4)``. The frequency ``ω = 1/h`` turns an excess count
+    ``ρ`` into ``λ δ = ρ h^4``.
+    """
+    s = np.linspace(max(50.0, 0.2 * float(F)), 2.4 * float(F), 700)
+    q, _G = _convolve(
+        _rule_spline(Ks, Ps, 0.0, F), Ks, h, F, s, weights, method=method,
+    )
+    t, _peaks, _corr = _shape_scores(q, q, F, s)
+    gaps = np.diff(np.asarray(Ks, float))
+    gaps = gaps[gaps > 1e-12]
+    delta = float(np.median(gaps)) if gaps.size else float(h)
+    if not np.isfinite(t) or delta <= 0.0 or float(F) == 0.0:
+        return 0.0
+    rho = max(float(t) - float(tv_cap), 0.0) / _kernel_excess(weights)
+    return float(rho * (float(h) ** 4) / (delta * float(F) ** 3))
+
+
+def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5, method="fast", tv_cap=TV_CAP):
     """Smallest unimodal penalty, then the corner when the bend is sharp."""
     s = np.linspace(max(50.0, 0.2 * F), 2.4 * F, 700)
     rows = []
@@ -646,7 +722,7 @@ def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5, method="fa
         Cf = np.maximum(stock * (1.0 - np.clip(G, 0.0, 1.0)), 0.0)
         price = float(np.sqrt(np.mean((Cf - C) ** 2)))
         rows.append(dict(c=float(c), tv=tv, peaks=peaks, price=price, corr=corr))
-    uni = [r for r in rows if r["peaks"] <= 1 and r["tv"] <= 1.02]
+    uni = [r for r in rows if r["peaks"] <= 1 and r["tv"] <= float(tv_cap)]
     c0 = uni[0]["c"] if uni else rows[-1]["c"]
     sub = [r for r in rows if r["c"] + 1e-15 >= c0 and r["price"] > 1e-8 and r["corr"] > 0.0]
     if len(sub) < 5:

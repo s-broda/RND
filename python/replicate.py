@@ -8,7 +8,7 @@ Prints the Heston and variance-gamma ISE tables, including the listed
 competitors and a noisy Heston comparison, the listed pricing table, the
 wall-clock times of the three convolutions at penalty zero (raw seconds
 and the paper's half-up seconds), and the
-appendix scores for the smoothing spline. ``estimate_rnd(..., method=)``
+appendix chains under the closed-form penalty. ``estimate_rnd(..., method=)``
 selects the convolution: ``"naive"`` sums the closed-form cell integrals,
 ``"fft"`` is one real FFT of the sampled spline, and ``"fast"`` (the
 default) is one FFT of the order-eight box moments in ``density_closed.c``,
@@ -161,6 +161,12 @@ def _exact(label, p, calls, q_true, K_eval):
                 f"    {name:16} oracle {row['h_star']:.4g} {row['ise_star']:.4e}  "
                 f"n^-1/9 {row['h_9']:.4g} {row['ise_9']:.4e}"
             )
+            if name == "Tails+Thrice":
+                ruled = estimate_rnd(K, C, p.S0, p.r, p.T, p.q, K_eval=K_eval, h=h_9)
+                print(
+                    f"    {'rule':16} c={ruled['c']:.3e} "
+                    f"ISE={_ise(K_eval, ruled['q'], q_true):.4e}"
+                )
             key = {
                 "Quoted spline": "quoted",
                 "Tails": "tails",
@@ -503,7 +509,7 @@ def listed():
         forwards.append(sl.F)
         titles.append(title)
         print(
-            f"  {title:8} F={sl.F:.1f} h={bundle['h']:.2f} "
+            f"  {title:8} F={sl.F:.1f} h={bundle['h']:.2f} c={bundle['fit']['c']:.6e} "
             f"ASD {bundle['h_asd']:.4g} ASL {bundle['h_asl']:.4g} "
             f"GHSc {bundle['h_ghs_c']:.4g} GHSi {bundle['h_ghs_i']:.4g}"
         )
@@ -564,14 +570,16 @@ def _plot_listed(scored):
             f"  fig {title}: ASD h={bundle['h_asd']:.1f}  PCA h={bundle['h_pca']:.4f}  "
             f"ASL h={bundle['h_asl']:.3f}  GHS IV h={bundle['h_ghs_i']:.1f}"
         )
+        q_ghs_i = bundle["q_ghs_i"]
         ax = axes[row, 0]
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
-        ymax = 1.15 * np.nanmax(np.maximum(np.concatenate([
-            fit["q"][core], q_asl[core],
-        ]), 0))
+        base = np.maximum(np.concatenate([fit["q"][core], q_asl[core], q_pca[core]]), 0)
+        spike = np.maximum(q_ghs_i[core], 0)
+        ymax = 1.15 * max(float(np.nanmax(base)), min(float(np.nanmax(spike)), 1.35 * float(np.nanmax(base))))
         h_ours, = ax.plot(s, np.maximum(fit["q"], 0), color="#1f77b4", lw=1.5, label="Ours", zorder=5)
         h_pca, = ax.plot(s, np.maximum(q_pca, 0), color="#2ca02c", lw=1.15, ls="-.", label="PCA", zorder=4)
         h_ghs_c, = ax.plot(s, np.maximum(q_ghs_c, 0), color="#ff7f0e", lw=1.15, label="GHS, call, 2×", zorder=4)
+        h_ghs_i, = ax.plot(s, np.maximum(q_ghs_i, 0), color="#17becf", lw=1.15, ls=(0, (4, 1.5)), label="GHS, IV, 2×", zorder=4)
         h_asd, = ax.plot(s, np.maximum(q_asd, 0), color="#8c564b", lw=1.15, ls="--", label="Aït-Sahalia–Duarte", zorder=3)
         h_asl_d, = ax.plot(s, np.maximum(q_asl, 0), color="#d62728", lw=1.05, ls=":", label="Aït-Sahalia–Lo", zorder=4)
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
@@ -580,9 +588,9 @@ def _plot_listed(scored):
         ax.set_title(title)
         ax.set_xlabel(r"Strike $K$")
         ax.legend(
-            [h_ours, h_pca, h_ghs_c, h_asd, h_asl_d],
-            ["Ours", "PCA", "GHS, call, 2×", "Aït-Sahalia–Duarte", "Aït-Sahalia–Lo"],
-            frameon=False, fontsize=7.0, loc="upper right",
+            [h_ours, h_pca, h_ghs_c, h_ghs_i, h_asd, h_asl_d],
+            ["Ours", "PCA", "GHS, call, 2×", "GHS, IV, 2×", "Aït-Sahalia–Duarte", "Aït-Sahalia–Lo"],
+            frameon=False, fontsize=6.5, loc="upper right",
         )
         if row == 0:
             ax.set_ylabel(r"$f_{\mathbb{Q}}(K)$")
@@ -591,29 +599,32 @@ def _plot_listed(scored):
         P_pca, C_pca = _parity(sl, C_pca)
         P_asl, C_asl = _parity(sl, C_asl)
         P_ghs_c, C_ghs_c = _parity(sl, C_ghs_c)
+        P_ghs_i, C_ghs_i = _parity(sl, bundle["C_ghs_i"])
         iv = _otm_iv(sl, P_c, C_c)
         iv_pca = _otm_iv(sl, P_pca, C_pca)
         iv_asl = _otm_iv(sl, P_asl, C_asl)
         iv_ghs_c = _otm_iv(sl, P_ghs_c, C_ghs_c)
+        iv_ghs_i = _otm_iv(sl, P_ghs_i, C_ghs_i)
         iv_m = _otm_iv(sl, sl.P, sl.C)
         lo, hi = 0.55 * sl.F, 1.40 * sl.F
         show = np.isfinite(iv_m) & (sl.K >= lo) & (sl.K <= hi)
         ax = axes[row, 1]
         ax.set_xlim(lo, hi)
         y1, y2 = _iv_ylim(
-            [iv_m[show], iv[show], iv_pca[show], iv_asl[show], iv_ghs_c[show]]
+            [iv_m[show], iv[show], iv_pca[show], iv_asl[show], iv_ghs_c[show], iv_ghs_i[show]]
         )
         ax.set_ylim(y1, y2)
         h_mkt, = ax.plot(sl.K[show], iv_m[show], "k.", ms=2.6, alpha=0.40, label="Market", zorder=2)
-        h_asl, = ax.plot(sl.K[show], iv_asl[show], color="#d62728", lw=1.0, ls="--", label="Aït-Sahalia–Lo", zorder=4)
+        h_asl, = ax.plot(sl.K[show], iv_asl[show], color="#d62728", lw=1.0, ls=":", label="Aït-Sahalia–Lo", zorder=4)
         h_ghs_c, = ax.plot(sl.K[show], iv_ghs_c[show], color="#ff7f0e", lw=1.15, label="GHS, call, 2×", zorder=5)
+        h_ghs_i, = ax.plot(sl.K[show], iv_ghs_i[show], color="#17becf", lw=1.15, ls=(0, (4, 1.5)), label="GHS, IV, 2×", zorder=5)
         h_pca, = ax.plot(sl.K[show], iv_pca[show], color="#2ca02c", lw=1.05, ls="-.", label="PCA", zorder=5)
         h_ours, = ax.plot(sl.K[show], iv[show], color="#1f77b4", lw=1.4, label="Ours", zorder=6)
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlabel(r"Strike $K$")
         ax.legend(
-            [h_mkt, h_ours, h_ghs_c, h_pca, h_asl],
-            ["Market", "Ours", "GHS, call, 2×", "PCA", "Aït-Sahalia–Lo"],
+            [h_mkt, h_ours, h_ghs_c, h_ghs_i, h_pca, h_asl],
+            ["Market", "Ours", "GHS, call, 2×", "GHS, IV, 2×", "PCA", "Aït-Sahalia–Lo"],
             frameon=False, fontsize=6.5, loc="upper right",
         )
         if row == 0:
@@ -628,11 +639,17 @@ def _plot_listed(scored):
         s = bundle["s"]
         fit = bundle["fit"]
         core = (s >= 0.65 * sl.F) & (s <= 1.30 * sl.F)
-        ymax = 1.15 * np.nanmax(np.maximum(fit["q"][core], 0))
+        base = np.maximum(np.concatenate([
+            fit["q"][core], bundle["q_asl"][core], bundle["q_pca"][core],
+        ]), 0)
+        spike = np.maximum(bundle["q_ghs_i"][core], 0)
+        ymax = 1.15 * max(
+            float(np.nanmax(base)),
+            min(float(np.nanmax(spike)), 1.35 * float(np.nanmax(base))),
+        )
         ax = axes[row, 0]
         ax.plot(s, np.maximum(bundle["q_ghs_cv"], 0), color="#ff7f0e", lw=1.0, ls=":", label="GHS call, CV")
         ax.plot(s, np.maximum(bundle["q_ghs_iv_cv"], 0), color="#17becf", lw=1.0, ls="--", label="GHS IV, CV")
-        ax.plot(s, np.maximum(bundle["q_ghs_i"], 0), color="#17becf", lw=1.15, ls="-.", label="GHS IV, 2×")
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlim(0.55 * sl.F, 1.40 * sl.F)
         ax.set_ylim(0, ymax)
@@ -644,21 +661,18 @@ def _plot_listed(scored):
 
         P_cv, C_cv = _parity(sl, bundle["C_ghs_cv"])
         P_iv, C_iv = _parity(sl, bundle["C_ghs_iv_cv"])
-        P_ghs_i, C_ghs_i = _parity(sl, bundle["C_ghs_i"])
         iv_cv = _otm_iv(sl, P_cv, C_cv)
         iv_iv = _otm_iv(sl, P_iv, C_iv)
-        iv_ghs_i = _otm_iv(sl, P_ghs_i, C_ghs_i)
         iv_m = _otm_iv(sl, sl.P, sl.C)
         lo, hi = 0.55 * sl.F, 1.40 * sl.F
         show = np.isfinite(iv_m) & (sl.K >= lo) & (sl.K <= hi)
         ax = axes[row, 1]
-        y1, y2 = _iv_ylim([iv_m[show], iv_cv[show], iv_iv[show], iv_ghs_i[show]])
+        y1, y2 = _iv_ylim([iv_m[show], iv_cv[show], iv_iv[show]])
         ax.set_xlim(lo, hi)
         ax.set_ylim(y1, y2)
         ax.plot(sl.K[show], iv_m[show], "k.", ms=2.6, alpha=0.40, label="Market", zorder=2)
         ax.plot(sl.K[show], iv_cv[show], color="#ff7f0e", lw=1.0, ls=":", label="GHS call, CV", zorder=4)
         ax.plot(sl.K[show], iv_iv[show], color="#17becf", lw=1.0, ls="--", label="GHS IV, CV", zorder=5)
-        ax.plot(sl.K[show], iv_ghs_i[show], color="#17becf", lw=1.15, ls="-.", label="GHS IV, 2×", zorder=5)
         ax.axvline(sl.F, color="0.45", ls="--", lw=0.8)
         ax.set_xlabel(r"Strike $K$")
         ax.legend(frameon=False, fontsize=6.5, loc="upper right")
@@ -1328,11 +1342,11 @@ def _score_smoothing_c(base, c):
 def _choose_smoothing_c(rows, curv_min=0.5):
     """Smallest unimodal penalty, then the L-curve corner when the bend is sharp.
 
-    Unimodal means one peak and total variation at most 1.02 on [0.55F, 1.40F].
+    Unimodal means one peak and total variation at most 1 on [0.55F, 1.40F].
     The corner is of log call residual against log gap between the thriced
     density and the plain Gaussian. A flat bend keeps the unimodal penalty.
     """
-    uni = [r for r in rows if r["peaks"] <= 1 and r["tv"] <= 1.02]
+    uni = [r for r in rows if r["peaks"] <= 1 and r["tv"] <= 1.0]
     c0 = uni[0]["c"] if uni else rows[-1]["c"]
     sub = [r for r in rows if r["c"] + 1e-15 >= c0 and r["price"] > 1e-8 and r["corr"] > 0.0]
     if len(sub) < 5:
@@ -1364,20 +1378,22 @@ def _smoothing_fit_at(base, c, K_eval=None, K_price=None):
 
 def smoothing_spline_fit(
     K, C, S0, r, T, q, K_eval=None, K_price=None, h_rule="deriv", method="fast",
+    penalty="closed", tv_cap=1.0,
 ):
-    """The paper's estimator. ``estimate_rnd`` with its default penalty rule."""
+    """The paper's estimator. ``estimate_rnd`` with its default closed-form penalty."""
     return estimate_rnd(
         K, C, S0, r, T, q, K_eval=K_eval, K_price=K_price, h=h_rule, method=method,
+        penalty=penalty, tv_cap=tv_cap,
     )
 
 
-def _smoothing_holdout(sl, h_rule="deriv"):
+def _smoothing_holdout(sl, h_rule="deriv", penalty="closed", tv_cap=1.0):
     errs = []
     for train, test in _folds(len(sl.K)):
         Ct = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
         fit = smoothing_spline_fit(
             sl.K[train], Ct, sl.S0, sl.r, sl.T, sl.q, K_price=sl.K[test],
-            h_rule=h_rule,
+            h_rule=h_rule, penalty=penalty, tv_cap=tv_cap,
         )
         errs.append(_otm_rmse_slice(sl, fit["C"], test))
     return float(np.mean(errs))
@@ -1483,7 +1499,7 @@ def _timing_designs():
 
 
 def convolution_times(repeats=5, warmup=1):
-    """One pricing at penalty zero. The penalty search is off.
+    """One pricing at penalty zero. The penalty rule is not applied.
 
     Each timing is ``estimate_rnd(..., c=0, K_price=K)``: the natural cubic
     through the knots, then the density and the calls at the quoted strikes.
@@ -1495,7 +1511,7 @@ def convolution_times(repeats=5, warmup=1):
     import time
 
     print(
-        f"\nConvolution times at c=0, search off. "
+        f"\nConvolution times at c=0, penalty rule off. "
         f"warmup {warmup}, min of {repeats}."
     )
     methods = ("naive", "fft", "fast")
@@ -1526,6 +1542,86 @@ def convolution_times(repeats=5, warmup=1):
         )
 
 
+def extra_chains():
+    """Appendix chains: the closed-form rule on expiries outside the four slices.
+
+    Same quote screen as the paper. Maturity runs from 14 days to two years,
+    each chain has at least 40 strikes, and each root keeps at most eight
+    expiries spread across the calendar. Weekly roots are left out. The four
+    published slices are left out. SPX, NDX, and RUT are the 23 September 2026
+    dumps; DJX is 19 September 2026.
+    """
+    from datetime import date
+
+    from src.spx import asof_from_raw, build_otm_slice, fetch_cboe
+
+    paper = {
+        ("SPX", date(2026, 12, 18)),
+        ("SPX", date(2027, 3, 19)),
+        ("NDX", date(2026, 12, 18)),
+        ("RUT", date(2026, 12, 18)),
+    }
+    print("\nAppendix chains  penalty=closed  tv_cap=1")
+    for symbol, name in (
+        ("SPX", "cboe_spx.json"),
+        ("NDX", "cboe_ndx.json"),
+        ("RUT", "cboe_rut.json"),
+        ("DJX", "cboe_djx.json"),
+    ):
+        raw = fetch_cboe(RES / name, symbol)
+        asof = asof_from_raw(raw)
+        expiries = set()
+        for opt in raw["data"]["options"]:
+            occ = opt["option"]
+            if len(occ) <= len(symbol) or not occ.startswith(symbol):
+                continue
+            if not occ[len(symbol)].isdigit():
+                continue
+            yy = int(occ[len(symbol):len(symbol) + 2])
+            mm = int(occ[len(symbol) + 2:len(symbol) + 4])
+            dd = int(occ[len(symbol) + 4:len(symbol) + 6])
+            expiries.add(date(2000 + yy, mm, dd))
+        built = []
+        for exp in sorted(expiries):
+            if (symbol, exp) in paper:
+                continue
+            if (exp - asof).days < 14 or (exp - asof).days / 365.25 > 2.0:
+                continue
+            try:
+                sl = build_otm_slice(raw, exp, r=0.04, root=symbol, asof=asof)
+            except RuntimeError:
+                continue
+            if len(sl.K) < 40:
+                continue
+            built.append(sl)
+        if len(built) > 8:
+            pick = [built[int(round(i))] for i in np.linspace(0, len(built) - 1, 8)]
+            seen, uniq = set(), []
+            for sl in pick:
+                if sl.expiry in seen:
+                    continue
+                seen.add(sl.expiry)
+                uniq.append(sl)
+            built = uniq
+        print(f"  {symbol} asof {asof.isoformat()}  n_chains {len(built)}")
+        for sl in built:
+            C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
+            s = np.linspace(max(50.0, 0.2 * sl.F), 2.4 * sl.F, 1601)
+            fit = smoothing_spline_fit(
+                sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K,
+            )
+            o, pu, ca = _otm(sl, fit["C"])
+            mass, peaks = _mass_peaks(sl.F, fit["q"], s)
+            tv = _variation(sl.F, fit["q"], s)
+            ho = _smoothing_holdout(sl)
+            print(
+                f"  {sl.root} {sl.expiry.isoformat()} n={len(sl.K):4d} "
+                f"c={fit['c']:.3e} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
+                f"hold {ho:.3f} mass {mass:.3f} peaks {peaks} tv {tv:.3f}",
+                flush=True,
+            )
+
+
 def main():
     K_eval = np.linspace(60.0, 150.0, 401)
     p = BCC97
@@ -1540,6 +1636,7 @@ def main():
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
     noisy_heston()
     listed()
+    extra_chains()
     convolution_times()
     print("DONE")
 
