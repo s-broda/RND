@@ -5,10 +5,10 @@ Run from the repository root::
     python3 python/replicate.py
 
 Prints the Heston and variance-gamma ISE tables, including the listed
-competitors and a noisy Heston comparison, the listed pricing table, the
+competitors and a noisy Heston comparison, the listed pricing table, and the
 wall-clock times of the three convolutions at penalty zero (raw seconds
-and the paper's half-up seconds), and the
-appendix chains under the closed-form penalty. ``estimate_rnd(..., method=)``
+and the paper's half-up seconds). The appendix chains are not part of this
+run: the quotes cannot be redistributed. ``estimate_rnd(..., method=)``
 selects the convolution: ``"naive"`` sums the closed-form cell integrals,
 ``"fft"`` is one real FFT of the sampled spline, and ``"fast"`` (the
 default) is one FFT of the order-eight box moments in ``density_closed.c``,
@@ -1553,6 +1553,12 @@ def convolution_times(repeats=5, warmup=1):
 def extra_chains():
     """Appendix chains: the closed-form rule and PCA on expiries outside the four slices.
 
+    Not called from ``main``. The quotes are not shipped. Cboe's North American
+    Data Policies, effective 1 September 2026, do not permit a recipient of
+    delayed Cboe options quotes to redistribute them externally except to a
+    named affiliate, and historical quotes require a data agreement and
+    approval before they go to anyone else. This reads the local dumps.
+
     Same quote screen as the paper. Maturity runs from 14 days to two years,
     each chain has at least 40 strikes, and each root keeps at most eight
     expiries spread across the calendar. Weekly roots are left out. The four
@@ -1652,7 +1658,6 @@ def main():
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
     noisy_heston()
     listed()
-    extra_chains()
     convolution_times()
     print("DONE")
 

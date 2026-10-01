@@ -2,9 +2,14 @@
 %% Template: elsarticle-template-harv.tex (elsarticle 3.x).
 \documentclass[preprint,12pt,authoryear,times]{elsarticle}
 
-\usepackage{amssymb,mathtools,amsthm,booktabs,float,siunitx,xcolor}
+\usepackage{amssymb,mathtools,amsthm,booktabs,float,longtable,siunitx,xcolor}
 \usepackage[hidelinks]{hyperref}
 \mathtoolsset{showonlyrefs}
+% longtable does not call \@makecaption, so give it the class caption size.
+\makeatletter
+\patchcmd{\LT@makecaption}{\reset@font}{\reset@font\footnotesize}{}{%
+  \errmessage{longtable caption font patch failed}}
+\makeatother
 
 \journal{Journal of Econometrics}
 
@@ -319,7 +324,7 @@ h
 \end{equation}
 with \(n\) the number of quoted strikes. This \(0.34\) is the bandwidth constant. The penalty in \eqref{eq:smooth-penalty} is \eqref{eq:penalty-rule}. Any fixed positive multiple of \(n^{-1/9}\) meets Theorem~\ref{thm:cons}, because \(n^{4/9}/(\log n)^2\to\infty\). This is the bandwidth used below.
 
-\section{Computational concerns}
+\section{Computational Aspects}
 \label{sec:compute}
 
 Equations \eqref{eq:cubic} and \eqref{eq:thrice} ask for one convolution. The density is \(-F\) times the derivative of the smoothed slope of the completed spline. The call is that slope smoothed by the Gaussian cdf, at the same three bandwidths. This section writes three evaluations of that pair, in the order in which each one removes work. The first sums every cell at every strike. The second replaces the sum by one discrete Fourier transform of the sampled spline. The third keeps the transform and replaces the fine samples by the exact moments of boxes no wider than one bandwidth. Each evaluation is the same integral. On the designs of Sections~\ref{sec:heston} and~\ref{sec:emp} the three agree past the printed precision: the integrated squared errors, the selected penalties, the out-of-the-money errors, the hold-out errors, the mass, and the total variation.
@@ -760,75 +765,110 @@ The cross-validated call cubic of \citeauthor{grith2012}, and that paper's impli
 \section{Further listed chains}
 \label{app:chains}
 
-Table~\ref{tab:extra} applies \eqref{eq:penalty-rule} to twenty-three further expiries from the same feeds, and scores PCA on each chain. The four chains of Section~\ref{sec:emp} are left out. The screens of Section~\ref{sec:data} are unchanged, including the discount rate \(r=0.04\). Only the standard monthly roots are kept. Maturity runs from fourteen days to two years, each chain has at least forty strikes, and each root keeps at most eight expiries spread across the calendar. SPX, NDX, and RUT are the 23~September 2026 snapshots. DJX is the 19~September 2026 snapshot.
+Table~\ref{tab:extra} applies \eqref{eq:penalty-rule} to twenty-three further expiries from the same feeds, and scores PCA on each chain. The four chains of Section~\ref{sec:emp} are left out. The screens of Section~\ref{sec:data} are unchanged, including the discount rate \(r=0.04\). Only the standard monthly roots are kept. Maturity runs from fourteen days to two years, each chain has at least forty strikes, and each root keeps at most eight expiries spread across the calendar. SPX, NDX, and RUT are the 23~September 2026 snapshots. DJX is the 19~September 2026 snapshot. Average is the equal-weight mean of these twenty-three chains. Grand is the equal-weight mean of these chains and the four chains in Table~\ref{tab:listed}. These quotes are not in that table and not in the replication files. Under the Cboe Global Markets North American Data Policies, effective 1~September 2026, a recipient of delayed Cboe options quotes may not redistribute them externally except to a named affiliate, and historical quotes may be redistributed to anyone else only under a data agreement and Cboe's approval.
 
 The rule does not count modes. Two chains keep two peaks. SPX 17~December 2027 has penalty zero and variation \(1.004\): both local maxima exceed one fifth of the mode, and the extra oscillation is four tenths of one percent of that mode. DJX 17~September 2027 has variation \(1.433\) and penalty \(5.50\times 10^{-4}\). On SPX 16~June 2028 and NDX 17~December 2027 the fitted density has one peak, with penalties \(4.46\times 10^{-4}\) and \(4.26\times 10^{-4}\). Several long-dated NDX hold-outs are large because the quotes themselves are large.
 
-\clearpage
-\begin{table}[H]
-\centering
+\begingroup
+\setlength{\tabcolsep}{3pt}%
+\begin{longtable}{@{}ll S[table-format=3.0] *{4}{S[table-format=2.3]} *{2}{S[table-format=1.1]}@{}}
 \caption{The estimator \eqref{eq:penalty-rule} on expiries outside Table~\ref{tab:listed}.}
-\label{tab:extra}
-{\fontsize{13}{15}\selectfont
-\setlength{\tabcolsep}{1.5pt}%
-\renewcommand{\arraystretch}{0.41}%
-\begin{tabular}{@{}ll S[table-format=3.0] *{4}{S[table-format=2.3]} *{2}{S[table-format=1.1]}@{}}
+\label{tab:extra}\\
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} & \multicolumn{1}{c}{\(n\)} &
   \multicolumn{1}{c}{Hold-out} & \multicolumn{1}{c}{OTM} &
   \multicolumn{1}{c}{Puts} & \multicolumn{1}{c}{Calls} &
   \multicolumn{1}{c}{Mass} & \multicolumn{1}{c}{TV} \\
 \midrule
-SPX 16 Oct 2026 & Ours & 438 & 0.025 & 0.022 & 0.020 & 0.026 & 1.0 & 1.0 \\
-SPX 16 Oct 2026 & PCA & 438 & 0.065 & 0.064 & 0.072 & 0.035 & 1.0 & 1.0 \\
-SPX 15 Jan 2027 & Ours & 395 & 0.046 & 0.039 & 0.038 & 0.045 & 1.0 & 1.0 \\
-SPX 15 Jan 2027 & PCA & 395 & 0.064 & 0.053 & 0.053 & 0.054 & 1.0 & 1.0 \\
-SPX 16 Apr 2027 & Ours & 217 & 0.283 & 0.138 & 0.090 & 0.244 & 1.0 & 1.0 \\
-SPX 16 Apr 2027 & PCA & 217 & 0.152 & 0.115 & 0.073 & 0.205 & 1.0 & 1.0 \\
-SPX 17 Jun 2027 & Ours & 235 & 0.154 & 0.138 & 0.122 & 0.184 & 1.0 & 1.0 \\
-SPX 17 Jun 2027 & PCA & 235 & 0.180 & 0.147 & 0.111 & 0.234 & 1.0 & 1.0 \\
-SPX 16 Jul 2027 & Ours & 209 & 0.184 & 0.168 & 0.161 & 0.183 & 1.0 & 1.0 \\
-SPX 16 Jul 2027 & PCA & 209 & 0.180 & 0.125 & 0.126 & 0.121 & 1.0 & 1.3 \\
-SPX 17 Sep 2027 & Ours & 207 & 0.330 & 0.297 & 0.271 & 0.387 & 1.0 & 1.0 \\
-SPX 17 Sep 2027 & PCA & 207 & 0.343 & 0.237 & 0.184 & 0.386 & 1.0 & 1.6 \\
-SPX 17 Dec 2027 & Ours & 143 & 0.533 & 0.430 & 0.408 & 0.500 & 1.0 & 1.0 \\
-SPX 17 Dec 2027 & PCA & 143 & 0.606 & 0.459 & 0.276 & 0.824 & 1.0 & 1.4 \\
-SPX 16 Jun 2028 & Ours & 199 & 1.516 & 1.700 & 1.635 & 1.901 & 1.0 & 1.0 \\
-SPX 16 Jun 2028 & PCA & 199 & 2.290 & 2.336 & 2.487 & 1.746 & 1.0 & 1.0 \\
-NDX 16 Oct 2026 & Ours & 269 & 0.473 & 0.410 & 0.347 & 0.578 & 1.0 & 1.0 \\
-NDX 16 Oct 2026 & PCA & 269 & 0.458 & 0.395 & 0.346 & 0.531 & 1.0 & 1.2 \\
-NDX 20 Nov 2026 & Ours & 252 & 1.173 & 1.196 & 1.130 & 1.406 & 1.0 & 1.0 \\
-NDX 20 Nov 2026 & PCA & 252 & 1.236 & 1.067 & 1.072 & 1.047 & 1.0 & 1.4 \\
-NDX 19 Feb 2027 & Ours & 95 & 1.356 & 0.695 & 0.716 & 0.637 & 1.0 & 1.0 \\
-NDX 19 Feb 2027 & PCA & 95 & 1.276 & 1.149 & 1.128 & 1.202 & 1.0 & 1.0 \\
-NDX 19 Mar 2027 & Ours & 110 & 0.757 & 0.544 & 0.481 & 0.695 & 1.0 & 1.0 \\
-NDX 19 Mar 2027 & PCA & 110 & 1.243 & 0.967 & 0.637 & 1.577 & 1.0 & 1.0 \\
-NDX 16 Apr 2027 & Ours & 83 & 1.077 & 0.756 & 0.821 & 0.590 & 1.0 & 1.0 \\
-NDX 16 Apr 2027 & PCA & 83 & 1.646 & 1.276 & 1.034 & 1.690 & 1.0 & 1.0 \\
-NDX 21 May 2027 & Ours & 68 & 7.094 & 1.891 & 1.447 & 2.831 & 1.0 & 1.1 \\
-NDX 21 May 2027 & PCA & 68 & 6.347 & 2.927 & 0.768 & 5.702 & 1.0 & 1.0 \\
-NDX 17 Sep 2027 & Ours & 96 & 14.622 & 1.952 & 1.988 & 1.833 & 1.0 & 1.0 \\
-NDX 17 Sep 2027 & PCA & 96 & 13.202 & 8.906 & 2.187 & 17.774 & 1.0 & 1.0 \\
-NDX 17 Dec 2027 & Ours & 117 & 32.318 & 28.023 & 25.179 & 37.466 & 1.0 & 1.0 \\
-NDX 17 Dec 2027 & PCA & 117 & 30.636 & 30.312 & 26.360 & 42.826 & 1.0 & 1.0 \\
-RUT 16 Oct 2026 & Ours & 219 & 0.023 & 0.018 & 0.018 & 0.018 & 1.0 & 1.0 \\
-RUT 16 Oct 2026 & PCA & 219 & 0.041 & 0.038 & 0.037 & 0.040 & 1.0 & 1.0 \\
-RUT 20 Nov 2026 & Ours & 203 & 0.032 & 0.030 & 0.031 & 0.029 & 1.0 & 1.0 \\
-RUT 20 Nov 2026 & PCA & 203 & 0.059 & 0.055 & 0.071 & 0.038 & 1.0 & 1.0 \\
-RUT 19 Mar 2027 & Ours & 131 & 0.299 & 0.178 & 0.104 & 0.345 & 1.0 & 1.1 \\
-RUT 19 Mar 2027 & PCA & 131 & 0.147 & 0.146 & 0.145 & 0.152 & 1.0 & 1.0 \\
-RUT 17 Jun 2027 & Ours & 69 & 0.054 & 0.039 & 0.048 & 0.025 & 1.0 & 1.0 \\
-RUT 17 Jun 2027 & PCA & 69 & 0.373 & 0.177 & 0.224 & 0.092 & 1.0 & 1.0 \\
-DJX 19 Mar 2027 & Ours & 44 & 0.059 & 0.027 & 0.022 & 0.038 & 1.0 & 1.1 \\
-DJX 19 Mar 2027 & PCA & 44 & 0.154 & 0.104 & 0.101 & 0.114 & 1.0 & 1.0 \\
-DJX 17 Jun 2027 & Ours & 57 & 0.071 & 0.057 & 0.050 & 0.074 & 1.0 & 1.1 \\
-DJX 17 Jun 2027 & PCA & 57 & 0.377 & 0.118 & 0.130 & 0.072 & 1.0 & 1.0 \\
-DJX 17 Sep 2027 & Ours & 41 & 0.627 & 0.500 & 0.351 & 0.802 & 1.0 & 1.4 \\
-DJX 17 Sep 2027 & PCA & 41 & 0.356 & 0.209 & 0.225 & 0.147 & 1.0 & 1.0 \\
+\endfirsthead
+\toprule
+\multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} & \multicolumn{1}{c}{\(n\)} &
+  \multicolumn{1}{c}{Hold-out} & \multicolumn{1}{c}{OTM} &
+  \multicolumn{1}{c}{Puts} & \multicolumn{1}{c}{Calls} &
+  \multicolumn{1}{c}{Mass} & \multicolumn{1}{c}{TV} \\
+\midrule
+\endhead
+\midrule
+\endfoot
 \bottomrule
-\end{tabular}
-}
-\end{table}
+\endlastfoot
+
+SPX 16 Oct 2026 & Ours & 438 & 0.025 & 0.022 & 0.020 & 0.026 & 1.0 & 1.0 \\*
+SPX 16 Oct 2026 & PCA & 438 & 0.065 & 0.064 & 0.072 & 0.035 & 1.0 & 1.0 \\
+\midrule
+SPX 15 Jan 2027 & Ours & 395 & 0.046 & 0.039 & 0.038 & 0.045 & 1.0 & 1.0 \\*
+SPX 15 Jan 2027 & PCA & 395 & 0.064 & 0.053 & 0.053 & 0.054 & 1.0 & 1.0 \\
+\midrule
+SPX 16 Apr 2027 & Ours & 217 & 0.283 & 0.138 & 0.090 & 0.244 & 1.0 & 1.0 \\*
+SPX 16 Apr 2027 & PCA & 217 & 0.152 & 0.115 & 0.073 & 0.205 & 1.0 & 1.0 \\
+\midrule
+SPX 17 Jun 2027 & Ours & 235 & 0.154 & 0.138 & 0.122 & 0.184 & 1.0 & 1.0 \\*
+SPX 17 Jun 2027 & PCA & 235 & 0.180 & 0.147 & 0.111 & 0.234 & 1.0 & 1.0 \\
+\midrule
+SPX 16 Jul 2027 & Ours & 209 & 0.184 & 0.168 & 0.161 & 0.183 & 1.0 & 1.0 \\*
+SPX 16 Jul 2027 & PCA & 209 & 0.180 & 0.125 & 0.126 & 0.121 & 1.0 & 1.3 \\
+\midrule
+SPX 17 Sep 2027 & Ours & 207 & 0.330 & 0.297 & 0.271 & 0.387 & 1.0 & 1.0 \\*
+SPX 17 Sep 2027 & PCA & 207 & 0.343 & 0.237 & 0.184 & 0.386 & 1.0 & 1.6 \\
+\midrule
+SPX 17 Dec 2027 & Ours & 143 & 0.533 & 0.430 & 0.408 & 0.500 & 1.0 & 1.0 \\*
+SPX 17 Dec 2027 & PCA & 143 & 0.606 & 0.459 & 0.276 & 0.824 & 1.0 & 1.4 \\
+\midrule
+SPX 16 Jun 2028 & Ours & 199 & 1.516 & 1.700 & 1.635 & 1.901 & 1.0 & 1.0 \\*
+SPX 16 Jun 2028 & PCA & 199 & 2.290 & 2.336 & 2.487 & 1.746 & 1.0 & 1.0 \\
+\midrule
+NDX 16 Oct 2026 & Ours & 269 & 0.473 & 0.410 & 0.347 & 0.578 & 1.0 & 1.0 \\*
+NDX 16 Oct 2026 & PCA & 269 & 0.458 & 0.395 & 0.346 & 0.531 & 1.0 & 1.2 \\
+\midrule
+NDX 20 Nov 2026 & Ours & 252 & 1.173 & 1.196 & 1.130 & 1.406 & 1.0 & 1.0 \\*
+NDX 20 Nov 2026 & PCA & 252 & 1.236 & 1.067 & 1.072 & 1.047 & 1.0 & 1.4 \\
+\midrule
+NDX 19 Feb 2027 & Ours & 95 & 1.356 & 0.695 & 0.716 & 0.637 & 1.0 & 1.0 \\*
+NDX 19 Feb 2027 & PCA & 95 & 1.276 & 1.149 & 1.128 & 1.202 & 1.0 & 1.0 \\
+\midrule
+NDX 19 Mar 2027 & Ours & 110 & 0.757 & 0.544 & 0.481 & 0.695 & 1.0 & 1.0 \\*
+NDX 19 Mar 2027 & PCA & 110 & 1.243 & 0.967 & 0.637 & 1.577 & 1.0 & 1.0 \\
+\midrule
+NDX 16 Apr 2027 & Ours & 83 & 1.077 & 0.756 & 0.821 & 0.590 & 1.0 & 1.0 \\*
+NDX 16 Apr 2027 & PCA & 83 & 1.646 & 1.276 & 1.034 & 1.690 & 1.0 & 1.0 \\
+\midrule
+NDX 21 May 2027 & Ours & 68 & 7.094 & 1.891 & 1.447 & 2.831 & 1.0 & 1.1 \\*
+NDX 21 May 2027 & PCA & 68 & 6.347 & 2.927 & 0.768 & 5.702 & 1.0 & 1.0 \\
+\midrule
+NDX 17 Sep 2027 & Ours & 96 & 14.622 & 1.952 & 1.988 & 1.833 & 1.0 & 1.0 \\*
+NDX 17 Sep 2027 & PCA & 96 & 13.202 & 8.906 & 2.187 & 17.774 & 1.0 & 1.0 \\
+\midrule
+NDX 17 Dec 2027 & Ours & 117 & 32.318 & 28.023 & 25.179 & 37.466 & 1.0 & 1.0 \\*
+NDX 17 Dec 2027 & PCA & 117 & 30.636 & 30.312 & 26.360 & 42.826 & 1.0 & 1.0 \\
+\midrule
+RUT 16 Oct 2026 & Ours & 219 & 0.023 & 0.018 & 0.018 & 0.018 & 1.0 & 1.0 \\*
+RUT 16 Oct 2026 & PCA & 219 & 0.041 & 0.038 & 0.037 & 0.040 & 1.0 & 1.0 \\
+\midrule
+RUT 20 Nov 2026 & Ours & 203 & 0.032 & 0.030 & 0.031 & 0.029 & 1.0 & 1.0 \\*
+RUT 20 Nov 2026 & PCA & 203 & 0.059 & 0.055 & 0.071 & 0.038 & 1.0 & 1.0 \\
+\midrule
+RUT 19 Mar 2027 & Ours & 131 & 0.299 & 0.178 & 0.104 & 0.345 & 1.0 & 1.1 \\*
+RUT 19 Mar 2027 & PCA & 131 & 0.147 & 0.146 & 0.145 & 0.152 & 1.0 & 1.0 \\
+\midrule
+RUT 17 Jun 2027 & Ours & 69 & 0.054 & 0.039 & 0.048 & 0.025 & 1.0 & 1.0 \\*
+RUT 17 Jun 2027 & PCA & 69 & 0.373 & 0.177 & 0.224 & 0.092 & 1.0 & 1.0 \\
+\midrule
+DJX 19 Mar 2027 & Ours & 44 & 0.059 & 0.027 & 0.022 & 0.038 & 1.0 & 1.1 \\*
+DJX 19 Mar 2027 & PCA & 44 & 0.154 & 0.104 & 0.101 & 0.114 & 1.0 & 1.0 \\
+\midrule
+DJX 17 Jun 2027 & Ours & 57 & 0.071 & 0.057 & 0.050 & 0.074 & 1.0 & 1.1 \\*
+DJX 17 Jun 2027 & PCA & 57 & 0.377 & 0.118 & 0.130 & 0.072 & 1.0 & 1.0 \\
+\midrule
+DJX 17 Sep 2027 & Ours & 41 & 0.627 & 0.500 & 0.351 & 0.802 & 1.0 & 1.4 \\*
+DJX 17 Sep 2027 & PCA & 41 & 0.356 & 0.209 & 0.225 & 0.147 & 1.0 & 1.0 \\
+\midrule
+Average & Ours & 169 & 2.744 & 1.706 & 1.543 & 2.210 & 1.0 & 1.0 \\*
+Average & PCA & 169 & 2.671 & 2.234 & 1.646 & 3.331 & 1.0 & 1.1 \\
+\midrule
+Grand & Ours & 184 & 2.383 & 1.497 & 1.359 & 1.917 & 1.0 & 1.0 \\*
+Grand & PCA & 184 & 2.332 & 1.952 & 1.450 & 2.892 & 1.0 & 1.1 \\
+\end{longtable}
+\endgroup
 
 \section*{Code and Data Availability}
 
