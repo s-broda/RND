@@ -5,11 +5,14 @@ Run from the repository root::
     python3 python/replicate.py
 
 Prints the Heston and variance-gamma ISE tables, including the listed
-competitors and a noisy Heston comparison, the listed pricing table, and
-the appendix scores for the smoothing spline. The estimator evaluates the
-convolution in equation (10) of the paper by one FFT of the shared box
-moments in density_closed.c, with thricing as one multiplier, and by one
-real FFT of the sampled spline when that file cannot be compiled. The script writes
+competitors and a noisy Heston comparison, the listed pricing table, the
+wall-clock times of the three convolutions at penalty zero, and the
+appendix scores for the smoothing spline. ``estimate_rnd(..., method=)``
+selects the convolution: ``"naive"`` sums the closed-form cell integrals,
+``"fft"`` is one real FFT of the sampled spline, and ``"fast"`` (the
+default) is one FFT of the order-eight box moments in ``density_closed.c``,
+with thricing as one multiplier. If that file cannot be compiled,
+``"fast"`` uses the sampled-spline FFT. The script writes
 figures/ccdf_heston_rnd.pdf, figures/ccdf_vg_rnd.pdf,
 figures/ccdf_listed.pdf, and figures/ccdf_listed_kern.pdf.
 """
@@ -29,7 +32,7 @@ PY = Path(__file__).resolve().parent
 ROOT = PY.parent
 sys.path.insert(0, str(PY))
 
-from rnd import _Phi, _knots, _phi, _right_wing, _smooth, estimate_rnd
+from rnd import _Phi, _convolve_slope, _knots, _right_wing, _smooth, estimate_rnd
 from src import black_scholes as bs
 from src.competitors import (
     asd_bandwidth,
@@ -963,70 +966,6 @@ def _secant_spline(K, C, S0, r, T, q, h, mult):
 
 
 
-def _J0(u):
-    return u * _Phi(u) + _phi(u)
-
-
-def _J1(u):
-    return 0.5 * u * u * _Phi(u) + 0.5 * u * _phi(u) - 0.5 * _Phi(u)
-
-
-def _J2(u):
-    return u ** 3 * _Phi(u) / 3.0 + u * u * _phi(u) / 3.0 + 2.0 * _phi(u) / 3.0
-
-
-def _J3(u):
-    return (
-        u ** 4 * _Phi(u) / 4.0
-        + u ** 3 * _phi(u) / 4.0
-        + 0.75 * u * _phi(u)
-        - 0.75 * _Phi(u)
-    )
-
-
-def _convolve_slope(x, cells, h):
-    """Closed form of ``(g * κ_h)'`` and ``g * K_h`` for a piecewise-cubic slope.
-
-    On a cell, ``g(y) = a + b(y-L) + c(y-L)^2 + d(y-L)^3``. A quadratic cell
-    (``d = 0``) is the integrand in the cubic-spline formula. The ``u^3``
-    integrals are elementary, so a cubic cell stays closed form.
-    """
-    x = np.atleast_1d(np.asarray(x, dtype=float))
-    h = max(float(h), 1e-6)
-    dconv = np.zeros(x.shape, dtype=float)
-    level = np.zeros(x.shape, dtype=float)
-    for L, R, a, b, c, d in cells:
-        uL = (x - L) / h
-        uR = (x - R) / h
-        hu = h * uL
-        A0 = a + b * hu + c * hu ** 2 + d * hu ** 3
-        A1 = -(b * h + 2.0 * c * h * hu + 3.0 * d * h * hu ** 2)
-        A2 = c * h * h + 3.0 * d * h * h * hu
-        A3 = -d * h ** 3
-        I0 = _Phi(uL) - _Phi(uR)
-        I1 = -_phi(uL) + _phi(uR)
-        I2 = (-uL * _phi(uL) + _Phi(uL)) - (-uR * _phi(uR) + _Phi(uR))
-        I3 = -(uL ** 2 + 2.0) * _phi(uL) + (uR ** 2 + 2.0) * _phi(uR)
-        dA0 = b + 2.0 * c * hu + 3.0 * d * hu ** 2
-        dA1 = -(2.0 * c * h + 6.0 * d * h * hu)
-        dA2 = 3.0 * d * h * h
-        dI0 = (_phi(uL) - _phi(uR)) / h
-        dI1 = (uL * _phi(uL) - uR * _phi(uR)) / h
-        dI2 = (uL ** 2 * _phi(uL) - uR ** 2 * _phi(uR)) / h
-        dI3 = (uL ** 3 * _phi(uL) - uR ** 3 * _phi(uR)) / h
-        dconv += (
-            dA0 * I0 + A0 * dI0 + dA1 * I1 + A1 * dI1
-            + dA2 * I2 + A2 * dI2 + A3 * dI3
-        )
-        level += h * (
-            A0 * (_J0(uL) - _J0(uR))
-            + A1 * (_J1(uL) - _J1(uR))
-            + A2 * (_J2(uL) - _J2(uR))
-            + A3 * (_J3(uL) - _J3(uR))
-        )
-    return dconv, level
-
-
 def _slope_cells(K, C, r, T, F, knots, spl):
     """Pieces of the secant spline, with constant-slope tails matched at the ends."""
     cells = []
@@ -1422,10 +1361,12 @@ def _smoothing_fit_at(base, c, K_eval=None, K_price=None):
     return out
 
 
-def smoothing_spline_fit(K, C, S0, r, T, q, K_eval=None, K_price=None, h_rule="deriv"):
+def smoothing_spline_fit(
+    K, C, S0, r, T, q, K_eval=None, K_price=None, h_rule="deriv", method="fast",
+):
     """The paper's estimator. ``estimate_rnd`` with its default penalty rule."""
     return estimate_rnd(
-        K, C, S0, r, T, q, K_eval=K_eval, K_price=K_price, h=h_rule,
+        K, C, S0, r, T, q, K_eval=K_eval, K_price=K_price, h=h_rule, method=method,
     )
 
 
@@ -1505,6 +1446,83 @@ def smoothing_spline_pilot(n_reps=30, seed=20260923, sd=0.01):
         )
 
 
+def _half_up(x, digits):
+    scale = 10.0 ** int(digits)
+    return float(np.floor(float(x) * scale + 0.5) / scale)
+
+
+def _timing_designs():
+    """The eight designs of the computational table, inputs built once."""
+    def heston_calls(K, p=BCC97):
+        return np.maximum(
+            carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc, 0.0,
+        )
+
+    def vg_calls_pos(K, p=CM99):
+        return np.maximum(vg_calls(K, p), 0.0)
+
+    rows = []
+    for name, p, calls, K in (
+        ("Heston, dense", BCC97, heston_calls, np.linspace(30.0, 220.0, 256)),
+        ("Heston, sparse", BCC97, heston_calls, np.linspace(70.0, 140.0, 16)),
+        ("Variance gamma, dense", CM99, vg_calls_pos, np.linspace(30.0, 220.0, 256)),
+        ("Variance gamma, sparse", CM99, vg_calls_pos, np.linspace(70.0, 140.0, 16)),
+    ):
+        rows.append((name, np.asarray(K, float), calls(K), p.S0, p.r, p.T, p.q))
+    for csv, title in (
+        ("spx_20261218.csv", "SPX 18 Dec 2026"),
+        ("spx_20270319.csv", "SPX 19 Mar 2027"),
+        ("ndx_20261218.csv", "NDX 18 Dec 2026"),
+        ("rut_20261218.csv", "RUT 18 Dec 2026"),
+    ):
+        sl = load_slice(RES / csv)
+        C = _projected_calls(sl.K, sl.C, sl.r, sl.T, sl.F)
+        rows.append((title, sl.K, C, sl.S0, sl.r, sl.T, sl.q))
+    return rows
+
+
+def convolution_times(repeats=5, warmup=1):
+    """Seconds for one pricing at penalty zero. The penalty search is off.
+
+    Each timing is ``estimate_rnd(..., c=0, K_price=K)``: the natural cubic
+    through the knots, then the density and the calls at the quoted strikes.
+    One warmup call is discarded. The recorded time is the minimum of
+    ``repeats``. Ratios use the raw times, then half-up to one decimal.
+    """
+    import time
+
+    print(
+        f"\nConvolution times at c=0, search off. "
+        f"warmup {warmup}, min of {repeats}."
+    )
+    methods = ("naive", "fft", "fast")
+    for name, K, C, S0, r, T, q in _timing_designs():
+        raw = {}
+        for method in methods:
+            def once(method=method, K=K, C=C, S0=S0, r=r, T=T, q=q):
+                return estimate_rnd(
+                    K, C, S0, r, T, q, c=0.0, K_price=K, method=method,
+                )
+
+            for _ in range(warmup):
+                once()
+            best = None
+            for _ in range(repeats):
+                t0 = time.perf_counter()
+                once()
+                dt = time.perf_counter() - t0
+                best = dt if best is None else min(best, dt)
+            raw[method] = best
+        print(
+            f"  {name:24} "
+            f"naive {raw['naive']:.6f} ({_half_up(raw['naive'], 3):.3f}) "
+            f"fft {raw['fft']:.6f} ({_half_up(raw['fft'], 3):.3f}) "
+            f"fast {raw['fast']:.6f} ({_half_up(raw['fast'], 3):.3f}) "
+            f"fft/naive {_half_up(raw['naive'] / raw['fft'], 1):.1f} "
+            f"fast/naive {_half_up(raw['naive'] / raw['fast'], 1):.1f}"
+        )
+
+
 def main():
     K_eval = np.linspace(60.0, 150.0, 401)
     p = BCC97
@@ -1519,6 +1537,7 @@ def main():
     _figure_exact(FIG / "ccdf_vg_rnd.pdf", K_eval, qv, plot_v, "Variance gamma")
     noisy_heston()
     listed()
+    convolution_times()
     print("DONE")
 
 

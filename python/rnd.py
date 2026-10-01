@@ -1,14 +1,18 @@
 """Risk-neutral density from a single-maturity call strip.
 
 The public entry point is ``estimate_rnd``. Copy this file together with
-``density_closed.c``. The estimator depends only on NumPy and SciPy, and on a
-C compiler when one is present. It rescales calls to a complementary cdf,
-fits that function with a smoothing spline, completes the unquoted tails, and
-convolves the spline with a Gaussian. That integral is elementary on each
-cell of the cubic. The expansion in ``density_closed.c`` evaluates it
-by one FFT of the shared box moments, with thricing as one multiplier;
-if that file cannot be compiled, the same convolution is one real FFT
-of the sampled spline.
+``density_closed.c``. The estimator depends only on NumPy and SciPy. A C
+compiler is used when one is present. It rescales calls to a complementary
+cdf, fits that function with a smoothing spline, completes the unquoted
+tails, and convolves the spline with a Gaussian.
+
+``method`` selects the convolution. ``"naive"`` sums the closed-form cell
+integrals. ``"fft"`` is one real FFT of the sampled spline. ``"fast"`` is
+one FFT of the order-eight box moments in ``density_closed.c``, with
+thricing as one multiplier. ``"fast"`` is the default. If that file cannot
+be compiled, ``"fast"`` uses the sampled-spline FFT; ``"fft"`` and
+``"naive"`` do not depend on the compiler.
+
 Thricing and the penalty rule are on by default. The default bandwidth is
 ``0.38 F σ_ATM √T n^{-1/9}``.
 
@@ -64,6 +68,7 @@ def estimate_rnd(
     c="rule",
     higher=None,
     deriv_c=None,
+    method="fast",
 ):
     """Risk-neutral density of ``S_T`` from one expiry's calls.
 
@@ -100,6 +105,10 @@ def estimate_rnd(
         ``False`` is one Gaussian, ``"twice"`` is twicing.
     deriv_c : float, optional
         Replaces ``0.38`` in the default bandwidth.
+    method : {"fast", "fft", "naive"}
+        ``"fast"`` transforms the box moments. ``"fft"`` transforms the
+        sampled spline. ``"naive"`` sums the cell integrals. ``"fast"``
+        falls back to ``"fft"`` when ``density_closed.c`` cannot be compiled.
 
     Returns
     -------
@@ -109,6 +118,8 @@ def estimate_rnd(
     """
     if higher is not None:
         kernel = higher
+    if method not in ("fast", "fft", "naive"):
+        raise ValueError("method must be 'naive', 'fft', or 'fast'")
     weights = _kernel_weights(kernel)
     K = np.asarray(K, dtype=float)
     C = np.asarray(C, dtype=float)
@@ -127,12 +138,16 @@ def estimate_rnd(
         h_use = float(h)
     Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
     if c == "rule":
-        c_use = _choose_penalty(K, C, Ks, Ps, h_use, stock, F, weights)
+        c_use = _choose_penalty(K, C, Ks, Ps, h_use, stock, F, weights, method=method)
         spl = _rule_spline(Ks, Ps, c_use, F)
     else:
         c_use = float(c)
         spl = CubicSpline(Ks, Ps, bc_type="natural") if c_use <= 0.0 else _rule_spline(Ks, Ps, c_use, F)
-    qhat, G = _convolve(spl, Ks, h_use, F, K_eval, weights, level_at=None if K_price is None else np.asarray(K_price, dtype=float))
+    qhat, G = _convolve(
+        spl, Ks, h_use, F, K_eval, weights,
+        level_at=None if K_price is None else np.asarray(K_price, dtype=float),
+        method=method,
+    )
     C_hat = None
     if G is not None:
         C_hat = stock * np.clip(1.0 - np.clip(G, 0.0, 1.0), 0.0, 1.0)
@@ -259,8 +274,7 @@ def _convolve_fft(spl, Ks, h, F, x, weights, level_at=None, with_plain=False):
     Thricing is the multiplier
     ``(8/3) e^{-h^2 ω^2/2} - 2 e^{-h^2 ω^2} + (1/3) e^{-2 h^2 ω^2}``
     applied to that transform. ``with_plain`` also returns the untwiced
-    density, from the same transform, for the penalty rule. This is the
-    fallback when ``density_closed.c`` cannot be compiled.
+    density, from the same transform, for the penalty rule.
     """
     x = np.asarray(x, dtype=float)
     cover = x.ravel()
@@ -450,17 +464,149 @@ def _convolve_series(spl, Ks, h, F, x, weights, level_at=None, with_plain=False)
     return q, G, (-float(F) * plain).reshape(shape)
 
 
-def _convolve(spl, Ks, h, F, x, weights, level_at=None, with_plain=False):
+def _J0(u):
+    return u * _Phi(u) + _phi(u)
+
+
+def _J1(u):
+    return 0.5 * u * u * _Phi(u) + 0.5 * u * _phi(u) - 0.5 * _Phi(u)
+
+
+def _J2(u):
+    return u ** 3 * _Phi(u) / 3.0 + u * u * _phi(u) / 3.0 + 2.0 * _phi(u) / 3.0
+
+
+def _J3(u):
+    return (
+        u ** 4 * _Phi(u) / 4.0
+        + u ** 3 * _phi(u) / 4.0
+        + 0.75 * u * _phi(u)
+        - 0.75 * _Phi(u)
+    )
+
+
+def _convolve_slope(x, cells, h):
+    """Closed form of ``(g * κ_h)'`` and ``g * K_h`` for a piecewise-cubic slope.
+
+    On a cell, ``g(y) = a + b(y-L) + c(y-L)^2 + d(y-L)^3``. A quadratic cell
+    (``d = 0``) is the slope of a cubic spline. The powers against ``φ`` and
+    ``Φ`` are elementary.
+    """
+    x = np.atleast_1d(np.asarray(x, dtype=float))
+    h = max(float(h), 1e-6)
+    dconv = np.zeros(x.shape, dtype=float)
+    level = np.zeros(x.shape, dtype=float)
+    for L, R, a, b, c, d in cells:
+        uL = (x - L) / h
+        uR = (x - R) / h
+        hu = h * uL
+        A0 = a + b * hu + c * hu ** 2 + d * hu ** 3
+        A1 = -(b * h + 2.0 * c * h * hu + 3.0 * d * h * hu ** 2)
+        A2 = c * h * h + 3.0 * d * h * h * hu
+        A3 = -d * h ** 3
+        I0 = _Phi(uL) - _Phi(uR)
+        I1 = -_phi(uL) + _phi(uR)
+        I2 = (-uL * _phi(uL) + _Phi(uL)) - (-uR * _phi(uR) + _Phi(uR))
+        I3 = -(uL ** 2 + 2.0) * _phi(uL) + (uR ** 2 + 2.0) * _phi(uR)
+        dA0 = b + 2.0 * c * hu + 3.0 * d * hu ** 2
+        dA1 = -(2.0 * c * h + 6.0 * d * h * hu)
+        dA2 = 3.0 * d * h * h
+        dI0 = (_phi(uL) - _phi(uR)) / h
+        dI1 = (uL * _phi(uL) - uR * _phi(uR)) / h
+        dI2 = (uL ** 2 * _phi(uL) - uR ** 2 * _phi(uR)) / h
+        dI3 = (uL ** 3 * _phi(uL) - uR ** 3 * _phi(uR)) / h
+        dconv += (
+            dA0 * I0 + A0 * dI0 + dA1 * I1 + A1 * dI1
+            + dA2 * I2 + A2 * dI2 + A3 * dI3
+        )
+        level += h * (
+            A0 * (_J0(uL) - _J0(uR))
+            + A1 * (_J1(uL) - _J1(uR))
+            + A2 * (_J2(uL) - _J2(uR))
+            + A3 * (_J3(uL) - _J3(uR))
+        )
+    return dconv, level
+
+
+def _spline_slope_cells(spl, Ks):
+    """Quadratic pieces of the spline slope, one per knot interval."""
+    t = np.asarray(Ks, dtype=float)
+    p1 = np.asarray(spl(t, nu=1), dtype=float)
+    p2 = np.asarray(spl(t, nu=2), dtype=float)
+    cells = []
+    for i in range(t.size - 1):
+        width = float(t[i + 1] - t[i])
+        if width <= 1e-12:
+            continue
+        c = 0.5 * float(p2[i + 1] - p2[i]) / width
+        cells.append((float(t[i]), float(t[i + 1]), float(p1[i]), float(p2[i]), c, 0.0))
+    return cells
+
+
+def _weighted_slope(x, cells, h, weights):
+    x = np.asarray(x, dtype=float)
+    d_tot = np.zeros(x.shape, dtype=float)
+    level = np.zeros(x.shape, dtype=float)
+    for fac, w in weights:
+        d_one, level_one = _convolve_slope(x, cells, float(h) * float(fac))
+        d_tot = d_tot + float(w) * d_one
+        level = level + float(w) * level_one
+    return d_tot, level
+
+
+def _convolve_naive(spl, Ks, h, F, x, weights, level_at=None, with_plain=False):
+    """Density and level by summing the closed-form cell integrals.
+
+    Each cell of the spline slope is a quadratic. Thricing sums those
+    integrals at the three bandwidths. ``with_plain`` also returns the
+    untwiced density.
+    """
+    cells = _spline_slope_cells(spl, Ks)
+    x_arr = np.asarray(x, dtype=float)
+    la = None if level_at is None else np.asarray(level_at, dtype=float)
+    same = la is not None and la.shape == x_arr.shape and np.array_equal(la, x_arr)
+    if la is None or same:
+        d, level = _weighted_slope(x_arr, cells, h, weights)
+        q = -float(F) * d
+        G = level if la is not None else None
+    else:
+        n_x = x_arr.size
+        pts = np.concatenate([x_arr.ravel(), la.ravel()])
+        d_all, level_all = _weighted_slope(pts, cells, h, weights)
+        q = (-float(F) * d_all[:n_x]).reshape(x_arr.shape)
+        G = level_all[n_x:].reshape(la.shape)
+    if not with_plain:
+        return q, G
+    d_plain, _ = _convolve_slope(x_arr, cells, float(h))
+    return q, G, -float(F) * d_plain
+
+
+def _convolve(spl, Ks, h, F, x, weights, level_at=None, with_plain=False, method="fast"):
     """Density and, if requested, the smoothed complementary cdf.
 
-    One FFT of the shared box moments, with thricing as one multiplier.
-    The sampled-spline FFT is the fallback when that file cannot be
-    compiled. ``with_plain`` also returns the untwiced density for the
-    penalty rule.
+    ``method="naive"`` sums the cell integrals. ``method="fft"`` is one
+    real FFT of the sampled spline. ``method="fast"`` is one FFT of the
+    order-eight box moments. ``with_plain`` also returns the untwiced
+    density for the penalty rule.
     """
-    if _closed_library() is not None:
-        return _convolve_series(spl, Ks, h, F, x, weights, level_at=level_at, with_plain=with_plain)
-    return _convolve_fft(spl, Ks, h, F, x, weights, level_at=level_at, with_plain=with_plain)
+    if method == "naive":
+        return _convolve_naive(
+            spl, Ks, h, F, x, weights, level_at=level_at, with_plain=with_plain,
+        )
+    if method == "fft":
+        return _convolve_fft(
+            spl, Ks, h, F, x, weights, level_at=level_at, with_plain=with_plain,
+        )
+    if method == "fast":
+        # No C compiler: the sampled-spline FFT evaluates the same convolution.
+        if _closed_library() is not None:
+            return _convolve_series(
+                spl, Ks, h, F, x, weights, level_at=level_at, with_plain=with_plain,
+            )
+        return _convolve_fft(
+            spl, Ks, h, F, x, weights, level_at=level_at, with_plain=with_plain,
+        )
+    raise ValueError("method must be 'naive', 'fft', or 'fast'")
 
 
 def _rule_spline(Ks, Ps, c, F):
@@ -487,13 +633,15 @@ def _shape_scores(q, q_plain, F, s):
     return tv, peaks, corr
 
 
-def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5):
+def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5, method="fast"):
     """Smallest unimodal penalty, then the corner when the bend is sharp."""
     s = np.linspace(max(50.0, 0.2 * F), 2.4 * F, 700)
     rows = []
     for c in SMOOTH_C:
         spl = _rule_spline(Ks, Ps, c, F)
-        q, G, q_plain = _convolve(spl, Ks, h, F, s, weights, level_at=K, with_plain=True)
+        q, G, q_plain = _convolve(
+            spl, Ks, h, F, s, weights, level_at=K, with_plain=True, method=method,
+        )
         tv, peaks, corr = _shape_scores(q, q_plain, F, s)
         Cf = np.maximum(stock * (1.0 - np.clip(G, 0.0, 1.0)), 0.0)
         price = float(np.sqrt(np.mean((Cf - C) ** 2)))
