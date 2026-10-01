@@ -37,7 +37,7 @@
 \cortext[cor1]{Corresponding author.}
 
 \begin{abstract}
-European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. The calls are rescaled to a complementary distribution, the empirical measure of the risk-neutral jumps in strike, and that measure is fit by a smoothing spline. A Gaussian damping of its characteristic function inverts in closed form and, after the unquoted tails are filled and the kernel is thriced, supplies both the density and the call. The penalty is zero when the thriced density scores at most the positive-part variation of the thriced kernel, and otherwise a closed function of the excess. The estimator is in-fill consistent. On each of the four listed chains, and in the average, the even/odd hold-out error is smaller than each comparison method. Each fitted density has one peak, mass \(1.0\), and total variation \(1.0\). On noisy Heston quotes the mean integrated squared error is the smallest of the comparison methods on the dense chain, and below the positive convolution on both.
+European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. The calls are rescaled to a complementary distribution, the empirical measure of the risk-neutral jumps in strike, and that measure is fit by a smoothing spline. A Gaussian damping of its characteristic function inverts in closed form and, after the unquoted tails are filled and the kernel is thriced, supplies both the density and the call. The penalty is zero when the thriced density scores at most the positive-part variation of the thriced kernel, and otherwise a closed function of the excess. The estimator is in-fill consistent. On each of the four listed chains, and in the average, the even/odd hold-out error is smaller than each comparison method. Each fitted density has one peak, mass \(1.0\), and total variation \(1.0\). On noisy Heston quotes the mean integrated squared error is the smallest of the comparison methods on both chains.
 \end{abstract}
 
 \begin{keyword}
@@ -55,7 +55,7 @@ risk-neutral density \sep option prices \sep kernel estimation \sep in-fill cons
 
 This paper estimates that density from the empirical measure of a single maturity. The calls are rescaled to a complementary distribution, which records the risk-neutral jumps in strike. A smoothing spline fits the measure: a natural cubic, with a penalty on the second derivative that is zero when the thriced density scores at most \(1.007\), the positive-part score of the thriced kernel, and otherwise the closed form \eqref{eq:penalty-rule}. A Gaussian damping of the characteristic function of the spline inverts in closed form. The same smoothing is the density and, after one integration, the call. Tails complete the unquoted wings, and thricing raises the order of the kernel. With those pieces in place, Theorem~\ref{thm:cons} gives in-fill consistency on the interior of a compact interval whenever the mesh is quasi-uniform and fills the interval, \(h\to 0\), and \(nh^{5}/(\log n)^{2}\to\infty\). On the exact designs below the selected penalty is zero.
 
-We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{aitsahalia2003} smooth a decreasing-convex projection of the calls with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. \citet{aitsahalia1998} smooth implied volatility, and \citet{grith2012} use a local cubic of the call and of implied volatility. On the listed chains of Section~\ref{sec:emp} the even/odd hold-out error is smaller than each of these methods on each chain and in the average. The fitted density has one peak, mass \(1.0\), and total variation \(1.0\). The out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}. On noisy Heston quotes the mean integrated squared error is the smallest of these methods on the dense chain, and below that convolution on both chains.
+We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{aitsahalia2003} smooth a decreasing-convex projection of the calls with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. \citet{aitsahalia1998} smooth implied volatility, and \citet{grith2012} use a local cubic of the call and of implied volatility. On the listed chains of Section~\ref{sec:emp} the even/odd hold-out error is smaller than each of these methods on each chain and in the average. The fitted density has one peak, mass \(1.0\), and total variation \(1.0\). The out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}. On noisy Heston quotes the mean integrated squared error is the smallest of these methods on both chains.
 
 The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency of the estimator and states the bandwidth used below. Section~\ref{sec:compute} compares three evaluations of that closed form. Section~\ref{sec:heston} compares that estimator with those of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
 
@@ -405,9 +405,9 @@ Summing the series at one strike visits the boxes that lie inside five standard 
   \multicolumn{1}{c}{FFT+ME} \\
 \midrule
 Heston, dense & 0.125 & 0.003 & 0.002 & 50.0 & 67.5 \\
-Heston, sparse & 0.006 & 0.001 & 0.001 & 4.3 & 4.7 \\
+Heston, sparse & 0.011 & 0.002 & 0.001 & 7.5 & 8.3 \\
 Variance gamma, dense & 0.124 & 0.003 & 0.002 & 45.2 & 58.9 \\
-Variance gamma, sparse & 0.006 & 0.002 & 0.001 & 4.1 & 4.6 \\
+Variance gamma, sparse & 0.011 & 0.002 & 0.001 & 7.3 & 8.2 \\
 SPX 18 Dec 2026 & 0.272 & 0.004 & 0.001 & 74.3 & 191.1 \\
 SPX 19 Mar 2027 & 0.101 & 0.003 & 0.001 & 37.7 & 79.6 \\
 NDX 18 Dec 2026 & 0.161 & 0.002 & 0.001 & 68.5 & 129.5 \\
@@ -416,7 +416,7 @@ RUT 18 Dec 2026 & 0.035 & 0.002 & 0.001 & 16.2 & 32.9 \\
 \end{tabular}
 \end{table}
 
-The sampled-spline transform is between \(4.1\) and \(74.3\) times as fast as the cell sum. The moment expansion is between \(4.6\) and \(191.1\) times as fast as the cell sum, and between \(1.1\) and \(2.6\) times as fast as the sampled-spline transform. On the two chains with sixteen strikes the cell sum takes \(0.006\) seconds and both transforms take one or two milliseconds, so each ratio lies between four and five. On the listed chains the cell sum grows with the number of knots, from \(0.035\) seconds on the Russell chain to \(0.272\) seconds on the December S\&P~500 chain. The moment expansion stays between \(0.001\) and \(0.002\) seconds on every row. The gap between the two transforms is the small constant of the preceding paragraph.
+The sampled-spline transform is between \(7.3\) and \(74.3\) times as fast as the cell sum. The moment expansion is between \(8.2\) and \(191.1\) times as fast as the cell sum, and between \(1.1\) and \(2.6\) times as fast as the sampled-spline transform. On the two chains with thirty-two strikes the cell sum takes \(0.011\) seconds and both transforms take one or two milliseconds, so each ratio lies between seven and nine. On the listed chains the cell sum grows with the number of knots, from \(0.035\) seconds on the Russell chain to \(0.272\) seconds on the December S\&P~500 chain. The moment expansion stays between \(0.001\) and \(0.002\) seconds on every row. The gap between the two transforms is the small constant of the preceding paragraph.
 
 \section{Numerical Illustration}
 \label{sec:heston}
@@ -429,7 +429,7 @@ f_{\Q}(K)
 \frac1{K\pi}\int_0^\infty
 \mathrm{Re}\bigl[e^{-\mathrm{i}u\log K}\varphi(u)\bigr]\,\mathrm{d}u,
 \end{equation}
-where \(\varphi(u)=\E^{\Q}[e^{\mathrm{i}u\log S_T}]\). Two chains are used: a dense grid of \(m=256\) equally spaced strikes on \([30,220]\) (spacing \(\delta=0.745\)) and a sparse grid of \(m=16\) equally spaced strikes on \([70,140]\) (spacing \(\delta=4.67\)). Integrated squared error (ISE) is \(\int_{60}^{150}(\hat f_{\Q}-f_{\Q})^2\,\mathrm{d}K\), evaluated by the trapezoidal rule on \(401\) equally spaced points. Table~\ref{tab:heston-tail} reports ISE for four nested estimators at the oracle \(h^{\ast}\) and at \eqref{eq:h-d2}. The oracle minimizes the integral on a geometric grid in \(h\).
+where \(\varphi(u)=\E^{\Q}[e^{\mathrm{i}u\log S_T}]\). Two chains are used: a dense grid of \(m=256\) equally spaced strikes on \([30,220]\) (spacing \(\delta=0.745\)) and a sparse grid of \(m=32\) equally spaced strikes on \([70,140]\) (spacing \(\delta=2.26\)). Integrated squared error (ISE) is \(\int_{60}^{150}(\hat f_{\Q}-f_{\Q})^2\,\mathrm{d}K\), evaluated by the trapezoidal rule on \(401\) equally spaced points. Table~\ref{tab:heston-tail} reports ISE for four nested estimators at the oracle \(h^{\ast}\) and at \eqref{eq:h-d2}. The oracle minimizes the integral on a geometric grid in \(h\).
 
 \begin{table}[H]
 \centering
@@ -454,13 +454,13 @@ Dense & Tails+Thrice
   & 0.63 & 1.16e-12 & 1.79 & 8.78e-9 \\
 \midrule
 Sparse & Quoted spline
-  & 16.35 & 1.80e-2 & 2.38 & 1.18e-1 \\
+  & 16.19 & 1.80e-2 & 2.24 & 1.25e-1 \\
 Sparse & Tails
-  & 0.93 & 3.40e-6 & 2.38 & 3.42e-5 \\
+  & 0.45 & 1.13e-6 & 2.24 & 2.64e-5 \\
 Sparse & Tails+Twice
-  & 1.91 & 1.68e-6 & 2.38 & 2.22e-6 \\
+  & 1.64 & 9.67e-7 & 2.24 & 1.35e-6 \\
 Sparse & Tails+Thrice
-  & 2.20 & 1.43e-6 & 2.38 & 1.44e-6 \\
+  & 2.18 & 9.19e-7 & 2.24 & 9.25e-7 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -499,13 +499,13 @@ Dense & Tails+Thrice
   & 0.46 & 4.04e-7 & 1.14 & 1.28e-5 \\
 \midrule
 Sparse & Quoted spline
-  & 14.17 & 3.27e-2 & 1.48 & 1.91e-1 \\
+  & 14.03 & 3.26e-2 & 1.42 & 1.99e-1 \\
 Sparse & Tails
-  & 0.93 & 5.78e-4 & 1.48 & 6.37e-4 \\
+  & 0.45 & 3.97e-5 & 1.42 & 2.25e-4 \\
 Sparse & Tails+Twice
-  & 1.91 & 5.12e-4 & 1.48 & 5.27e-4 \\
+  & 0.80 & 3.31e-5 & 1.42 & 6.18e-5 \\
 Sparse & Tails+Thrice
-  & 2.20 & 4.87e-4 & 1.48 & 5.42e-4 \\
+  & 0.92 & 3.13e-5 & 1.42 & 4.40e-5 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -517,7 +517,7 @@ Sparse & Tails+Thrice
 \label{fig:vg-rnd}
 \end{figure}
 
-On the dense chain the wings again do not move the error. At \eqref{eq:h-d2}, twicing lowers it and thricing lowers it further. That bandwidth is wider than the oracle, and the error is larger. The density of \(S_T\) is more peaked than under Heston, so the errors are larger than on that design. On the sparse chain the quoted spline without tails misses the window. Tails restore it. Twicing lowers that error, and thricing at \eqref{eq:h-d2} remains near its oracle. Figure~\ref{fig:vg-rnd} plots the quoted spline, tails, tails plus twice, and tails plus thrice at \eqref{eq:h-d2}.
+On the dense chain the wings again do not move the error. At \eqref{eq:h-d2}, twicing lowers it and thricing lowers it further. That bandwidth is wider than the oracle, and the error is larger. The density of \(S_T\) is more peaked than under Heston, so the errors are larger than on that design. On the sparse chain the quoted spline without tails misses the window. Tails restore it. Twicing lowers that error, and thricing lowers it further. Figure~\ref{fig:vg-rnd} plots the quoted spline, tails, tails plus twice, and tails plus thrice at \eqref{eq:h-d2}.
 
 Table~\ref{tab:sim-comp} scores the estimator of Section~\ref{sec:construct} against the methods of Section~\ref{sec:emp} on the same four chains. Each fit starts from the decreasing-convex projection. On these exact quotes the penalty is zero.
 
@@ -532,19 +532,19 @@ Table~\ref{tab:sim-comp} scores the estimator of Section~\ref{sec:construct} aga
   \multicolumn{1}{c}{Heston dense} & \multicolumn{1}{c}{Heston sparse} &
   \multicolumn{1}{c}{VG dense} & \multicolumn{1}{c}{VG sparse} \\
 \midrule
-Ours & 8.78e-9 & 1.44e-6 & 1.28e-5 & 5.42e-4 \\
-PCA & 8.55e-8 & 7.16e-3 & 2.05e-4 & 2.55e-2 \\
-\citeauthor{grith2012}, IV, \(2\times\) & 9.27e-8 & 2.81e-5 & 1.15e-4 & 1.67e-3 \\
-\citeauthor{grith2012}, IV, CV & 6.24e-9 & 4.79e-6 & 2.16e-5 & 7.40e-4 \\
-\citeauthor{aitsahalia2003} & 6.13e-4 & 2.47e-3 & 6.47e-3 & 1.95e-3 \\
-\citeauthor{grith2012}, call, \(2\times\) & 1.14e-5 & 5.22e-3 & 4.45e-4 & 1.89e-2 \\
-\citeauthor{grith2012}, call, CV & 7.52e-7 & 6.81e-4 & 5.39e-5 & 6.65e-3 \\
-\citeauthor{aitsahalia1998} & 2.20e-8 & 4.29e-6 & 3.22e-5 & 4.94e-4 \\
+Ours & 8.78e-9 & 9.25e-7 & 1.28e-5 & 4.40e-5 \\
+PCA & 8.55e-8 & 3.39e-4 & 2.05e-4 & 9.29e-3 \\
+\citeauthor{grith2012}, IV, \(2\times\) & 9.27e-8 & 4.34e-6 & 1.15e-4 & 7.03e-4 \\
+\citeauthor{grith2012}, IV, CV & 6.24e-9 & 5.66e-7 & 2.16e-5 & 2.53e-4 \\
+\citeauthor{aitsahalia2003} & 6.13e-4 & 2.32e-5 & 6.47e-3 & 1.13e-3 \\
+\citeauthor{grith2012}, call, \(2\times\) & 1.14e-5 & 6.32e-4 & 4.45e-4 & 6.25e-3 \\
+\citeauthor{grith2012}, call, CV & 7.52e-7 & 5.59e-5 & 5.39e-5 & 1.36e-3 \\
+\citeauthor{aitsahalia1998} & 2.20e-8 & 4.16e-7 & 3.22e-5 & 1.18e-4 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The estimator is the smallest on sparse Heston and on dense variance gamma. It is also smaller than the positive convolution, the plug-in local linear, both call cubics, and the doubled implied-volatility cubic on every chain. On dense Heston the cross-validated implied-volatility cubic is smaller. On sparse variance gamma the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} is smaller.
+The estimator is the smallest on both variance-gamma chains. It is also smaller than the positive convolution, the plug-in local linear, both call cubics, and the doubled implied-volatility cubic on every chain. On dense Heston the cross-validated implied-volatility cubic is smaller. On sparse Heston that cubic and the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} are smaller.
 
 The same designs are repeated with noise in the quotes. Black--Scholes implied volatility receives independent \(N(0,0.01^{2})\) noise. Values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Each replication starts from the projection of those calls, and the penalty is chosen on that draw by the rule of Section~\ref{sec:emp-est}. Table~\ref{tab:heston-noise} is that comparison.
 
@@ -557,19 +557,19 @@ The same designs are repeated with noise in the quotes. Black--Scholes implied v
 \multicolumn{1}{@{}c}{Estimator} &
   \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
 \midrule
-Ours & 2.02e-4 & 7.36e-4 \\
-PCA & 4.36e-4 & 7.20e-3 \\
-\citeauthor{grith2012}, IV, \(2\times\) & 2.56e-3 & 8.61e-5 \\
-\citeauthor{grith2012}, IV, CV & 1.56e-2 & 2.74e-4 \\
-\citeauthor{aitsahalia2003} & 5.95e-4 & 6.33e-3 \\
-\citeauthor{grith2012}, call, \(2\times\) & 2.17e-3 & 5.81e-3 \\
-\citeauthor{grith2012}, call, CV & 1.54e-2 & 1.15e-3 \\
-\citeauthor{aitsahalia1998} & 2.15e-4 & 4.30e-4 \\
+Ours & 2.02e-4 & 2.60e-4 \\
+PCA & 4.36e-4 & 3.61e-4 \\
+\citeauthor{grith2012}, IV, \(2\times\) & 2.56e-3 & 1.20e-1 \\
+\citeauthor{grith2012}, IV, CV & 1.56e-2 & 3.55e-2 \\
+\citeauthor{aitsahalia2003} & 5.95e-4 & 2.99e-3 \\
+\citeauthor{grith2012}, call, \(2\times\) & 2.17e-3 & 1.43e-3 \\
+\citeauthor{grith2012}, call, CV & 1.54e-2 & 1.08e-3 \\
+\citeauthor{aitsahalia1998} & 2.15e-4 & 3.02e-4 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-On the dense chain the smoothing spline is the smallest of the comparison methods. On the sparse chain the implied-volatility cubics and the Nadaraya--Watson smile are smaller. On both chains the smoothing spline is below the positive convolution.
+On both chains the smoothing spline is the smallest of the comparison methods.
 
 \section{Empirical Applications}
 \label{sec:emp}
@@ -747,7 +747,7 @@ Total variation, defined in the caption of Table~\ref{tab:listed}, charges an ex
 \section{Conclusion}
 \label{sec:conc}
 
-The estimator reads the risk-neutral density off the empirical measure of a single maturity. Calls are rescaled to a complementary distribution, a smoothing spline fits that measure, the unquoted tails are filled, and a thriced Gaussian convolution of the spline is the density and the call. The penalty is zero when the thriced density scores at most \(1.007\), and otherwise \eqref{eq:penalty-rule}. On the exact chains that penalty is zero. The estimator is the smallest on sparse Heston and on dense variance gamma. On dense Heston the cross-validated implied-volatility cubic is smaller, and on sparse variance gamma the Nadaraya--Watson smile is smaller. With noise in implied volatility the smoothing spline is the smallest on the dense chain, and on the sparse chain the implied-volatility cubics and that smile are smaller. On each of the four listed chains the hold-out error is smaller than every other method, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. The cross-validated call cubic is tighter in sample on each chain, and the cross-validated implied-volatility cubic is tighter in sample except on SPX March. The call cubic does not hold out on the far wing.
+The estimator reads the risk-neutral density off the empirical measure of a single maturity. Calls are rescaled to a complementary distribution, a smoothing spline fits that measure, the unquoted tails are filled, and a thriced Gaussian convolution of the spline is the density and the call. The penalty is zero when the thriced density scores at most \(1.007\), and otherwise \eqref{eq:penalty-rule}. On the exact chains that penalty is zero. The estimator is the smallest on both variance-gamma chains. On dense Heston the cross-validated implied-volatility cubic is smaller, and on sparse Heston that cubic and the Nadaraya--Watson smile are smaller. With noise in implied volatility the smoothing spline is the smallest on both chains. On each of the four listed chains the hold-out error is smaller than every other method, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. The cross-validated call cubic is tighter in sample on each chain, and the cross-validated implied-volatility cubic is tighter in sample except on SPX March. The call cubic does not hold out on the far wing.
 
 \appendix
 \section{Other listed densities}

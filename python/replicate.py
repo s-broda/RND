@@ -125,7 +125,7 @@ def _exact(label, p, calls, q_true, K_eval):
     plot = {}
     for chain, K in (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 16)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
     ):
         C = np.maximum(calls(K), 0.0)
         delta = float(np.median(np.diff(K)))
@@ -254,7 +254,7 @@ def _figure_exact(path, K_eval, q_true, plot, title):
         ax.set_xlim(60, 150)
         ax.set_ylim(0.0, 1.18 * float(np.nanmax(q_true)))
         ax.set_xlabel(r"Strike $K$")
-        ax.set_title("Dense, $m=256$" if chain == "dense" else "Sparse, $m=16$")
+        ax.set_title("Dense, $m=256$" if chain == "dense" else "Sparse, $m=32$")
         ax.legend(frameon=False)
     axes[0].set_ylabel(r"$f_{\mathbb{Q}}(K)$")
     fig.tight_layout(w_pad=2.4)
@@ -702,7 +702,7 @@ def _iv_noise(K, C, S0, r, T, q, rng, sd=0.01):
 def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
     """Mean ISE on Heston quotes with N(0, sd^2) noise in implied volatility.
 
-    One generator, dense chain then the 16-strike chain, so the two columns
+    One generator, dense chain then the 32-strike chain, so the two columns
     share the noise stream in the paper.
     """
     print(f"\nNoisy Heston  reps={n_reps}  iv sd={sd}  seed={seed}")
@@ -713,7 +713,7 @@ def noisy_heston(n_reps=30, seed=20260923, sd=0.01):
     calls = lambda K: carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc
     for chain, K in (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 16)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
     ):
         C_true = np.maximum(calls(K), 0.0)
         acc = {}
@@ -829,7 +829,7 @@ def literature():
         q_true = np.asarray(q_true, float)
         for chain, K in (
             ("dense", np.linspace(30.0, 220.0, 256)),
-            ("sparse", np.linspace(70.0, 140.0, 16)),
+            ("sparse", np.linspace(70.0, 140.0, 32)),
         ):
             C = np.maximum(calls(K), 0.0)
             F = float(model.forward)
@@ -843,7 +843,7 @@ def literature():
     names = ("AS-Lo", "GHS call", "GHS IV", "ASD", "Ours mesh", "Ours deriv")
     for chain, K in (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 16)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
     ):
         C_true = np.maximum(calls(K), 0.0)
         acc = {name: [] for name in names}
@@ -1012,7 +1012,7 @@ def _check_slope_closed_form():
     """Quadratic cells match ``_smooth``. A cubic cell matches a trapezoidal integral."""
     from scipy.interpolate import CubicSpline
 
-    K = np.linspace(70.0, 140.0, 16)
+    K = np.linspace(70.0, 140.0, 32)
     p = BCC97
     C = np.maximum(
         carr_madan_puts(K, p) + p.S0 * np.exp(-p.q * p.T) - K * p.disc, 0.0,
@@ -1125,7 +1125,7 @@ def direct_secant_pilot(n_reps=30, seed=20260923, sd=0.01, mults=(2.0, 4.0)):
     )
     chains = (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 16)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
     )
     for label, p, calls, dens in designs:
         q_true = dens(K_eval, p)
@@ -1242,7 +1242,7 @@ def midpoint_average_pilot(n_reps=30, seed=20260923, sd=0.01):
     )
     chains = (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 16)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
     )
     for label, p, calls, dens in designs:
         q_true = dens(K_eval, p)
@@ -1421,7 +1421,7 @@ def smoothing_spline_pilot(n_reps=30, seed=20260923, sd=0.01):
     )
     chains = (
         ("dense", np.linspace(30.0, 220.0, 256)),
-        ("sparse", np.linspace(70.0, 140.0, 16)),
+        ("sparse", np.linspace(70.0, 140.0, 32)),
     )
     for label, p, calls, dens in designs:
         q_true = dens(K_eval, p)
@@ -1489,9 +1489,9 @@ def _timing_designs():
     rows = []
     for name, p, calls, K in (
         ("Heston, dense", BCC97, heston_calls, np.linspace(30.0, 220.0, 256)),
-        ("Heston, sparse", BCC97, heston_calls, np.linspace(70.0, 140.0, 16)),
+        ("Heston, sparse", BCC97, heston_calls, np.linspace(70.0, 140.0, 32)),
         ("Variance gamma, dense", CM99, vg_calls_pos, np.linspace(30.0, 220.0, 256)),
-        ("Variance gamma, sparse", CM99, vg_calls_pos, np.linspace(70.0, 140.0, 16)),
+        ("Variance gamma, sparse", CM99, vg_calls_pos, np.linspace(70.0, 140.0, 32)),
     ):
         rows.append((name, np.asarray(K, float), calls(K), p.S0, p.r, p.T, p.q))
     for csv, title in (
