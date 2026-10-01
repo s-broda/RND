@@ -15,11 +15,13 @@ be compiled, ``"fast"`` uses the sampled-spline FFT; ``"fft"`` and
 
 Thricing and the closed-form penalty are on by default. That penalty is
 ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``: ``t`` is the clipped total
-variation of the thriced interpolant on ``[0.55F, 1.40F]``, ``v_* - 1`` is
-the excess variation of that kernel, ``δ`` is the median knot spacing, and
-``tv_cap`` defaults to ``1``. ``penalty="search"`` replaces the formula by
+variation of the thriced interpolant on ``[0.55F, 1.40F]``, completed to
+zero at the two endpoints and divided by twice the maximum. A unimodal
+curve scores 1. ``v_* - 1`` is the excess variation of that kernel, ``δ``
+is the median knot spacing, and ``tv_cap`` defaults to the kernel's own
+positive-part score, about ``1.007``. ``penalty="search"`` replaces the formula by
 the 17-point grid and the curvature corner. The default bandwidth is
-``0.38 F σ_ATM √T n^{-1/9}``.
+``0.34 F σ_ATM √T n^{-1/9}``.
 
 Pass ``c=0`` for the cubic through the knots, ``kernel="twice"`` or
 ``kernel="plain"`` for the other convolutions, and ``tails=False`` to drop
@@ -41,14 +43,15 @@ from scipy.interpolate import CubicSpline
 from scipy.special import erf
 from scipy.stats import norm
 
-DERIV_C = 0.38
+DERIV_C = 0.34
 
 # Dimensionless penalty in λ = c F^3 ∫(f'')^2. Zero passes through the knots.
 SMOOTH_C = np.array([0.0, *np.geomspace(1e-7, 3e-4, 16)])
 
-# A unimodal curve scores 1. Both selectors stay at zero until the clipped
-# total variation of the thriced density exceeds this allowance.
-TV_CAP = 1.0
+# Placeholder until positive_kernel_score() runs. A unimodal curve scores 1.
+# The allowance is the thriced kernel's own positive-part score, so those
+# sidelobes do not turn the penalty on. Callers read this name at call time.
+TV_CAP = None
 
 
 def _kernel_weights(kernel):
@@ -79,13 +82,14 @@ def estimate_rnd(
     deriv_c=None,
     method="fast",
     penalty="closed",
-    tv_cap=TV_CAP,
+    tv_cap=None,
 ):
     """Risk-neutral density of ``S_T`` from one expiry's calls.
 
     The default is the estimator in the paper: tails, thricing, bandwidth
-    ``deriv_c F σ_ATM √T n^{-1/9}`` with ``deriv_c=0.38``, and the penalty
-    ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)`` with ``tv_cap=1``.
+    ``deriv_c F σ_ATM √T n^{-1/9}`` with ``deriv_c=0.34``, and the penalty
+    ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``tv_cap`` defaults to
+    the thriced kernel's positive-part score.
 
     Parameters
     ----------
@@ -116,15 +120,16 @@ def estimate_rnd(
         Used when ``c="rule"``. ``"closed"`` (the default) and ``"rule"``
         are ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``"search"``
         is the ``SMOOTH_C`` grid and the curvature corner.
-    tv_cap : float
-        Clipped-variation allowance for both selectors. The closed form is
-        zero until the interpolant exceeds it. The search keeps the
-        smallest grid value at or below this cap.
+    tv_cap : float, optional
+        Clipped-variation allowance for both selectors. The default is the
+        thriced kernel's own positive-part score. The closed form is zero
+        until the interpolant exceeds it. The search keeps the smallest
+        grid value at or below this cap.
     higher : bool or str, optional
         Alias of ``kernel`` kept for older calls. ``True`` is thricing,
         ``False`` is one Gaussian, ``"twice"`` is twicing.
     deriv_c : float, optional
-        Replaces ``0.38`` in the default bandwidth.
+        Replaces ``0.34`` in the default bandwidth.
     method : {"fast", "fft", "naive"}
         ``"fast"`` transforms the box moments. ``"fft"`` transforms the
         sampled spline. ``"naive"`` sums the cell integrals. ``"fast"``
@@ -142,6 +147,7 @@ def estimate_rnd(
         raise ValueError("method must be 'naive', 'fft', or 'fast'")
     if penalty not in ("search", "closed", "rule"):
         raise ValueError("penalty must be 'search', 'closed', or 'rule'")
+    tv_cap = TV_CAP if tv_cap is None else float(tv_cap)
     weights = _kernel_weights(kernel)
     K = np.asarray(K, dtype=float)
     C = np.asarray(C, dtype=float)
@@ -290,7 +296,7 @@ def _atm_sigma(K, C, S0, r, T, q, F):
 
 
 def _bandwidth(K, C, S0, r, T, q, F, deriv_c=None):
-    """``deriv_c F σ_ATM √T n^{-1/9}``. ``deriv_c`` defaults to ``0.38``."""
+    """``deriv_c F σ_ATM √T n^{-1/9}``. ``deriv_c`` defaults to ``0.34``."""
     n = max(len(K), 8)
     sig = _atm_sigma(K, C, S0, r, T, q, F)
     const = DERIV_C if deriv_c is None else float(deriv_c)
@@ -645,15 +651,45 @@ def _rule_spline(Ks, Ps, c, F):
     return make_smoothing_spline(Ks, Ps, lam=lam)
 
 
+def clipped_variation(p):
+    """Variation of a nonnegative curve completed to zero, over twice its maximum.
+
+    The completion adds the rise from zero at the left endpoint and the fall
+    back to zero at the right. A unimodal curve scores 1. An extra
+    oscillation raises the score by its height relative to the mode.
+    """
+    p = np.maximum(np.nan_to_num(np.asarray(p, float)), 0.0)
+    if p.size < 3 or float(p.max()) <= 0.0:
+        return float("nan")
+    span = float(np.sum(np.abs(np.diff(p))) + p[0] + p[-1])
+    return span / (2.0 * float(p.max()))
+
+
+def positive_kernel_score(weights=None):
+    """Positive-part variation of the thriced kernel.
+
+    The same functional as ``clipped_variation``. The kernel integrates to
+    one and changes sign; after the negative sidelobes are removed, the
+    score sits just above the unimodal value 1. That score is the allowance.
+    """
+    if weights is None:
+        weights = _kernel_weights("thrice")
+    z = np.linspace(-40.0, 40.0, 80001)
+    L = np.zeros_like(z)
+    for fac, w in weights:
+        L += float(w) * norm.pdf(z / float(fac)) / float(fac)
+    return clipped_variation(np.maximum(L, 0.0))
+
+
+TV_CAP = positive_kernel_score()
+
+
 def _shape_scores(q, q_plain, F, s):
     m = (s >= 0.55 * F) & (s <= 1.40 * F)
     corr = float(np.sqrt(np.mean((q[m] - q_plain[m]) ** 2)))
     p = np.maximum(np.nan_to_num(np.asarray(q, float)), 0.0)
     core = p[m]
-    if core.size < 3 or float(core.max()) <= 0.0:
-        tv = float("nan")
-    else:
-        tv = float(np.sum(np.abs(np.diff(core))) / (2.0 * float(core.max())))
+    tv = clipped_variation(core)
     peaks = 0
     if core.size > 4 and np.nanmax(core) > 0:
         peaks = int(np.sum(
@@ -687,14 +723,17 @@ def _kernel_excess(weights):
     return excess
 
 
-def _closed_penalty(Ks, Ps, h, F, weights, tv_cap=TV_CAP, method="fast"):
+def _closed_penalty(Ks, Ps, h, F, weights, tv_cap=None, method="fast"):
     """``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)`` from one interpolant.
 
-    ``t`` is the clipped total variation of the thriced interpolant. ``δ``
+    ``t`` is the clipped total variation of the thriced interpolant, completed
+    to zero at the window ends. ``δ``
     is the median knot spacing, the gap in the smoothing-spline damper
     ``1/(1 + λ δ ω^4)``. The frequency ``ω = 1/h`` turns an excess count
     ``ρ`` into ``λ δ = ρ h^4``.
     """
+    if tv_cap is None:
+        tv_cap = TV_CAP
     s = np.linspace(max(50.0, 0.2 * float(F)), 2.4 * float(F), 700)
     q, _G = _convolve(
         _rule_spline(Ks, Ps, 0.0, F), Ks, h, F, s, weights, method=method,
@@ -709,8 +748,10 @@ def _closed_penalty(Ks, Ps, h, F, weights, tv_cap=TV_CAP, method="fast"):
     return float(rho * (float(h) ** 4) / (delta * float(F) ** 3))
 
 
-def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5, method="fast", tv_cap=TV_CAP):
+def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5, method="fast", tv_cap=None):
     """Smallest unimodal penalty, then the corner when the bend is sharp."""
+    if tv_cap is None:
+        tv_cap = TV_CAP
     s = np.linspace(max(50.0, 0.2 * F), 2.4 * F, 700)
     rows = []
     for c in SMOOTH_C:

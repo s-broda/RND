@@ -33,7 +33,16 @@ PY = Path(__file__).resolve().parent
 ROOT = PY.parent
 sys.path.insert(0, str(PY))
 
-from rnd import _Phi, _convolve_slope, _knots, _right_wing, _smooth, estimate_rnd
+from rnd import (
+    _Phi,
+    _convolve_slope,
+    _knots,
+    _right_wing,
+    _smooth,
+    clipped_variation,
+    estimate_rnd,
+    TV_CAP,
+)
 from src import black_scholes as bs
 from src.competitors import (
     asd_bandwidth,
@@ -271,16 +280,14 @@ def _otm(sl, C_hat):
 
 
 def _variation(F, q, s):
-    """Total variation of max(q, 0) on [0.55F, 1.40F], divided by twice the maximum.
+    """Total variation of max(q, 0) on [0.55F, 1.40F], over twice the maximum.
 
-    A unimodal curve scores 1. Scaling by the forward cancels, so the score is
-    the same in strike units and in moneyness.
+    The curve is completed to zero at the endpoints, so a unimodal curve
+    scores 1 and the score is at least 1. Scaling by the forward cancels,
+    so the score is the same in strike units and in moneyness.
     """
     m = (s >= 0.55 * F) & (s <= 1.40 * F)
-    p = np.maximum(np.nan_to_num(np.asarray(q, float)[m]), 0.0)
-    if p.size < 3 or float(p.max()) <= 0.0:
-        return float("nan")
-    return float(np.sum(np.abs(np.diff(p))) / (2.0 * float(p.max())))
+    return clipped_variation(np.asarray(q, float)[m])
 
 
 def _mass_peaks(F, q, s):
@@ -1378,22 +1385,23 @@ def _smoothing_fit_at(base, c, K_eval=None, K_price=None):
 
 def smoothing_spline_fit(
     K, C, S0, r, T, q, K_eval=None, K_price=None, h_rule="deriv", method="fast",
-    penalty="closed", tv_cap=1.0,
+    penalty="closed", tv_cap=None,
 ):
     """The paper's estimator. ``estimate_rnd`` with its default closed-form penalty."""
     return estimate_rnd(
         K, C, S0, r, T, q, K_eval=K_eval, K_price=K_price, h=h_rule, method=method,
-        penalty=penalty, tv_cap=tv_cap,
+        penalty=penalty, tv_cap=TV_CAP if tv_cap is None else tv_cap,
     )
 
 
-def _smoothing_holdout(sl, h_rule="deriv", penalty="closed", tv_cap=1.0):
+def _smoothing_holdout(sl, h_rule="deriv", penalty="closed", tv_cap=None):
     errs = []
     for train, test in _folds(len(sl.K)):
         Ct = _projected_calls(sl.K[train], sl.C[train], sl.r, sl.T, sl.F)
         fit = smoothing_spline_fit(
             sl.K[train], Ct, sl.S0, sl.r, sl.T, sl.q, K_price=sl.K[test],
-            h_rule=h_rule, penalty=penalty, tv_cap=tv_cap,
+            h_rule=h_rule, penalty=penalty,
+            tv_cap=TV_CAP if tv_cap is None else tv_cap,
         )
         errs.append(_otm_rmse_slice(sl, fit["C"], test))
     return float(np.mean(errs))
@@ -1543,7 +1551,7 @@ def convolution_times(repeats=5, warmup=1):
 
 
 def extra_chains():
-    """Appendix chains: the closed-form rule on expiries outside the four slices.
+    """Appendix chains: the closed-form rule and PCA on expiries outside the four slices.
 
     Same quote screen as the paper. Maturity runs from 14 days to two years,
     each chain has at least 40 strikes, and each root keeps at most eight
@@ -1561,7 +1569,7 @@ def extra_chains():
         ("NDX", date(2026, 12, 18)),
         ("RUT", date(2026, 12, 18)),
     }
-    print("\nAppendix chains  penalty=closed  tv_cap=1")
+    print(f"\nAppendix chains  penalty=closed  tv_cap={TV_CAP:.6f}")
     for symbol, name in (
         ("SPX", "cboe_spx.json"),
         ("NDX", "cboe_ndx.json"),
@@ -1610,16 +1618,24 @@ def extra_chains():
             fit = smoothing_spline_fit(
                 sl.K, C, sl.S0, sl.r, sl.T, sl.q, K_eval=s, K_price=sl.K,
             )
-            o, pu, ca = _otm(sl, fit["C"])
-            mass, peaks = _mass_peaks(sl.F, fit["q"], s)
-            tv = _variation(sl.F, fit["q"], s)
-            ho = _smoothing_holdout(sl)
-            print(
-                f"  {sl.root} {sl.expiry.isoformat()} n={len(sl.K):4d} "
-                f"c={fit['c']:.3e} OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
-                f"hold {ho:.3f} mass {mass:.3f} peaks {peaks} tv {tv:.3f}",
-                flush=True,
+            h_pca = pca_cv_bandwidth(sl.K, C, sl.S0, sl.r, sl.T, sl.q, sl.F)
+            C_pca, q_pca, _, _, _ = pca_fit(
+                sl.K, C, sl.r, sl.T, sl.F, h_pca, sl.K, s,
             )
+            rows = (
+                ("Ours", fit["C"], fit["q"], _smoothing_holdout(sl)),
+                ("PCA", C_pca, q_pca, _holdout_method(sl, "pca")),
+            )
+            for name, chat, qhat, ho in rows:
+                o, pu, ca = _otm(sl, chat)
+                mass, _ = _mass_peaks(sl.F, qhat, s)
+                tv = _variation(sl.F, qhat, s)
+                print(
+                    f"  {sl.root} {sl.expiry.isoformat()} {name:4} n={len(sl.K):4d} "
+                    f"OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
+                    f"hold {ho:.3f} mass {mass:.1f} tv {tv:.1f}",
+                    flush=True,
+                )
 
 
 def main():

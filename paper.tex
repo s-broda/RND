@@ -32,7 +32,7 @@
 \cortext[cor1]{Corresponding author.}
 
 \begin{abstract}
-European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. The calls are rescaled to a complementary distribution, the empirical measure of the risk-neutral jumps in strike, and that measure is fit by a smoothing spline. A Gaussian damping of its characteristic function inverts in closed form and, after the unquoted tails are filled and the kernel is thriced, supplies both the density and the call. The penalty is zero when the thriced density is unimodal and otherwise a closed function of its excess variation. The estimator is in-fill consistent. On four listed chains the even/odd hold-out error is smaller than each comparison method on every chain, and each fitted density has one peak, mass \(1.0\), and total variation \(1.0\). On noisy Heston quotes the mean integrated squared error is the smallest of the comparison methods on the dense chain, and below the positive convolution on both.
+European option prices of a single maturity encode the risk-neutral density of the underlying at expiry. Differentiating those prices twice is ill-posed on a finite strike list. The calls are rescaled to a complementary distribution, the empirical measure of the risk-neutral jumps in strike, and that measure is fit by a smoothing spline. A Gaussian damping of its characteristic function inverts in closed form and, after the unquoted tails are filled and the kernel is thriced, supplies both the density and the call. The penalty is zero when the thriced density scores at most the positive-part variation of the thriced kernel, and otherwise a closed function of the excess. The estimator is in-fill consistent. On each of the four listed chains, and in the average, the even/odd hold-out error is smaller than each comparison method. Each fitted density has one peak, mass \(1.0\), and total variation \(1.0\). On noisy Heston quotes the mean integrated squared error is the smallest of the comparison methods on the dense chain, and below the positive convolution on both.
 \end{abstract}
 
 \begin{keyword}
@@ -48,9 +48,9 @@ risk-neutral density \sep option prices \sep kernel estimation \sep in-fill cons
 
 \citet{breeden1978} identified the risk-neutral density of the underlying at a fixed expiry with the second strike derivative of the corresponding European call, scaled by a discount factor. The identity assumes a twice differentiable price curve. A market supplies a finite ordered list of strikes and a quote at each knot. Numerical second differentiation of that list is ill-posed: interpolants oscillate, change sign, and depend on the interpolating scheme. The literature responds with parametric mixtures and Gram--Charlier expansions, implied-volatility interpolants, local polynomials of the call, and \citet{bondarenko2003}'s positive convolution approximation, which forces the density to be a mixture of a positive kernel with a discrete probability fitted to prices. Section~\ref{sec:lit} reviews these approaches.
 
-This paper estimates that density from the empirical measure of a single maturity. The calls are rescaled to a complementary distribution, which records the risk-neutral jumps in strike. A smoothing spline fits the measure: a natural cubic, with a penalty on the second derivative that is zero when the thriced density scores at most one and otherwise the closed form \eqref{eq:penalty-rule}. A Gaussian damping of the characteristic function of the spline inverts in closed form. The same smoothing is the density and, after one integration, the call. Tails complete the unquoted wings, and thricing raises the order of the kernel. With those pieces in place, Theorem~\ref{thm:cons} gives in-fill consistency on the interior of a compact interval whenever the mesh is quasi-uniform and fills the interval, \(h\to 0\), and \(nh^{5}/(\log n)^{2}\to\infty\). On the exact designs below the selected penalty is zero to the printed precision.
+This paper estimates that density from the empirical measure of a single maturity. The calls are rescaled to a complementary distribution, which records the risk-neutral jumps in strike. A smoothing spline fits the measure: a natural cubic, with a penalty on the second derivative that is zero when the thriced density scores at most \(1.007\), the positive-part score of the thriced kernel, and otherwise the closed form \eqref{eq:penalty-rule}. A Gaussian damping of the characteristic function of the spline inverts in closed form. The same smoothing is the density and, after one integration, the call. Tails complete the unquoted wings, and thricing raises the order of the kernel. With those pieces in place, Theorem~\ref{thm:cons} gives in-fill consistency on the interior of a compact interval whenever the mesh is quasi-uniform and fills the interval, \(h\to 0\), and \(nh^{5}/(\log n)^{2}\to\infty\). On the exact designs below the selected penalty is zero.
 
-We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{aitsahalia2003} smooth a decreasing-convex projection of the calls with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. \citet{aitsahalia1998} smooth implied volatility, and \citet{grith2012} use a local cubic of the call and of implied volatility. On the listed chains of Section~\ref{sec:emp} the even/odd hold-out error is smaller than each of these methods on every chain, and the fitted density has one peak, mass \(1.0\), and total variation \(1.0\). The out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}. On noisy Heston quotes the mean integrated squared error is the smallest of these methods on the dense chain, and below that convolution on both chains.
+We compare the fit to several extant methods. \citeauthor{bondarenko2003}'s method convolves a positive kernel with a discrete probability, so the estimate is a density by construction. \citet{aitsahalia2003} smooth a decreasing-convex projection of the calls with a local polynomial, so the density is nonnegative by design and the call cannot match quotes that violate convexity. \citet{aitsahalia1998} smooth implied volatility, and \citet{grith2012} use a local cubic of the call and of implied volatility. On the listed chains of Section~\ref{sec:emp} the even/odd hold-out error is smaller than each of these methods on each chain and in the average. The fitted density has one peak, mass \(1.0\), and total variation \(1.0\). The out-of-the-money root-mean-square error (RMSE) is below the convolution of \citeauthor{bondarenko2003}. On noisy Heston quotes the mean integrated squared error is the smallest of these methods on the dense chain, and below that convolution on both chains.
 
 The remainder of this manuscript is structured as follows. Section~\ref{sec:lit} reviews related work. Section~\ref{sec:est} constructs the estimator. The characteristic function of the normalized call supplies the closed form. Section~\ref{sec:refine} records two refinements: completing the tails and thricing. Section~\ref{sec:ifc} proves in-fill consistency of the estimator and states the bandwidth used below. Section~\ref{sec:compute} compares three evaluations of that closed form. Section~\ref{sec:heston} compares that estimator with those of Section~\ref{sec:emp} on exact Heston and variance-gamma quotes and on noisy Heston quotes. Section~\ref{sec:emp} presents an empirical illustration on four listed chains. Section~\ref{sec:conc} concludes.
 
@@ -182,16 +182,16 @@ Observed calls at strikes \(0<K_1<\cdots<K_m\) supply values \(\tilde C_i=C_i/(S
 \;+\;
 c\,F^3\int\bigl(f''(K)\bigr)^2\,\mathrm{d}K.
 \end{equation}
-The factor \(F^3\) makes \(c\) dimensionless. The value is read from the thriced interpolant, the estimator at penalty zero. On \([0.55F,1.40F]\) let \(t\) be the total variation of its positive part, divided by twice the maximum, the functional in the caption of Table~\ref{tab:listed}. A unimodal curve scores \(1\). Let \(\delta\) be the median spacing of the knots in \eqref{eq:smooth-penalty}. The thriced kernel integrates to one and changes sign. Its signed total variation, the integral of the absolute kernel on the bandwidth scale, equals \(v_*=1.196\), so the negative sidelobes contribute the excess \(v_*-1=0.196\). Scored by the same positive-part functional, that kernel is \(1.007\). The allowance in the rule is the unimodal score, \(1\), which sits just under the kernel's own score, so those sidelobes can turn a small penalty on. An interpolant that scores \(1\) receives none.
+The factor \(F^3\) makes \(c\) dimensionless. The value is read from the thriced interpolant, the estimator at penalty zero. On \([0.55F,1.40F]\) let \(t\) be the total variation of its positive part, divided by twice the maximum, the functional in the caption of Table~\ref{tab:listed}. The variation includes the step from zero up to the left endpoint and the step from the right endpoint back to zero. With those steps \(t\ge 1\), and a unimodal curve scores \(1\). Let \(\delta\) be the median spacing of the knots in \eqref{eq:smooth-penalty}. The thriced kernel integrates to one and changes sign. Its signed total variation, the integral of the absolute kernel on the bandwidth scale, equals \(v_*=1.196\), so the negative sidelobes contribute the excess \(v_*-1=0.196\). Scored by the same positive-part functional, that kernel is \(t_*=1.007\). The allowance in the rule is that score. An interpolant that scores \(t_*\) or less receives none, and the kernel's own sidelobes leave the penalty at zero.
 
-On a uniform knot spacing the smoothing spline multiplies a Fourier mode \(e^{\mathrm{i}\omega x}\) by \(1/(1+\lambda\delta\omega^4)\), with \(\lambda=c F^3\). Count the excess \((t-1)_+\) in units of \(v_*-1\), and call that count \(\rho\). Attenuating the kernel frequency \(\omega=1/h\) by the factor \(1/(1+\rho)\) fixes \(\lambda\delta=\rho h^4\), and
+On a uniform knot spacing the smoothing spline multiplies a Fourier mode \(e^{\mathrm{i}\omega x}\) by \(1/(1+\lambda\delta\omega^4)\), with \(\lambda=c F^3\). Count the excess \((t-t_*)_+\) in units of \(v_*-1\), and call that count \(\rho\). Attenuating the kernel frequency \(\omega=1/h\) by the factor \(1/(1+\rho)\) fixes \(\lambda\delta=\rho h^4\), and
 \begin{equation}
 \label{eq:penalty-rule}
 c
 \;=\;
-\frac{(t-1)_+}{v_*-1}\,\frac{h^4}{\delta F^3}.
+\frac{(t-t_*)_+}{v_*-1}\,\frac{h^4}{\delta F^3}.
 \end{equation}
-The interpolant is computed once and the penalized spline is fit once. The penalty stays zero until the clipped variation exceeds the allowance. It does not require the density to have a single peak: a second mode raises \(c\) only through \(t\). On the exact Heston quotes, and on dense variance gamma, \(t\le 1\) and \eqref{eq:penalty-rule} selects zero. On sparse variance gamma the penalty is of order \(10^{-9}\) and does not move the printed error. The minimiser, written \(P^{\mathrm{cs}}\), is a cubic spline, so the integrals below are closed form. The c.f.\ of this absolutely continuous measure is \(\int e^{\mathrm{i}s K}\,P^{\mathrm{cs}\prime}(K)\,\mathrm{d}K\). Replace \(\varphi_P\) by the product of that integral with the Fourier transform of a Gaussian kernel of width \(h\),
+The interpolant is computed once and the penalized spline is fit once. The penalty stays zero until the clipped variation exceeds the allowance. It does not require the density to have a single peak: a second mode raises \(c\) only through \(t\). On each of the four exact chains in Section~\ref{sec:heston}, \(t\) is at most the allowance and \eqref{eq:penalty-rule} selects zero. The minimiser, written \(P^{\mathrm{cs}}\), is a cubic spline, so the integrals below are closed form. The c.f.\ of this absolutely continuous measure is \(\int e^{\mathrm{i}s K}\,P^{\mathrm{cs}\prime}(K)\,\mathrm{d}K\). Replace \(\varphi_P\) by the product of that integral with the Fourier transform of a Gaussian kernel of width \(h\),
 \begin{equation}
 \label{eq:phi-hat}
 \hat\varphi_P(s)
@@ -297,7 +297,7 @@ At penalty zero the natural cubic through a \(C^4\) function converges to the fu
 \]
 where \(L\) is a fixed integrable combination of second derivatives of the thriced kernel and \(\int L=0\). The sum has mean zero and variance of order \(\tau^2/(n_m h_m^5)\), uniformly on the compact. Chebyshev's inequality and a Lipschitz constant of the same order give uniform convergence in probability. The thriced interpolant is therefore consistent for \(f_{\Q}\) on the window of \eqref{eq:penalty-rule}, and its maximum stays bounded away from zero in probability.
 
-Write \(Z\) for the error in that interpolant and \(\rho=(t-1)_+/(v_*-1)\). Differentiating the kernel sum multiplies the pointwise variance by \(h_m^{-2}\). Cauchy--Schwarz then bounds the expected total variation of \(Z\) by a multiple of \((n_m h_m^7)^{-1/2}\), and the variation of \(f_{\Q}\) on the window is finite, so \(\rho=O_p\bigl(1+(n_m h_m^7)^{-1/2}\bigr)\). The half-width \(\beta=(\lambda\delta)^{1/4}\) in the multiplier \(1/(1+(\beta\omega)^4)\) satisfies \(\beta^4=O_p(h_m^4+\sqrt{h_m/n_m})\). Since \(h_m/n_m=h_m^6/(n_m h_m^5)\to 0\), one has \(\beta=o_p(1)\).
+Write \(Z\) for the error in that interpolant and \(\rho=((t-t_*)_+)/(v_*-1)\), where \(t_*=1.007\) is the fixed allowance in \eqref{eq:penalty-rule}. Since \(t_*>1\), this \(\rho\) is at most \((t-1)_+/(v_*-1)\). Differentiating the kernel sum multiplies the pointwise variance by \(h_m^{-2}\). Cauchy--Schwarz then bounds the expected total variation of \(Z\) by a multiple of \((n_m h_m^7)^{-1/2}\), and the variation of \(f_{\Q}\) on the window is finite, so \(\rho=O_p\bigl(1+(n_m h_m^7)^{-1/2}\bigr)\). The half-width \(\beta=(\lambda\delta)^{1/4}\) in the multiplier \(1/(1+(\beta\omega)^4)\) satisfies \(\beta^4=O_p(h_m^4+\sqrt{h_m/n_m})\). Since \(h_m/n_m=h_m^6/(n_m h_m^5)\to 0\), one has \(\beta=o_p(1)\).
 
 That multiplier is the transform of an even kernel of unit mass, with vanishing moments of orders \(1\), \(2\), and \(3\) and fourth moment of order \(\beta^4\). The poles lie off the real axis, so the tails decay exponentially on the scale \(\beta\). Applied to \(P''\), which is \(C^4\), the bias on an interior compact is of order \(\beta^4\). It tends to zero in probability with \(\beta\). Thricing composes the result with three Gaussian approximate identities whose widths tend to zero, and the composition tends to \(f_{\Q}\).
 
@@ -315,9 +315,9 @@ The bandwidth \(h\) in \eqref{eq:thrice} is of order \(n^{-1/9}\). That rate bal
 \label{eq:h-d2}
 h
 \;=\;
-0.38\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/9},
+0.34\,F\,\hat\sigma_{\mathrm{ATM}}\sqrt{T}\,n^{-1/9},
 \end{equation}
-with \(n\) the number of quoted strikes. This \(0.38\) is the bandwidth constant. The penalty in \eqref{eq:smooth-penalty} is \eqref{eq:penalty-rule}. Any fixed positive multiple of \(n^{-1/9}\) meets Theorem~\ref{thm:cons}, because \(n^{4/9}/(\log n)^2\to\infty\). This is the bandwidth used below.
+with \(n\) the number of quoted strikes. This \(0.34\) is the bandwidth constant. The penalty in \eqref{eq:smooth-penalty} is \eqref{eq:penalty-rule}. Any fixed positive multiple of \(n^{-1/9}\) meets Theorem~\ref{thm:cons}, because \(n^{4/9}/(\log n)^2\to\infty\). This is the bandwidth used below.
 
 \section{Computational concerns}
 \label{sec:compute}
@@ -399,19 +399,19 @@ Summing the series at one strike visits the boxes that lie inside five standard 
   \multicolumn{1}{c}{FFT} &
   \multicolumn{1}{c}{FFT+ME} \\
 \midrule
-Heston, dense & 0.125 & 0.003 & 0.002 & 49.1 & 66.7 \\
+Heston, dense & 0.125 & 0.003 & 0.002 & 50.0 & 67.5 \\
 Heston, sparse & 0.006 & 0.001 & 0.001 & 4.3 & 4.7 \\
-Variance gamma, dense & 0.121 & 0.003 & 0.002 & 46.5 & 57.5 \\
+Variance gamma, dense & 0.124 & 0.003 & 0.002 & 45.2 & 58.9 \\
 Variance gamma, sparse & 0.006 & 0.002 & 0.001 & 4.1 & 4.6 \\
-SPX 18 Dec 2026 & 0.273 & 0.004 & 0.001 & 65.5 & 193.7 \\
-SPX 19 Mar 2027 & 0.102 & 0.003 & 0.001 & 40.4 & 79.9 \\
-NDX 18 Dec 2026 & 0.162 & 0.003 & 0.001 & 64.5 & 131.3 \\
-RUT 18 Dec 2026 & 0.036 & 0.002 & 0.001 & 18.5 & 32.7 \\
+SPX 18 Dec 2026 & 0.272 & 0.004 & 0.001 & 74.3 & 191.1 \\
+SPX 19 Mar 2027 & 0.101 & 0.003 & 0.001 & 37.7 & 79.6 \\
+NDX 18 Dec 2026 & 0.161 & 0.002 & 0.001 & 68.5 & 129.5 \\
+RUT 18 Dec 2026 & 0.035 & 0.002 & 0.001 & 16.2 & 32.9 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The sampled-spline transform is between \(4.1\) and \(65.5\) times as fast as the cell sum. The moment expansion is between \(4.6\) and \(193.7\) times as fast as the cell sum, and between \(1.1\) and \(3.0\) times as fast as the sampled-spline transform. On the two chains with sixteen strikes the cell sum takes \(0.006\) seconds and both transforms take one or two milliseconds, so each ratio lies between four and five. On the listed chains the cell sum grows with the number of knots, from \(0.036\) seconds on the Russell chain to \(0.273\) seconds on the December S\&P~500 chain. The moment expansion stays between \(0.001\) and \(0.002\) seconds on every row. The gap between the two transforms is the small constant of the preceding paragraph.
+The sampled-spline transform is between \(4.1\) and \(74.3\) times as fast as the cell sum. The moment expansion is between \(4.6\) and \(191.1\) times as fast as the cell sum, and between \(1.1\) and \(2.6\) times as fast as the sampled-spline transform. On the two chains with sixteen strikes the cell sum takes \(0.006\) seconds and both transforms take one or two milliseconds, so each ratio lies between four and five. On the listed chains the cell sum grows with the number of knots, from \(0.035\) seconds on the Russell chain to \(0.272\) seconds on the December S\&P~500 chain. The moment expansion stays between \(0.001\) and \(0.002\) seconds on every row. The gap between the two transforms is the small constant of the preceding paragraph.
 
 \section{Numerical Illustration}
 \label{sec:heston}
@@ -440,22 +440,22 @@ where \(\varphi(u)=\E^{\Q}[e^{\mathrm{i}u\log S_T}]\). Two chains are used: a de
   {\(h^{\ast}\)} & {Oracle ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.15 & 9.76e-10 & 2.00 & 1.70e-5 \\
+  & 0.15 & 9.76e-10 & 1.79 & 1.11e-5 \\
 Dense & Tails
-  & 0.15 & 9.76e-10 & 2.00 & 1.70e-5 \\
+  & 0.15 & 9.76e-10 & 1.79 & 1.11e-5 \\
 Dense & Tails+Twice
-  & 0.39 & 2.68e-12 & 2.00 & 2.50e-7 \\
+  & 0.39 & 2.68e-12 & 1.79 & 1.14e-7 \\
 Dense & Tails+Thrice
-  & 0.63 & 1.16e-12 & 2.00 & 2.50e-8 \\
+  & 0.63 & 1.16e-12 & 1.79 & 8.78e-9 \\
 \midrule
 Sparse & Quoted spline
-  & 16.35 & 1.80e-2 & 2.66 & 1.05e-1 \\
+  & 16.35 & 1.80e-2 & 2.38 & 1.18e-1 \\
 Sparse & Tails
-  & 0.93 & 3.40e-6 & 2.66 & 5.08e-5 \\
+  & 0.93 & 3.40e-6 & 2.38 & 3.42e-5 \\
 Sparse & Tails+Twice
-  & 1.91 & 1.68e-6 & 2.66 & 3.13e-6 \\
+  & 1.91 & 1.68e-6 & 2.38 & 2.22e-6 \\
 Sparse & Tails+Thrice
-  & 2.20 & 1.43e-6 & 2.66 & 1.60e-6 \\
+  & 2.20 & 1.43e-6 & 2.38 & 1.44e-6 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -485,22 +485,22 @@ Table~\ref{tab:vg-tail} repeats the design for the variance-gamma process of \ci
   {\(h^{\ast}\)} & {Oracle ISE} & {\(h_{1/9}\)} & {\(h_{1/9}\) ISE} \\
 \midrule
 Dense & Quoted spline
-  & 0.17 & 5.12e-7 & 1.28 & 1.55e-4 \\
+  & 0.17 & 5.12e-7 & 1.14 & 1.10e-4 \\
 Dense & Tails
-  & 0.17 & 5.12e-7 & 1.28 & 1.55e-4 \\
+  & 0.17 & 5.12e-7 & 1.14 & 1.10e-4 \\
 Dense & Tails+Twice
-  & 0.33 & 3.93e-7 & 1.28 & 3.22e-5 \\
+  & 0.33 & 3.93e-7 & 1.14 & 2.13e-5 \\
 Dense & Tails+Thrice
-  & 0.46 & 4.04e-7 & 1.28 & 1.95e-5 \\
+  & 0.46 & 4.04e-7 & 1.14 & 1.28e-5 \\
 \midrule
 Sparse & Quoted spline
-  & 14.17 & 3.27e-2 & 1.65 & 1.71e-1 \\
+  & 14.17 & 3.27e-2 & 1.48 & 1.91e-1 \\
 Sparse & Tails
-  & 0.93 & 5.78e-4 & 1.65 & 6.92e-4 \\
+  & 0.93 & 5.78e-4 & 1.48 & 6.37e-4 \\
 Sparse & Tails+Twice
-  & 1.91 & 5.12e-4 & 1.65 & 5.14e-4 \\
+  & 1.91 & 5.12e-4 & 1.48 & 5.27e-4 \\
 Sparse & Tails+Thrice
-  & 2.20 & 4.87e-4 & 1.65 & 5.18e-4 \\
+  & 2.20 & 4.87e-4 & 1.48 & 5.42e-4 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -514,11 +514,11 @@ Sparse & Tails+Thrice
 
 On the dense chain the wings again do not move the error. At \eqref{eq:h-d2}, twicing lowers it and thricing lowers it further. That bandwidth is wider than the oracle, and the error is larger. The density of \(S_T\) is more peaked than under Heston, so the errors are larger than on that design. On the sparse chain the quoted spline without tails misses the window. Tails restore it. Twicing lowers that error, and thricing at \eqref{eq:h-d2} remains near its oracle. Figure~\ref{fig:vg-rnd} plots the quoted spline, tails, tails plus twice, and tails plus thrice at \eqref{eq:h-d2}.
 
-Table~\ref{tab:sim-comp} scores the estimator of Section~\ref{sec:construct} against the methods of Section~\ref{sec:emp} on the same four chains. Each fit starts from the decreasing-convex projection. On these exact quotes the penalty is zero to the printed precision, so the row is the thriced spline at \eqref{eq:h-d2}.
+Table~\ref{tab:sim-comp} scores the estimator of Section~\ref{sec:construct} against the methods of Section~\ref{sec:emp} on the same four chains. Each fit starts from the decreasing-convex projection. On these exact quotes the penalty is zero.
 
 \begin{table}[H]
 \centering
-\caption{Integrated squared error on \([60,150]\) for the estimator of Section~\ref{sec:construct} and the methods of Section~\ref{sec:emp}. Ours is thriced at \eqref{eq:h-d2}; on these exact quotes the penalty is zero to the printed precision. Each other row uses that estimator's bandwidth from Section~\ref{sec:emp}. \citeauthor{grith2012} is shown at the leave-one-out width and at twice that width.}
+\caption{Integrated squared error on \([60,150]\) for the estimator of Section~\ref{sec:construct} and the methods of Section~\ref{sec:emp}. Ours is thriced at \eqref{eq:h-d2}. On these exact quotes the penalty is zero. Each other row uses that estimator's bandwidth from Section~\ref{sec:emp}. \citeauthor{grith2012} is shown at the leave-one-out width and at twice that width.}
 \label{tab:sim-comp}
 \setlength{\tabcolsep}{4pt}%
 \begin{tabular}{@{}l *{4}{S[table-format=1.2e-1, scientific-notation=true]}@{}}
@@ -527,7 +527,7 @@ Table~\ref{tab:sim-comp} scores the estimator of Section~\ref{sec:construct} aga
   \multicolumn{1}{c}{Heston dense} & \multicolumn{1}{c}{Heston sparse} &
   \multicolumn{1}{c}{VG dense} & \multicolumn{1}{c}{VG sparse} \\
 \midrule
-Ours & 2.50e-8 & 1.60e-6 & 1.95e-5 & 5.18e-4 \\
+Ours & 8.78e-9 & 1.44e-6 & 1.28e-5 & 5.42e-4 \\
 PCA & 8.55e-8 & 7.16e-3 & 2.05e-4 & 2.55e-2 \\
 \citeauthor{grith2012}, IV, \(2\times\) & 9.27e-8 & 2.81e-5 & 1.15e-4 & 1.67e-3 \\
 \citeauthor{grith2012}, IV, CV & 6.24e-9 & 4.79e-6 & 2.16e-5 & 7.40e-4 \\
@@ -539,7 +539,7 @@ PCA & 8.55e-8 & 7.16e-3 & 2.05e-4 & 2.55e-2 \\
 \end{tabular}
 \end{table}
 
-The estimator is the smallest on sparse Heston and on dense variance gamma. It is also smaller than the positive convolution, the plug-in local linear, both call cubics, and the doubled implied-volatility cubic on every chain. On dense Heston the cross-validated implied-volatility cubic and the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} are smaller. On sparse variance gamma that smile is smaller.
+The estimator is the smallest on sparse Heston and on dense variance gamma. It is also smaller than the positive convolution, the plug-in local linear, both call cubics, and the doubled implied-volatility cubic on every chain. On dense Heston the cross-validated implied-volatility cubic is smaller. On sparse variance gamma the Nadaraya--Watson smile of \citeauthor{aitsahalia1998} is smaller.
 
 The same designs are repeated with noise in the quotes. Black--Scholes implied volatility receives independent \(N(0,0.01^{2})\) noise. Values outside \([0.02,2.5]\) are clipped, and the call is rebuilt. Each replication starts from the projection of those calls, and the penalty is chosen on that draw by the rule of Section~\ref{sec:emp-est}. Table~\ref{tab:heston-noise} is that comparison.
 
@@ -552,7 +552,7 @@ The same designs are repeated with noise in the quotes. Black--Scholes implied v
 \multicolumn{1}{@{}c}{Estimator} &
   \multicolumn{1}{c}{Dense} & \multicolumn{1}{c}{Sparse} \\
 \midrule
-Ours & 1.74e-4 & 5.73e-4 \\
+Ours & 2.02e-4 & 7.36e-4 \\
 PCA & 4.36e-4 & 7.20e-3 \\
 \citeauthor{grith2012}, IV, \(2\times\) & 2.56e-3 & 8.61e-5 \\
 \citeauthor{grith2012}, IV, CV & 1.56e-2 & 2.74e-4 \\
@@ -576,11 +576,11 @@ The listed comparison uses European, AM-settled index options from Cboe's delaye
 
 A quote is retained if the bid is positive, the ask is at least the bid, the mid is at least \(0.25\), and the spread is at most \(\max(15,\,0.002 S_0,\,0.5\times\mathrm{mid})\). The \(15\)-point term is the tolerance on the S\&P~500. On the Nasdaq-100 a fixed \(15\)-point cap deletes puts whose spreads are a dollar or two wider and leaves a gap of several thousand points in the strike list. Among remaining put--call pairs, the forward is the median of \(K+e^{rT}(C-P)\) over strikes with \(|K-K_{\mathrm{atm}}|\le 50\) on SPX, where \(K_{\mathrm{atm}}\) is the pair closest to the cash index; on NDX and RUT the band is \(0.65\%\) of the spot. Dividend yield is \(q=r-\log(F/S_0)/T\). The working slice is out of the money (OTM): the put mid if \(K\le F\), the call mid if \(K\ge F\), the missing side filled by parity. Puts with \(K<0.7F\) and mid below \(0.50\) are then dropped; out-of-the-money calls with mid at least \(0.25\) are kept. Table~\ref{tab:data} records the filter counts. In \eqref{eq:cubic} and \eqref{eq:thrice}, \(\tilde C=C/(S_0e^{-qT})\) and \(F=S_0e^{(r-q)T}\).
 
-The December 2026 S\&P~500 AM quarterly (\(T=0.235\), \(S_0=7764.64\), \(F=7836\), \(q=0.11\%\)) appears in Figure~\ref{fig:listed}. After the screens it has \(n=444\) strikes on \([0.36F,1.30F]\), of which \(75\%\) are puts. Near the money the strike mesh is \(5\) (\(0.06\%\) of \(F\)); it is \(5\)--\(25\) on the put wing and up to \(200\) beyond \(1.2F\). Median out-of-the-money mids are \(39\) for puts and \(62\) for calls. Implied volatility \(\hat\sigma_{\mathrm{ATM}}=0.134\) is the median Black--Scholes implied volatility of contracts with \(|K-F|\le 0.03F\). The linear call tail of Section~\ref{sec:tails} is appended (\(C_m=0.25\) by the mid floor of the filter, \(n_R=80\) from \eqref{eq:nR}). The bandwidth \eqref{eq:h-d2} uses the \(444\) quoted strikes and equals \(h=98.6\). The March 2027 AM quarterly (\(T=0.485\), \(F=7918\), \(q=-0.04\%\), \(\hat\sigma_{\mathrm{ATM}}=0.144\)) filters to \(n=221\) strikes on \([0.20F,1.49F]\), with a \(25\)-point mesh at the money; \eqref{eq:nR} gives \(n_R=41\), and \eqref{eq:h-d2} gives \(h=165.9\).
+The December 2026 S\&P~500 AM quarterly (\(T=0.235\), \(S_0=7764.64\), \(F=7836\), \(q=0.11\%\)) appears in Figure~\ref{fig:listed}. After the screens it has \(n=444\) strikes on \([0.36F,1.30F]\), of which \(75\%\) are puts. Near the money the strike mesh is \(5\) (\(0.06\%\) of \(F\)); it is \(5\)--\(25\) on the put wing and up to \(200\) beyond \(1.2F\). Median out-of-the-money mids are \(39\) for puts and \(62\) for calls. Implied volatility \(\hat\sigma_{\mathrm{ATM}}=0.134\) is the median Black--Scholes implied volatility of contracts with \(|K-F|\le 0.03F\). The linear call tail of Section~\ref{sec:tails} is appended (\(C_m=0.25\) by the mid floor of the filter, \(n_R=80\) from \eqref{eq:nR}). The bandwidth \eqref{eq:h-d2} uses the \(444\) quoted strikes and equals \(h=88.3\). The March 2027 AM quarterly (\(T=0.485\), \(F=7918\), \(q=-0.04\%\), \(\hat\sigma_{\mathrm{ATM}}=0.144\)) filters to \(n=221\) strikes on \([0.20F,1.49F]\), with a \(25\)-point mesh at the money; \eqref{eq:nR} gives \(n_R=41\), and \eqref{eq:h-d2} gives \(h=148.5\).
 
-The Nasdaq-100 December 2026 AM quarterly (\(T=0.235\), \(S_0=30732\), \(F=31025\), \(q=-0.03\%\), \(\hat\sigma_{\mathrm{ATM}}=0.201\)) is built with the same screens. It filters to \(n=312\) strikes on \([0.29F,1.39F]\), \(83\%\) puts; the at-the-money mesh is \(25\), and gaps of \(1000\) appear beyond \(1.2F\). The bandwidth \eqref{eq:h-d2} is \(h=606.0\) (\(n=312\); the right wing has \(n_R=72\)).
+The Nasdaq-100 December 2026 AM quarterly (\(T=0.235\), \(S_0=30732\), \(F=31025\), \(q=-0.03\%\), \(\hat\sigma_{\mathrm{ATM}}=0.201\)) is built with the same screens. It filters to \(n=312\) strikes on \([0.29F,1.39F]\), \(83\%\) puts; the at-the-money mesh is \(25\), and gaps of \(1000\) appear beyond \(1.2F\). The bandwidth \eqref{eq:h-d2} is \(h=542.2\) (\(n=312\); the right wing has \(n_R=72\)).
 
-The Russell~2000 December 2026 AM quarterly (\(T=0.235\), \(S_0=2889.92\), \(F=2912\), \(q=0.80\%\), \(\hat\sigma_{\mathrm{ATM}}=0.183\)) filters to \(n=99\) strikes on \([0.45F,1.32F]\), \(59\%\) puts; the at-the-money mesh is \(10\). The last two calls are both \(0.25\), so the wing slope is the previous negative step. Equation \eqref{eq:nR} gives \(n_R=40\). The bandwidth \eqref{eq:h-d2} is \(h=59.0\).
+The Russell~2000 December 2026 AM quarterly (\(T=0.235\), \(S_0=2889.92\), \(F=2912\), \(q=0.80\%\), \(\hat\sigma_{\mathrm{ATM}}=0.183\)) filters to \(n=99\) strikes on \([0.45F,1.32F]\), \(59\%\) puts; the at-the-money mesh is \(10\). The last two calls are both \(0.25\), so the wing slope is the previous negative step. Equation \eqref{eq:nR} gives \(n_R=40\). The bandwidth \eqref{eq:h-d2} is \(h=52.8\).
 
 The quoted calls are replaced by the nearest vector in Euclidean distance that is decreasing and convex in strike. Consecutive slopes lie in \([-e^{-rT},0]\), and each coordinate is at least the intrinsic value \(e^{-rT}\max(F-K_i,0)\).  This is the unpenalized projection of \citeauthor{yatchew2006} and also the first step of \citeauthor{aitsahalia2003}. Puts of the projected call follow by parity, and both premiums are floored at zero.
 
@@ -607,7 +607,7 @@ RUT 18 Dec 2026 & 218 & 218 & 115 & 99 & 58 \\
 \label{sec:emp-est}
 
 \paragraph{Ours}
-Start from the projected calls of Section~\ref{sec:data}. Set \(P_i=1-C_i/(S_0e^{-qT})\). Fit \eqref{eq:smooth-penalty} with the tail knots of Section~\ref{sec:tails}, and invert at \eqref{eq:h-d2} with thricing. The constant \(c\) is \eqref{eq:penalty-rule}. On these four chains the selected values are \(8.63\times 10^{-7}\), \(0\), \(4.86\times 10^{-8}\), and \(2.20\times 10^{-6}\). Prices are floored at zero, with puts by parity.
+Start from the projected calls of Section~\ref{sec:data}. Set \(P_i=1-C_i/(S_0e^{-qT})\). Fit \eqref{eq:smooth-penalty} with the tail knots of Section~\ref{sec:tails}, and invert at \eqref{eq:h-d2} with thricing. The constant \(c\) is \eqref{eq:penalty-rule}. On these four chains the selected values are \(5.66\times 10^{-7}\), \(0\), \(8.24\times 10^{-7}\), and \(2.29\times 10^{-6}\). Prices are floored at zero, with puts by parity.
 
 \paragraph{\citeauthor{aitsahalia2003}}
 Start from the projected calls of Section~\ref{sec:data}. The price is a Gaussian local linear regression of those values. The bandwidth is the plug-in in their Section 3.5, taken from \citet{fangijbels1996}: a global polynomial of order four supplies the pilot curvature, the weight equals one within 1.5 standard deviations of the mean strike, the Gaussian constant is \(0.776\), and the rate is \(n^{-1/5}\). The widths are \(h=140.9\), \(256.1\), \(715.3\), and \(68.8\). The density is \(e^{rT}\) times the strike derivative of the local slope, scaled so that the mass on \([\max(50,0.2F),2.4F]\) equals one and shifted so that the mean equals the forward. Their May 1999 figure uses the bandwidth that minimised integrated squared error in a Monte Carlo sample of \(25\) strikes. That optimum is not stated as a formula, and the listed row uses the plug-in. The curves have \(2\), \(1\), \(4\), and \(4\) peaks. Prices in the table are the local-linear calls, floored, with puts by parity. 
@@ -616,7 +616,7 @@ Start from the projected calls of Section~\ref{sec:data}. The price is a Gaussia
 Start from the projected calls of Section~\ref{sec:data}. The density is the convolution of a Gaussian kernel on the spot with a discrete probability. The nodes are equally spaced from the first quoted strike to the last, and the spacing is the bandwidth, with the count kept between 12 and 61. The weights are nonnegative, sum to one, and have mean \(F\). Each node prices a call by the Bachelier formula. The bandwidth minimises the even/odd out-of-the-money error. The selected widths are \(h=188.0\), \(364.1\), \(400.0\), and \(171.3\). The NDX curve has four peaks. Prices in Table~\ref{tab:listed} are those calls, floored, with puts by parity.
 
 \paragraph{\citeauthor{aitsahalia1998}}
-Start from the projected calls of Section~\ref{sec:data}. On one maturity the futures price and the expiry are constant, and the semiparametric regression reduces to Nadaraya--Watson of Black--Scholes implied volatility on moneyness \(K/F\). The kernel on that regressor is the order-2 Gaussian. {\color{red}\textbf{The bandwidth is not their Appendix A rule. Carried onto these chains that rule gives \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\), about one standard deviation of moneyness, and the smile is flat. The width used here is the smallest value on a geometric grid from \(0.01\) to \(0.40\) at which the density has one peak and total variation at most \(1.05\).}} The selected widths are \(h=0.036\), \(0.025\), \(0.044\), and \(0.036\). Prices are the Black--Scholes calls at the smoothed volatility, floored, with puts by parity. The density is the strike derivative of that call. Each curve has one peak and mass \(1.0\).
+Start from the projected calls of Section~\ref{sec:data}. On one maturity the futures price and the expiry are constant, and the semiparametric regression reduces to Nadaraya--Watson of Black--Scholes implied volatility on moneyness \(K/F\). The kernel on that regressor is the order-2 Gaussian. {\color{red}\textbf{The bandwidth is not their Appendix A rule. Carried onto these chains that rule gives \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\), about one standard deviation of moneyness, and the smile is flat. The width used here is the smallest value on a geometric grid from \(0.01\) to \(0.40\) at which the density has one peak and total variation at most \(1.05\).}} The selected widths are \(h=0.036\), \(0.030\), \(0.044\), and \(0.036\). Prices are the Black--Scholes calls at the smoothed volatility, floored, with puts by parity. The density is the strike derivative of that call. Each curve has one peak and mass \(1.0\).
 
 \paragraph{\citeauthor{grith2012}}
 Start from the projected calls of Section~\ref{sec:data}. Both objects are a local cubic with the quartic kernel, and \(h\) is the half-width of that kernel. The bandwidth minimises the leave-one-out squared error of the local cubic, the cross-validation they compute and then set aside because the density is wiggly. The width in their comparison figure is twice that value: on the DAX chain, \(114\) against \(228\). The call row divides the call by the spot, reads the density as \(e^{rT}\) times the scaled second derivative, and prices from the local level. Cross-validation selects \(h=52.2\), \(317.9\), \(498.7\), and \(110.7\), so the doubled widths are \(104.4\), \(635.7\), \(997.4\), and \(221.5\). The implied-volatility row is a local cubic of Black--Scholes implied volatility against the strike, with Black--Scholes prices at the local level and a density that uses the local slope and curvature. Its cross-validated widths are \(h=88.9\), \(504.8\), \(498.7\), and \(204.0\), and the doubled widths are \(177.9\), \(1009.6\), \(997.4\), and \(407.9\). Their DAX figure for this row shows one widened curve, at \(372\), and does not print the cross-validated width, so the same doubling is used. The doubled call cubic and the doubled implied-volatility cubic are drawn on the left of Figure~\ref{fig:listed}, with \citeauthor{aitsahalia1998}. The cross-validated call cubic and the cross-validated implied-volatility cubic are wiggly. They are drawn in \ref{app:wiggly} so they do not crowd that figure. Prices are floored, with puts by parity.
@@ -625,7 +625,7 @@ Hold-out refits the projection and every tuned method on the training strikes on
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=98.6\), \(165.9\), \(606.0\), \(59.0\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.025\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV is the total variation of \(\max(\hat q,0)\) on \([0.55F,1.40F]\), divided by twice the maximum; a unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Ours has the smallest hold-out on each chain, with one peak and total variation \(1.0\).}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=88.3\), \(148.5\), \(542.2\), \(52.8\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.030\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV completes \(\max(\hat q,0)\) to zero at the ends of \([0.55F,1.40F]\) and divides its variation by twice the maximum. A unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Ours has one peak and total variation \(1.0\), and the smallest hold-out on each chain and in the average.}
 \label{tab:listed}
 {\fontsize{9.5}{11}\selectfont
 \setlength{\tabcolsep}{4pt}%
@@ -638,7 +638,7 @@ Hold-out refits the projection and every tuned method on the training strikes on
   \multicolumn{1}{c}{Mass} & \multicolumn{1}{c}{TV} \\
 \midrule
 SPX Dec & Ours
-  & 0.050 & 0.040 & 0.036 & 0.050 & 1.0 & 1.0 \\
+  & 0.043 & 0.036 & 0.034 & 0.043 & 1.0 & 1.0 \\
 SPX Dec & PCA
   & 0.055 & 0.051 & 0.053 & 0.048 & 1.0 & 1.0 \\
 SPX Dec & \citeauthor{grith2012}, IV, \(2\times\)
@@ -655,7 +655,7 @@ SPX Dec & \citeauthor{grith2012}, call, CV
   & 14.653 & 0.029 & 0.029 & 0.032 & 1.0 & 3.4 \\
 \midrule
 SPX Mar & Ours
-  & 0.066 & 0.056 & 0.052 & 0.067 & 1.0 & 1.0 \\
+  & 0.056 & 0.049 & 0.046 & 0.058 & 1.0 & 1.0 \\
 SPX Mar & PCA
   & 0.075 & 0.066 & 0.061 & 0.077 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{grith2012}, IV, \(2\times\)
@@ -663,7 +663,7 @@ SPX Mar & \citeauthor{grith2012}, IV, \(2\times\)
 SPX Mar & \citeauthor{grith2012}, IV, CV
   & 0.091 & 0.051 & 0.049 & 0.057 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{aitsahalia1998}
-  & 1.312 & 0.910 & 0.609 & 1.474 & 1.0 & 1.1 \\
+  & 1.312 & 1.312 & 0.853 & 2.157 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{aitsahalia2003}
   & 9.965 & 7.837 & 5.633 & 12.202 & 1.0 & 1.0 \\
 SPX Mar & \citeauthor{grith2012}, call, \(2\times\)
@@ -672,9 +672,9 @@ SPX Mar & \citeauthor{grith2012}, call, CV
   & 18.635 & 0.042 & 0.040 & 0.048 & 1.0 & 1.0 \\
 \midrule
 NDX Dec & Ours
-  & 1.110 & 1.057 & 1.106 & 0.780 & 1.0 & 1.0 \\
+  & 1.095 & 1.046 & 1.092 & 0.782 & 1.0 & 1.0 \\
 NDX Dec & PCA
-  & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.3 \\
+  & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.4 \\
 NDX Dec & \citeauthor{grith2012}, IV, \(2\times\)
   & 1.236 & 0.946 & 0.991 & 0.686 & 1.0 & 1.2 \\
 NDX Dec & \citeauthor{grith2012}, IV, CV
@@ -689,11 +689,11 @@ NDX Dec & \citeauthor{grith2012}, call, CV
   & 79.411 & 0.867 & 0.922 & 0.523 & 0.9 & 2.8 \\
 \midrule
 RUT Dec & Ours
-  & 0.035 & 0.033 & 0.033 & 0.034 & 1.0 & 1.0 \\
+  & 0.032 & 0.032 & 0.031 & 0.033 & 1.0 & 1.0 \\
 RUT Dec & PCA
   & 0.067 & 0.058 & 0.066 & 0.043 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.116 & 0.042 & 0.047 & 0.033 & 1.3 & 1.0 \\
+  & 0.116 & 0.042 & 0.047 & 0.033 & 1.3 & 1.5 \\
 RUT Dec & \citeauthor{grith2012}, IV, CV
   & 0.039 & 0.026 & 0.027 & 0.025 & 1.0 & 1.1 \\
 RUT Dec & \citeauthor{aitsahalia1998}
@@ -706,17 +706,17 @@ RUT Dec & \citeauthor{grith2012}, call, CV
   & 7.026 & 0.022 & 0.022 & 0.023 & 1.0 & 1.1 \\
 \midrule
 Average & Ours
-  & 0.316 & 0.297 & 0.307 & 0.233 & 1.0 & 1.0 \\
+  & 0.306 & 0.291 & 0.301 & 0.229 & 1.0 & 1.0 \\
 Average & PCA
   & 0.380 & 0.331 & 0.324 & 0.368 & 1.0 & 1.1 \\
 Average & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.422 & 0.296 & 0.303 & 0.243 & 1.1 & 1.1 \\
+  & 0.422 & 0.296 & 0.303 & 0.243 & 1.1 & 1.2 \\
 Average & \citeauthor{grith2012}, IV, CV
   & 0.363 & 0.244 & 0.257 & 0.160 & 1.0 & 1.6 \\
 Average & \citeauthor{aitsahalia1998}
-  & 8.224 & 8.123 & 6.787 & 12.368 & 1.0 & 1.0 \\
+  & 8.224 & 8.223 & 6.848 & 12.539 & 1.0 & 1.0 \\
 Average & \citeauthor{aitsahalia2003}
-  & 9.343 & 7.589 & 6.443 & 10.454 & 1.0 & 1.0 \\
+  & 9.343 & 7.589 & 6.443 & 10.454 & 1.0 & 1.1 \\
 Average & \citeauthor{grith2012}, call, \(2\times\)
   & 13.131 & 0.297 & 0.295 & 0.254 & 1.0 & 1.1 \\
 Average & \citeauthor{grith2012}, call, CV
@@ -728,7 +728,7 @@ Average & \citeauthor{grith2012}, call, CV
 
 A fit inside the decreasing-convex cone cannot undercut the gap between the quoted calls and that cone. The plug-in local linear of \citeauthor{aitsahalia2003} remains far from the quotes. The positive convolution tracks them much more closely, and its NDX density has four peaks.
 
-The estimator of this paper has the smallest hold-out in Table~\ref{tab:listed} on each chain, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. The penalty is zero on the March chain and positive on the other three. In sample the estimator is below the positive convolution on each chain. The cross-validated cubics of \citeauthor{grith2012} are as tight or tighter in sample, and the hold-out reverses that ranking. The call cubic fails in the far wing, where a one-sided fit on the held-out strikes misses the put. \citeauthor{aitsahalia1998} keeps one peak, with a larger pricing error.
+The estimator of this paper has the smallest hold-out in Table~\ref{tab:listed} on each of the four chains, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. The penalty is zero on SPX March and positive on the other three chains. In sample the estimator is below the positive convolution on each chain. The cross-validated call cubic of \citeauthor{grith2012} is tighter in sample on each chain. The cross-validated implied-volatility cubic is tighter in sample on SPX December, NDX, and RUT; on SPX March the estimator is slightly smaller. The hold-out reverses that comparison on each chain. The call cubic fails in the far wing, where a one-sided fit on the held-out strikes misses the put. \citeauthor{aitsahalia1998} keeps one peak, with a larger pricing error.
 
 Total variation, defined in the caption of Table~\ref{tab:listed}, charges an extra oscillation by its height relative to the mode. The cross-validated cubics oscillate. They are drawn in \ref{app:wiggly} rather than on the axes of Figure~\ref{fig:listed}. The doubled cubics, the plug-in local linear, and \citeauthor{aitsahalia1998} are on the left of that figure.
 
@@ -742,7 +742,7 @@ Total variation, defined in the caption of Table~\ref{tab:listed}, charges an ex
 \section{Conclusion}
 \label{sec:conc}
 
-The estimator reads the risk-neutral density off the empirical measure of a single maturity. Calls are rescaled to a complementary distribution, a smoothing spline fits that measure, the unquoted tails are filled, and a thriced Gaussian convolution of the spline is the density and the call. The penalty is zero when the thriced density scores at most one, and otherwise \eqref{eq:penalty-rule}. On exact quotes that penalty is zero to the printed precision, so those rows are the thriced spline at \eqref{eq:h-d2}. The estimator is the smallest on sparse Heston and on dense variance gamma. On dense Heston the cross-validated implied-volatility cubic and the Nadaraya--Watson smile are smaller, and on sparse variance gamma that smile is smaller. With noise in implied volatility the smoothing spline is the smallest on the dense chain, and on the sparse chain the implied-volatility cubics and that smile are smaller. On the four listed chains the hold-out error is smaller than every other method on each chain, and each density has one peak, unit mass, and total variation at one. The cross-validated cubics are as tight or tighter in sample. The call cubic does not hold out on the far wing.
+The estimator reads the risk-neutral density off the empirical measure of a single maturity. Calls are rescaled to a complementary distribution, a smoothing spline fits that measure, the unquoted tails are filled, and a thriced Gaussian convolution of the spline is the density and the call. The penalty is zero when the thriced density scores at most \(1.007\), and otherwise \eqref{eq:penalty-rule}. On the exact chains that penalty is zero. The estimator is the smallest on sparse Heston and on dense variance gamma. On dense Heston the cross-validated implied-volatility cubic is smaller, and on sparse variance gamma the Nadaraya--Watson smile is smaller. With noise in implied volatility the smoothing spline is the smallest on the dense chain, and on the sparse chain the implied-volatility cubics and that smile are smaller. On each of the four listed chains the hold-out error is smaller than every other method, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. The cross-validated call cubic is tighter in sample on each chain, and the cross-validated implied-volatility cubic is tighter in sample except on SPX March. The call cubic does not hold out on the far wing.
 
 \appendix
 \section{Other listed densities}
@@ -760,47 +760,71 @@ The cross-validated call cubic of \citeauthor{grith2012}, and that paper's impli
 \section{Further listed chains}
 \label{app:chains}
 
-Table~\ref{tab:extra} applies \eqref{eq:penalty-rule} to twenty-three further expiries from the same feeds. The four chains of Section~\ref{sec:emp} are left out. The screens of Section~\ref{sec:data} are unchanged, including the discount rate \(r=0.04\). Only the standard monthly roots are kept. Maturity runs from fourteen days to two years, each chain has at least forty strikes, and each root keeps at most eight expiries spread across the calendar. SPX, NDX, and RUT are the 23~September 2026 snapshots. DJX is the 19~September 2026 snapshot. The table is not a comparison with the other estimators.
+Table~\ref{tab:extra} applies \eqref{eq:penalty-rule} to twenty-three further expiries from the same feeds, and scores PCA on each chain. The four chains of Section~\ref{sec:emp} are left out. The screens of Section~\ref{sec:data} are unchanged, including the discount rate \(r=0.04\). Only the standard monthly roots are kept. Maturity runs from fourteen days to two years, each chain has at least forty strikes, and each root keeps at most eight expiries spread across the calendar. SPX, NDX, and RUT are the 23~September 2026 snapshots. DJX is the 19~September 2026 snapshot.
 
-The rule does not count modes. Three chains have two peaks. On SPX 16~June 2028 and NDX 17~December 2027 the clipped variation is still below one, so the penalty stays zero. On DJX 17~September 2027 the variation is \(1.387\) and the penalty is \(8.59\times 10^{-4}\). Several long-dated NDX hold-outs are large because the quotes themselves are large.
+The rule does not count modes. Two chains keep two peaks. SPX 17~December 2027 has penalty zero and variation \(1.004\): both local maxima exceed one fifth of the mode, and the extra oscillation is four tenths of one percent of that mode. DJX 17~September 2027 has variation \(1.433\) and penalty \(5.50\times 10^{-4}\). On SPX 16~June 2028 and NDX 17~December 2027 the fitted density has one peak, with penalties \(4.46\times 10^{-4}\) and \(4.26\times 10^{-4}\). Several long-dated NDX hold-outs are large because the quotes themselves are large.
 
+\clearpage
 \begin{table}[H]
 \centering
-\caption{The estimator \eqref{eq:penalty-rule} on expiries outside Table~\ref{tab:listed}. Hold-out, OTM, puts, and calls are the errors of that table. Mass and total variation are printed to three decimals, and peaks counts modes above one fifth of the maximum on \([0.55F,1.40F]\). A zero penalty is the case \(t\le 1\).}
+\caption{The estimator \eqref{eq:penalty-rule} on expiries outside Table~\ref{tab:listed}.}
 \label{tab:extra}
-{\fontsize{8}{9.5}\selectfont
-\setlength{\tabcolsep}{3.2pt}%
-\renewcommand{\arraystretch}{0.92}%
-\begin{tabular}{@{}lr l *{4}{S[table-format=2.3]} S[table-format=1.3] c S[table-format=1.3]@{}}
+{\fontsize{13}{15}\selectfont
+\setlength{\tabcolsep}{1.5pt}%
+\renewcommand{\arraystretch}{0.41}%
+\begin{tabular}{@{}ll S[table-format=3.0] *{4}{S[table-format=2.3]} *{2}{S[table-format=1.1]}@{}}
 \toprule
-\multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{\(n\)} & \multicolumn{1}{c}{\(c\)} &
+\multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} & \multicolumn{1}{c}{\(n\)} &
   \multicolumn{1}{c}{Hold-out} & \multicolumn{1}{c}{OTM} &
   \multicolumn{1}{c}{Puts} & \multicolumn{1}{c}{Calls} &
-  \multicolumn{1}{c}{Mass} & \multicolumn{1}{c}{Peaks} & \multicolumn{1}{c}{TV} \\
+  \multicolumn{1}{c}{Mass} & \multicolumn{1}{c}{TV} \\
 \midrule
-SPX 16 Oct 2026 & 438 & \(1.55\times 10^{-7}\) & 0.028 & 0.024 & 0.020 & 0.030 & 1.000 & 1 & 1.007 \\
-SPX 15 Jan 2027 & 395 & \(7.76\times 10^{-8}\) & 0.053 & 0.042 & 0.041 & 0.048 & 1.000 & 1 & 1.000 \\
-SPX 16 Apr 2027 & 217 & \(1.52\times 10^{-5}\) & 0.363 & 0.189 & 0.111 & 0.351 & 0.999 & 1 & 1.019 \\
-SPX 17 Jun 2027 & 235 & \(0\) & 0.169 & 0.149 & 0.134 & 0.194 & 0.998 & 1 & 0.988 \\
-SPX 16 Jul 2027 & 209 & \(0\) & 0.208 & 0.188 & 0.183 & 0.199 & 0.997 & 1 & 0.985 \\
-SPX 17 Sep 2027 & 207 & \(0\) & 0.354 & 0.318 & 0.296 & 0.398 & 0.996 & 1 & 0.974 \\
-SPX 17 Dec 2027 & 143 & \(0\) & 0.625 & 0.492 & 0.487 & 0.507 & 0.994 & 1 & 0.952 \\
-SPX 16 Jun 2028 & 199 & \(0\) & 1.106 & 1.058 & 1.004 & 1.221 & 0.990 & 2 & 0.939 \\
-NDX 16 Oct 2026 & 269 & \(1.76\times 10^{-6}\) & 0.531 & 0.453 & 0.367 & 0.671 & 1.001 & 1 & 1.009 \\
-NDX 20 Nov 2026 & 252 & \(1.74\times 10^{-5}\) & 1.323 & 1.351 & 1.216 & 1.750 & 1.000 & 1 & 0.998 \\
-NDX 19 Feb 2027 & 95 & \(0\) & 1.220 & 0.732 & 0.770 & 0.621 & 1.000 & 1 & 0.991 \\
-NDX 19 Mar 2027 & 110 & \(0\) & 0.782 & 0.552 & 0.500 & 0.681 & 1.000 & 1 & 0.980 \\
-NDX 16 Apr 2027 & 83 & \(0\) & 1.136 & 0.799 & 0.880 & 0.584 & 1.001 & 1 & 0.969 \\
-NDX 21 May 2027 & 68 & \(2.18\times 10^{-5}\) & 5.577 & 1.417 & 1.160 & 1.999 & 0.999 & 1 & 1.012 \\
-NDX 17 Sep 2027 & 96 & \(0\) & 9.632 & 2.221 & 2.339 & 1.796 & 0.997 & 1 & 0.962 \\
-NDX 17 Dec 2027 & 117 & \(0\) & 29.091 & 27.330 & 24.618 & 36.369 & 0.995 & 2 & 0.919 \\
-RUT 16 Oct 2026 & 219 & \(2.66\times 10^{-7}\) & 0.024 & 0.019 & 0.019 & 0.020 & 1.000 & 1 & 1.004 \\
-RUT 20 Nov 2026 & 203 & \(4.01\times 10^{-6}\) & 0.037 & 0.035 & 0.036 & 0.034 & 1.000 & 1 & 1.002 \\
-RUT 19 Mar 2027 & 131 & \(8.64\times 10^{-5}\) & 0.336 & 0.209 & 0.122 & 0.407 & 1.000 & 1 & 1.047 \\
-RUT 17 Jun 2027 & 69 & \(0\) & 0.058 & 0.044 & 0.055 & 0.024 & 0.997 & 1 & 0.961 \\
-DJX 19 Mar 2027 & 44 & \(1.15\times 10^{-5}\) & 0.070 & 0.036 & 0.028 & 0.055 & 1.001 & 1 & 1.045 \\
-DJX 17 Jun 2027 & 57 & \(4.00\times 10^{-5}\) & 0.080 & 0.065 & 0.054 & 0.092 & 0.999 & 1 & 1.046 \\
-DJX 17 Sep 2027 & 41 & \(8.59\times 10^{-4}\) & 0.829 & 0.699 & 0.519 & 1.080 & 1.014 & 2 & 1.387 \\
+SPX 16 Oct 2026 & Ours & 438 & 0.025 & 0.022 & 0.020 & 0.026 & 1.0 & 1.0 \\
+SPX 16 Oct 2026 & PCA & 438 & 0.065 & 0.064 & 0.072 & 0.035 & 1.0 & 1.0 \\
+SPX 15 Jan 2027 & Ours & 395 & 0.046 & 0.039 & 0.038 & 0.045 & 1.0 & 1.0 \\
+SPX 15 Jan 2027 & PCA & 395 & 0.064 & 0.053 & 0.053 & 0.054 & 1.0 & 1.0 \\
+SPX 16 Apr 2027 & Ours & 217 & 0.283 & 0.138 & 0.090 & 0.244 & 1.0 & 1.0 \\
+SPX 16 Apr 2027 & PCA & 217 & 0.152 & 0.115 & 0.073 & 0.205 & 1.0 & 1.0 \\
+SPX 17 Jun 2027 & Ours & 235 & 0.154 & 0.138 & 0.122 & 0.184 & 1.0 & 1.0 \\
+SPX 17 Jun 2027 & PCA & 235 & 0.180 & 0.147 & 0.111 & 0.234 & 1.0 & 1.0 \\
+SPX 16 Jul 2027 & Ours & 209 & 0.184 & 0.168 & 0.161 & 0.183 & 1.0 & 1.0 \\
+SPX 16 Jul 2027 & PCA & 209 & 0.180 & 0.125 & 0.126 & 0.121 & 1.0 & 1.3 \\
+SPX 17 Sep 2027 & Ours & 207 & 0.330 & 0.297 & 0.271 & 0.387 & 1.0 & 1.0 \\
+SPX 17 Sep 2027 & PCA & 207 & 0.343 & 0.237 & 0.184 & 0.386 & 1.0 & 1.6 \\
+SPX 17 Dec 2027 & Ours & 143 & 0.533 & 0.430 & 0.408 & 0.500 & 1.0 & 1.0 \\
+SPX 17 Dec 2027 & PCA & 143 & 0.606 & 0.459 & 0.276 & 0.824 & 1.0 & 1.4 \\
+SPX 16 Jun 2028 & Ours & 199 & 1.516 & 1.700 & 1.635 & 1.901 & 1.0 & 1.0 \\
+SPX 16 Jun 2028 & PCA & 199 & 2.290 & 2.336 & 2.487 & 1.746 & 1.0 & 1.0 \\
+NDX 16 Oct 2026 & Ours & 269 & 0.473 & 0.410 & 0.347 & 0.578 & 1.0 & 1.0 \\
+NDX 16 Oct 2026 & PCA & 269 & 0.458 & 0.395 & 0.346 & 0.531 & 1.0 & 1.2 \\
+NDX 20 Nov 2026 & Ours & 252 & 1.173 & 1.196 & 1.130 & 1.406 & 1.0 & 1.0 \\
+NDX 20 Nov 2026 & PCA & 252 & 1.236 & 1.067 & 1.072 & 1.047 & 1.0 & 1.4 \\
+NDX 19 Feb 2027 & Ours & 95 & 1.356 & 0.695 & 0.716 & 0.637 & 1.0 & 1.0 \\
+NDX 19 Feb 2027 & PCA & 95 & 1.276 & 1.149 & 1.128 & 1.202 & 1.0 & 1.0 \\
+NDX 19 Mar 2027 & Ours & 110 & 0.757 & 0.544 & 0.481 & 0.695 & 1.0 & 1.0 \\
+NDX 19 Mar 2027 & PCA & 110 & 1.243 & 0.967 & 0.637 & 1.577 & 1.0 & 1.0 \\
+NDX 16 Apr 2027 & Ours & 83 & 1.077 & 0.756 & 0.821 & 0.590 & 1.0 & 1.0 \\
+NDX 16 Apr 2027 & PCA & 83 & 1.646 & 1.276 & 1.034 & 1.690 & 1.0 & 1.0 \\
+NDX 21 May 2027 & Ours & 68 & 7.094 & 1.891 & 1.447 & 2.831 & 1.0 & 1.1 \\
+NDX 21 May 2027 & PCA & 68 & 6.347 & 2.927 & 0.768 & 5.702 & 1.0 & 1.0 \\
+NDX 17 Sep 2027 & Ours & 96 & 14.622 & 1.952 & 1.988 & 1.833 & 1.0 & 1.0 \\
+NDX 17 Sep 2027 & PCA & 96 & 13.202 & 8.906 & 2.187 & 17.774 & 1.0 & 1.0 \\
+NDX 17 Dec 2027 & Ours & 117 & 32.318 & 28.023 & 25.179 & 37.466 & 1.0 & 1.0 \\
+NDX 17 Dec 2027 & PCA & 117 & 30.636 & 30.312 & 26.360 & 42.826 & 1.0 & 1.0 \\
+RUT 16 Oct 2026 & Ours & 219 & 0.023 & 0.018 & 0.018 & 0.018 & 1.0 & 1.0 \\
+RUT 16 Oct 2026 & PCA & 219 & 0.041 & 0.038 & 0.037 & 0.040 & 1.0 & 1.0 \\
+RUT 20 Nov 2026 & Ours & 203 & 0.032 & 0.030 & 0.031 & 0.029 & 1.0 & 1.0 \\
+RUT 20 Nov 2026 & PCA & 203 & 0.059 & 0.055 & 0.071 & 0.038 & 1.0 & 1.0 \\
+RUT 19 Mar 2027 & Ours & 131 & 0.299 & 0.178 & 0.104 & 0.345 & 1.0 & 1.1 \\
+RUT 19 Mar 2027 & PCA & 131 & 0.147 & 0.146 & 0.145 & 0.152 & 1.0 & 1.0 \\
+RUT 17 Jun 2027 & Ours & 69 & 0.054 & 0.039 & 0.048 & 0.025 & 1.0 & 1.0 \\
+RUT 17 Jun 2027 & PCA & 69 & 0.373 & 0.177 & 0.224 & 0.092 & 1.0 & 1.0 \\
+DJX 19 Mar 2027 & Ours & 44 & 0.059 & 0.027 & 0.022 & 0.038 & 1.0 & 1.1 \\
+DJX 19 Mar 2027 & PCA & 44 & 0.154 & 0.104 & 0.101 & 0.114 & 1.0 & 1.0 \\
+DJX 17 Jun 2027 & Ours & 57 & 0.071 & 0.057 & 0.050 & 0.074 & 1.0 & 1.1 \\
+DJX 17 Jun 2027 & PCA & 57 & 0.377 & 0.118 & 0.130 & 0.072 & 1.0 & 1.0 \\
+DJX 17 Sep 2027 & Ours & 41 & 0.627 & 0.500 & 0.351 & 0.802 & 1.0 & 1.4 \\
+DJX 17 Sep 2027 & PCA & 41 & 0.356 & 0.209 & 0.225 & 0.147 & 1.0 & 1.0 \\
 \bottomrule
 \end{tabular}
 }
@@ -809,7 +833,7 @@ DJX 17 Sep 2027 & 41 & \(8.59\times 10^{-4}\) & 0.829 & 0.699 & 0.519 & 1.080 & 
 \section*{Code and Data Availability}
 
 
-A Python implementation of \eqref{eq:thrice}, the three evaluations in Section~\ref{sec:compute}, and a replication script are available at \url{https://github.com/s-broda/RND}.
+A Python implementation of \eqref{eq:thrice} and a replication script are available at \url{https://github.com/s-broda/RND}.
 
 \bibliographystyle{elsarticle-harv}
 \bibliography{refs}
