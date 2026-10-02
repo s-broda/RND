@@ -9,6 +9,9 @@
 \makeatletter
 \patchcmd{\LT@makecaption}{\reset@font}{\reset@font\footnotesize}{}{%
   \errmessage{longtable caption font patch failed}}
+% elsarticle appends a period to every \paragraph title.
+% This eats that period when the title already ends in one, as with ``et al.''.
+\newcommand{\noperiod}{\@gobble}
 \makeatother
 
 \journal{Journal of Econometrics}
@@ -78,7 +81,7 @@ The estimator of Section~\ref{sec:est} is a kernel smooth of that empirical meas
 
 \citet{rubinstein1994} and \citet{jackwerth1996} recovered probabilities on a binomial tree by minimizing a distance to a prior subject to pricing constraints. \citet{stutzer1996} and \citet{buchen1996} maximized entropy. These methods produce a valid density by construction, but the finite-support discretization and the choice of prior affect the tails. Viewing the problem as a linear inverse problem, \citet{cont2004} calibrated jump-diffusion models under a relative-entropy penalty; \citet{monnier2014} used the singular value decomposition of a restricted put operator.
 
-A number of papers compare methods on market data, where the true density is unknown, so that the criterion is typically pricing error or stability over time \citep{cooper1999,jondeau2000,coutant2001,anagnou2005,bliss2002,liu2007}. Studies that generate options from a known process are less common. \citet{bondarenko2003} finds that his method outperforms mixtures, expansions, and several regularization methods on integrated squared error. \citet{lai2014} finds that kernel regression outperforms spline interpolation and neural nets on pricing error. \citet{santos2015} compare mixtures, Edgeworth expansions, hypergeometric functions, and a \citeauthor{bliss2002} smoothing spline against Heston and other targets. \citet{lu2019} compares methods on affine jump-diffusions and again finds \citeauthor{bondarenko2003}'s method accurate. The typical ranking is that implied-volatility interpolants price well when quotes are clean, that mixtures are unstable once more than two components are admitted, and that \citeauthor{bondarenko2003}'s method is the most accurate among methods that do not use a parametric density of \(S_T\), when the true density is known. Section~\ref{sec:heston} is in this vein: the targets are Heston and variance-gamma, and the true density is known. Section~\ref{sec:emp} scores listed index chains, where the criterion is pricing error, against \citeauthor{bondarenko2003}, \citeauthor{aitsahalia2003}, \citeauthor{aitsahalia1998}, and \citeauthor{grith2012}.
+A number of papers compare methods on market data, where the true density is unknown, so that the criterion is typically pricing error or stability over time \citep{cooper1999,jondeau2000,coutant2001,anagnou2005,bliss2002,liu2007}. Studies that generate options from a known process are less common. \citet{bondarenko2003} finds that his method outperforms mixtures, expansions, and several regularization methods on integrated squared error. \citet{lai2014} finds that kernel regression outperforms spline interpolation and neural nets on pricing error. \citet{santos2015} compare mixtures, Edgeworth expansions, hypergeometric functions, and a \citeauthor{bliss2002} smoothing spline against Heston and other targets. \citet{lu2019} compares methods on affine jump-diffusions and again finds \citeauthor{bondarenko2003}'s method accurate. The typical ranking is that implied-volatility interpolants price well when quotes are clean, that mixtures are unstable once more than two components are admitted, and that \citeauthor{bondarenko2003}'s method is the most accurate among methods that do not use a parametric density of \(S_T\), when the true density is known. Section~\ref{sec:heston} is in this vein: the targets are Heston and variance-gamma, and the true density is known. Section~\ref{sec:emp} scores listed index chains, where the criterion is pricing error, against \citeauthor{bondarenko2003}, \citeauthor{aitsahalia2003}, \citeauthor{aitsahalia1998}, and \citeauthor{grith2012}
 
 \section{Construction of the Estimator}
 \label{sec:est}
@@ -331,7 +334,7 @@ Equations \eqref{eq:cubic} and \eqref{eq:thrice} ask for one convolution. The de
 
 Table~\ref{tab:fft} times one evaluation of the density and the calls at the quoted strikes. The bandwidth is \eqref{eq:h-d2} and the penalty is fixed at zero, so the spline is the natural cubic through the knots and the rule \eqref{eq:penalty-rule} is not applied. Building the spline is included. One warmup call is discarded, and the recorded time is the minimum of five. The machine is a late 2024 14-inch MacBook Pro with an Apple M4 chip.
 
-\paragraph{Summing the cells.}
+\paragraph{Summing the cells}
 The completed spline is held at its endpoint values outside the knots, the left value to the left of the first knot and the right value to the right of the last. Its slope is a quadratic on each knot interval and is zero on the two tails. On an interval \([L,R]\),
 \begin{equation}
 \label{eq:cell}
@@ -343,7 +346,7 @@ P^{\mathrm{cs}\prime}(L)
 \end{equation}
 where the third derivative is the constant \(P^{\mathrm{cs}\prime\prime\prime}(L)=(P^{\mathrm{cs}\prime\prime}(R)-P^{\mathrm{cs}\prime\prime}(L))/(R-L)\). Write \(u=(x-y)/h\). The integrals of \(1\), \(u\), and \(u^2\) against the standard normal density \(\phi\) and its distribution function \(\Phi\) are elementary, so each cell is a closed form in the two standardized distances \((x-L)/h\) and \((x-R)/h\). Differentiating under the integral gives \((g\ast\kappa_h)'\). Integrating the slope against \(\mathcal{K}_h\) gives the level in \eqref{eq:cubic}. The boundary terms at the two ends of the strip are the jumps where the flat tails meet the spline, so those jumps are part of the cell sum. Thricing repeats the cells at \(h\), \(h\sqrt{2}\), and \(2h\) and adds them with weights \(8/3\), \(-2\), and \(1/3\). A strike does not reuse the integral computed at its neighbour, and one bandwidth does not reuse the integrals of the other two. The cost grows with the number of cells times the number of strikes. This is the naive column of Table~\ref{tab:fft}.
 
-\paragraph{One transform of the sampled spline.}
+\paragraph{One transform of the sampled spline}
 Convolution against \(\kappa_h\) is multiplication by \(e^{-h^2 s^2/2}\). That factor is the exact Fourier transform of the Gaussian. Differentiation is multiplication by \(\mathrm{i}s\). One transform of the flat-extended spline therefore carries the level, the slope, and the second derivative, for every bandwidth at once.
 
 The samples lie on a uniform grid. To the left of the first knot the sample equals the left endpoint value, and to the right of the last knot it equals the right endpoint value, so the jumps in the slope are already present in the samples. The step is one sixty-fourth of the smaller of the median knot spacing and the narrow bandwidth. That step resolves the cubic and the kinks at the knots. The grid runs ten widths of the widest kernel, the kernel of width \(2h\), past every strike at which the density or the call is read. A discrete transform treats its input as one period of a periodic signal, and the pad is the region a wrapped copy would otherwise re-enter.
@@ -352,7 +355,7 @@ Thricing is a single multiplier on this transform, the combination \eqref{eq:phi
 
 Every strike and every bandwidth is then a reading of one transform, and each Gaussian integral has become a multiplication. The grid that makes the samples faithful is much finer than the spline: the step is a sixty-fourth of the knot spacing, and the pad is ten widths of the kernel of width \(2h\). The spline changes on the scale of the knots, and the Gaussian changes on the scale of \(h\). This is the FFT column of Table~\ref{tab:fft}. The next evaluation keeps the transform and places the samples on that coarser scale.
 
-\paragraph{Moments of boxes one bandwidth wide.}
+\paragraph{Moments of boxes one bandwidth wide}
 Partition the knots into boxes no wider than the narrow bandwidth, with the last edge on the last knot. On a box the second derivative is linear and the spline is cubic. Their moments about the box centre \(\xi\),
 \begin{equation}
 \label{eq:moments}
@@ -380,7 +383,7 @@ P^{\mathrm{cs}\prime}(t_0)\,\kappa_h(x-t_0)
 \end{equation}
 with \(t_0\) the first knot and \(t_m\) the last, and with the same three weights. Each flat tail contributes a Gaussian cdf to the level. If the transform does not fit in memory, the same series is summed at the strikes, inside a window of five standard deviations of each kernel. This is the FFT+ME column of Table~\ref{tab:fft}.
 
-\paragraph{The second gain is a small constant.}
+\paragraph{The second gain is a small constant}
 Summing the series at one strike visits the boxes that lie inside five standard deviations. The boxes are one bandwidth wide, so the three windows hold about five, eight, and ten boxes. That count stays fixed as further knots fill a fixed interval, and one strike then costs a few hundred operations. The transform evaluates the same series at every strike together. On the designs below its length is a few hundred to about a thousand samples, and the base-two logarithm of that length is about eight to ten. The logarithm and the three windows are constants of the same kind. Folding the three bandwidths into one multiplier, and the value together with the derivative into one inverse, multiplies the cost by a small constant.
 
 \begin{table}[H]
@@ -623,7 +626,7 @@ Start from the projected calls of Section~\ref{sec:data}. The density is the con
 \paragraph{\citeauthor{aitsahalia1998}}
 Start from the projected calls of Section~\ref{sec:data}. On one maturity the futures price and the expiry are constant, and the semiparametric regression reduces to Nadaraya--Watson of Black--Scholes implied volatility on moneyness \(K/F\). The kernel on that regressor is the order-2 Gaussian. {\color{red}\textbf{The bandwidth is not their Appendix A rule. Carried onto these chains that rule gives \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\), about one standard deviation of moneyness, and the smile is flat. The width used here is the smallest value on a geometric grid from \(0.01\) to \(0.40\) at which the density has one peak and total variation at most \(1.05\).}} The selected widths are \(h=0.036\), \(0.030\), \(0.044\), and \(0.036\). Prices are the Black--Scholes calls at the smoothed volatility, floored, with puts by parity. The density is the strike derivative of that call. Each curve has one peak and mass \(1.0\).
 
-\paragraph{\citeauthor{grith2012}}
+\paragraph{\citeauthor{grith2012}\noperiod}
 Start from the projected calls of Section~\ref{sec:data}. Both objects are a local cubic with the quartic kernel, and \(h\) is the half-width of that kernel. The bandwidth minimises the leave-one-out squared error of the local cubic, the cross-validation they compute and then set aside because the density is wiggly. The width in their comparison figure is twice that value: on the DAX chain, \(114\) against \(228\). The call row divides the call by the spot, reads the density as \(e^{rT}\) times the scaled second derivative, and prices from the local level. Cross-validation selects \(h=52.2\), \(317.9\), \(498.7\), and \(110.7\), so the doubled widths are \(104.4\), \(635.7\), \(997.4\), and \(221.5\). The implied-volatility row is a local cubic of Black--Scholes implied volatility against the strike, with Black--Scholes prices at the local level and a density that uses the local slope and curvature. Its cross-validated widths are \(h=88.9\), \(504.8\), \(498.7\), and \(204.0\), and the doubled widths are \(177.9\), \(1009.6\), \(997.4\), and \(407.9\). Their DAX figure for this row shows one widened curve, at \(372\), and does not print the cross-validated width, so the same doubling is used. The doubled call cubic and the doubled implied-volatility cubic are drawn on the left of Figure~\ref{fig:listed}, with \citeauthor{aitsahalia1998}. The cross-validated call cubic and the cross-validated implied-volatility cubic are wiggly. They are drawn in \ref{app:wiggly} so they do not crowd that figure. Prices are floored, with puts by parity.
 
 Hold-out refits the projection and every tuned method on the training strikes only, including the choice of its tuning constant, and scores the other half against the quoted mids. The two directions are averaged. 
