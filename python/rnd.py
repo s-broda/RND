@@ -85,16 +85,18 @@ def estimate_rnd(
     tv_cap=None,
     fill=False,
     pieces=False,
-    shape=False,
+    shape=True,
     shape_lo=0.90,
     shape_hi=1.10,
 ):
     """Risk-neutral density of ``S_T`` from one expiry's calls.
 
     The default is the estimator in the paper: tails, thricing, bandwidth
-    ``deriv_c F σ_ATM √T n^{-1/9}`` with ``deriv_c=0.34``, and the penalty
-    ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``tv_cap`` defaults to
-    the thriced kernel's positive-part score.
+    ``γ deriv_c F σ_ATM √T n^{-1/9}`` with ``deriv_c=0.34``, and the penalty
+    ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``γ`` is the butterfly
+    interquartile range divided by the normal interquartile range of scale
+    ``F σ_ATM √T``, clipped to ``[shape_lo, shape_hi]``. ``tv_cap`` defaults
+    to the thriced kernel's positive-part score.
 
     Parameters
     ----------
@@ -109,8 +111,9 @@ def estimate_rnd(
     K_price : array_like, optional
         Strikes at which to return calls. Omitted if None.
     h : float or "deriv", optional
-        Bandwidth. ``"deriv"`` (the default) is the rule above. A number
-        is used as given.
+        Bandwidth. ``"deriv"`` (the default) is the rule above, including
+        the butterfly factor when ``shape`` is true. A number is used as
+        given and is not scaled again.
     tails : bool
         Add the knots ``(0, 0)`` and, when the call has not died,
         ``(K_end, 1)``.
@@ -147,9 +150,11 @@ def estimate_rnd(
         that density by the nonnegative line with the same mass. Endpoint
         slopes stay, so the knot masses stay. ``False`` is the paper spline.
     shape : bool
-        Multiply the bandwidth by the butterfly interquartile range divided
-        by the normal interquartile range of scale ``F σ_ATM √T``, clipped
-        to ``[shape_lo, shape_hi]``. ``False`` leaves the bandwidth alone.
+        When the bandwidth comes from the formula, multiply it by the
+        butterfly interquartile range divided by the normal interquartile
+        range of scale ``F σ_ATM √T``, clipped to ``[shape_lo, shape_hi]``.
+        ``True`` is the paper rule. ``False`` leaves that formula unscaled.
+        A numeric ``h`` is never rescaled.
     shape_lo, shape_hi : float
         Clip for ``shape``. Ignored when ``shape`` is false.
     method : {"fast", "fft", "naive"}
@@ -182,15 +187,15 @@ def estimate_rnd(
         K_eval = K
     else:
         K_eval = np.asarray(K_eval, dtype=float)
+    shape_factor = 1.0
     if h is None or h == "deriv":
         h_use = _bandwidth(K, C, S0, r, T, q, F, deriv_c=deriv_c)
+        if shape:
+            raw = _butterfly_factor(K, C, S0, r, T, q, F)
+            shape_factor = float(np.clip(raw, float(shape_lo), float(shape_hi)))
+            h_use *= shape_factor
     else:
         h_use = float(h)
-    shape_factor = 1.0
-    if shape:
-        raw = _butterfly_factor(K, C, S0, r, T, q, F)
-        shape_factor = float(np.clip(raw, float(shape_lo), float(shape_hi)))
-        h_use *= shape_factor
     Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
     n_fill = 0
     if fill:

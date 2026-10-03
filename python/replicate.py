@@ -516,7 +516,8 @@ def listed():
         forwards.append(sl.F)
         titles.append(title)
         print(
-            f"  {title:8} F={sl.F:.1f} h={bundle['h']:.2f} c={bundle['fit']['c']:.6e} "
+            f"  {title:8} F={sl.F:.1f} h={bundle['h']:.4f} c={bundle['fit']['c']:.6e} "
+            f"shape={bundle['fit']['shape']:.4f} "
             f"ASD {bundle['h_asd']:.4g} ASL {bundle['h_asl']:.4g} "
             f"GHSc {bundle['h_ghs_c']:.4g} GHSi {bundle['h_ghs_i']:.4g}"
         )
@@ -1634,12 +1635,22 @@ def extra_chains():
             )
             for name, chat, qhat, ho in rows:
                 o, pu, ca = _otm(sl, chat)
-                mass, _ = _mass_peaks(sl.F, qhat, s)
+                mass, peaks = _mass_peaks(sl.F, qhat, s)
                 tv = _variation(sl.F, qhat, s)
+                note = ""
+                if name == "Ours":
+                    note = f" h={fit['h']:.4f} c={fit['c']:.6e} shape={fit['shape']:.4f}"
+                if peaks >= 2:
+                    yy = np.maximum(np.nan_to_num(qhat), 0.0)
+                    core = (s >= 0.55 * sl.F) & (s <= 1.40 * sl.F)
+                    yy = yy[core]
+                    loc = (yy[1:-1] > yy[:-2]) & (yy[1:-1] > yy[2:]) & (yy[1:-1] > 0.2 * yy.max())
+                    heights = np.sort(yy[1:-1][loc])
+                    note += f" second/mode {heights[-2] / yy.max():.4f}"
                 print(
                     f"  {sl.root} {sl.expiry.isoformat()} {name:4} n={len(sl.K):4d} "
                     f"OTM {o:.3f} puts {pu:.3f} calls {ca:.3f} "
-                    f"hold {ho:.3f} mass {mass:.1f} tv {tv:.1f}",
+                    f"hold {ho:.3f} mass {mass:.1f} tv {tv:.4f} peaks {peaks}{note}",
                     flush=True,
                 )
 

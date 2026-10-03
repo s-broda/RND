@@ -1,4 +1,7 @@
-"""Score the three trial switches against the paper rule.
+"""Score the trial switches against the unscaled bandwidth.
+
+On this branch ``estimate_rnd`` defaults to the clipped butterfly scale.
+The ``paper`` row passes ``shape=False`` and is the unscaled rule.
 
 Not part of the replication. From the repository root::
 
@@ -42,10 +45,10 @@ from src.spx import asof_from_raw, build_otm_slice, fetch_cboe, load_slice  # no
 from src.vg import CM99, vg_calls, vg_spot_density  # noqa: E402
 
 VARIANTS = (
-    ("paper", {}),
-    ("hole", {"fill": "hole"}),
-    ("fill", {"fill": "interior"}),
-    ("pieces", {"pieces": True}),
+    ("paper", {"shape": False}),
+    ("hole", {"fill": "hole", "shape": False}),
+    ("fill", {"fill": "interior", "shape": False}),
+    ("pieces", {"pieces": True, "shape": False}),
     ("shape", {"shape": True, "shape_lo": 0.90, "shape_hi": 1.10}),
     ("shape95", {"shape": True, "shape_lo": 0.95, "shape_hi": 1.05}),
 )
