@@ -83,6 +83,11 @@ def estimate_rnd(
     method="fast",
     penalty="closed",
     tv_cap=None,
+    fill=False,
+    pieces=False,
+    shape=False,
+    shape_lo=0.90,
+    shape_hi=1.10,
 ):
     """Risk-neutral density of ``S_T`` from one expiry's calls.
 
@@ -130,6 +135,23 @@ def estimate_rnd(
         ``False`` is one Gaussian, ``"twice"`` is twicing.
     deriv_c : float, optional
         Replaces ``0.34`` in the default bandwidth.
+    fill : False, "interior", "hole", or "all"
+        Knots on wide gaps, spaced ``h/8`` apart, with the complementary
+        cdf drawn as a straight line. ``"interior"`` fills quoted gaps
+        wider than ``h``. ``"hole"`` fills quoted gaps wider than both
+        ``h`` and twice the median quoted gap, so a regular mesh is left
+        alone. ``"all"`` is ``"interior"`` plus the two tails. ``False``
+        is the paper estimator.
+    pieces : bool
+        On each knot interval whose linear density changes sign, replace
+        that density by the nonnegative line with the same mass. Endpoint
+        slopes stay, so the knot masses stay. ``False`` is the paper spline.
+    shape : bool
+        Multiply the bandwidth by the butterfly interquartile range divided
+        by the normal interquartile range of scale ``F σ_ATM √T``, clipped
+        to ``[shape_lo, shape_hi]``. ``False`` leaves the bandwidth alone.
+    shape_lo, shape_hi : float
+        Clip for ``shape``. Ignored when ``shape`` is false.
     method : {"fast", "fft", "naive"}
         ``"fast"`` transforms the box moments. ``"fft"`` transforms the
         sampled spline. ``"naive"`` sums the cell integrals. ``"fast"``
@@ -164,7 +186,27 @@ def estimate_rnd(
         h_use = _bandwidth(K, C, S0, r, T, q, F, deriv_c=deriv_c)
     else:
         h_use = float(h)
+    shape_factor = 1.0
+    if shape:
+        raw = _butterfly_factor(K, C, S0, r, T, q, F)
+        shape_factor = float(np.clip(raw, float(shape_lo), float(shape_hi)))
+        h_use *= shape_factor
     Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
+    n_fill = 0
+    if fill:
+        mode = "interior" if fill is True else str(fill)
+        if mode not in ("interior", "hole", "all"):
+            raise ValueError("fill must be False, 'interior', 'hole', or 'all'")
+        min_gap = float(h_use)
+        if mode == "hole":
+            quoted_gaps = np.diff(K)
+            quoted_gaps = quoted_gaps[quoted_gaps > 1e-12]
+            med = float(np.median(quoted_gaps)) if quoted_gaps.size else min_gap
+            min_gap = max(min_gap, 2.0 * med)
+        Ks, Ps, n_fill = _fill_wide_gaps(
+            Ks, Ps, h_use, float(K[0]), float(K[-1]),
+            tails_too=(mode == "all"), min_gap=min_gap,
+        )
     if c == "rule":
         if penalty == "search":
             c_use = _choose_penalty(
@@ -178,16 +220,33 @@ def estimate_rnd(
     else:
         c_use = float(c)
         spl = CubicSpline(Ks, Ps, bc_type="natural") if c_use <= 0.0 else _rule_spline(Ks, Ps, c_use, F)
-    qhat, G = _convolve(
-        spl, Ks, h_use, F, K_eval, weights,
-        level_at=None if K_price is None else np.asarray(K_price, dtype=float),
-        method=method,
-    )
+    level_at = None if K_price is None else np.asarray(K_price, dtype=float)
+    n_pieces = 0
+    if pieces:
+        cells, n_pieces = _piece_cells(spl, Ks, F)
+        if n_pieces:
+            qhat, G = _convolve_cells(cells, h_use, F, K_eval, weights, level_at=level_at)
+        else:
+            qhat, G = _convolve(
+                spl, Ks, h_use, F, K_eval, weights, level_at=level_at, method=method,
+            )
+    else:
+        qhat, G = _convolve(
+            spl, Ks, h_use, F, K_eval, weights, level_at=level_at, method=method,
+        )
     C_hat = None
     if G is not None:
         C_hat = stock * np.clip(1.0 - np.clip(G, 0.0, 1.0), 0.0, 1.0)
         C_hat = np.maximum(C_hat, 0.0)
-    return {"q": qhat, "C": C_hat, "h": float(h_use), "c": float(c_use)}
+    return {
+        "q": qhat,
+        "C": C_hat,
+        "h": float(h_use),
+        "c": float(c_use),
+        "n_fill": int(n_fill),
+        "shape": float(shape_factor),
+        "n_pieces": int(n_pieces),
+    }
 
 
 def _knots(K, C, stock, F, disc, tails=True):
@@ -205,6 +264,128 @@ def _knots(K, C, stock, F, disc, tails=True):
         Ks, Ps = K.copy(), P.copy()
     keep = np.concatenate([[True], np.diff(Ks) > 1e-8])
     return Ks[keep], Ps[keep]
+
+
+def _fill_wide_gaps(Ks, Ps, h, quoted_lo, quoted_hi, tails_too=False, min_gap=None):
+    """Collinear knots on gaps wider than ``min_gap``, spaced ``h/8`` apart.
+
+    A gap that starts before the first quote or ends after the last quote
+    is a tail. Those are filled only when ``tails_too`` is set. At most 64
+    knots are added in one gap.
+    """
+    Ks = np.asarray(Ks, dtype=float)
+    Ps = np.asarray(Ps, dtype=float)
+    step = float(h) / 8.0
+    width_cut = float(h) if min_gap is None else float(min_gap)
+    if not np.isfinite(step) or step <= 1e-8 or Ks.size < 2:
+        return Ks, Ps, 0
+    out_k = []
+    out_p = []
+    n_ins = 0
+    lo = float(quoted_lo)
+    hi = float(quoted_hi)
+    for i in range(int(Ks.size) - 1):
+        left = float(Ks[i])
+        right = float(Ks[i + 1])
+        p_left = float(Ps[i])
+        p_right = float(Ps[i + 1])
+        out_k.append(left)
+        out_p.append(p_left)
+        gap = right - left
+        tail = left < lo - 1e-6 or right > hi + 1e-6
+        if gap <= width_cut or step >= gap or (tail and not tails_too):
+            continue
+        xs = left + step * np.arange(1, int(np.floor(gap / step)))
+        xs = xs[(xs > left + 1e-8) & (xs < right - 1e-8)]
+        if xs.size > 64:
+            xs = np.linspace(left, right, 66)[1:-1]
+        if xs.size == 0:
+            continue
+        ps = p_left + (p_right - p_left) * (xs - left) / gap
+        out_k.extend(np.asarray(xs, float).tolist())
+        out_p.extend(np.asarray(ps, float).tolist())
+        n_ins += int(xs.size)
+    out_k.append(float(Ks[-1]))
+    out_p.append(float(Ps[-1]))
+    return np.asarray(out_k, float), np.asarray(out_p, float), int(n_ins)
+
+
+def _butterfly_factor(K, C, S0, r, T, q, F):
+    """Butterfly IQR divided by the normal IQR of scale ``F σ_ATM √T``.
+
+    The butterflies are the positive second differences of the call, placed
+    at the interior strikes. The normal scale is the one in the bandwidth.
+    """
+    sig = _atm_sigma(K, C, S0, r, T, q, F)
+    scale = float(F) * sig * np.sqrt(max(float(T), 0.0))
+    normal_iqr = 1.3489795003921634 * scale
+    nodes_k = np.asarray(K, dtype=float)
+    calls = np.asarray(C, dtype=float)
+    if nodes_k.size < 4 or not np.isfinite(normal_iqr) or normal_iqr <= 0.0:
+        return 1.0
+    slopes = np.diff(calls) / np.maximum(np.diff(nodes_k), 1e-12)
+    # A convex call has increasing slopes, so the butterfly is the forward difference.
+    mass = np.maximum(slopes[1:] - slopes[:-1], 0.0)
+    total = float(mass.sum())
+    if total <= 0.0 or not np.isfinite(total):
+        return 1.0
+    cdf = np.cumsum(mass / total)
+    nodes = nodes_k[1:-1]
+    iqr = float(np.interp(0.75, cdf, nodes) - np.interp(0.25, cdf, nodes))
+    if not np.isfinite(iqr) or iqr <= 0.0:
+        return 1.0
+    return float(iqr / normal_iqr)
+
+
+def _piece_cells(spl, Ks, F):
+    """Spline slope cells, with sign-changing pieces clamped to a nonnegative line.
+
+    The clamped line keeps the piece mass, and the slope at each knot stays
+    the spline's slope. Returns the cells and the number of pieces clamped.
+    """
+    t = np.asarray(Ks, dtype=float)
+    slope = np.asarray(spl(t, nu=1), dtype=float)
+    curv = np.asarray(spl(t, nu=2), dtype=float)
+    cells = []
+    n_clamped = 0
+    scale_f = max(abs(float(F)), 1.0)
+    for i in range(t.size - 1):
+        width = float(t[i + 1] - t[i])
+        if width <= 1e-12:
+            continue
+        f_left = -float(F) * float(curv[i])
+        f_right = -float(F) * float(curv[i + 1])
+        mass = 0.5 * (f_left + f_right) * width
+        height = max(abs(f_left), abs(f_right), abs(mass) / width, 1e-16)
+        nonnegative = f_left >= -1e-8 * height and f_right >= -1e-8 * height
+        if mass <= 1e-14 * scale_f or nonnegative:
+            c2 = 0.5 * float(curv[i + 1] - curv[i]) / width
+            cells.append((float(t[i]), float(t[i + 1]), float(slope[i]), float(curv[i]), c2, 0.0))
+            continue
+        # Same mass, both ends nonnegative: the free end sits at the boundary.
+        cap = 2.0 * mass / width
+        f0 = min(max(f_left, 0.0), cap)
+        f1 = cap - f0
+        b = -f0 / float(F)
+        c2 = -(f1 - f0) / (2.0 * float(F) * width)
+        cells.append((float(t[i]), float(t[i + 1]), float(slope[i]), b, c2, 0.0))
+        n_clamped += 1
+    return cells, n_clamped
+
+
+def _convolve_cells(cells, h, F, x, weights, level_at=None):
+    """Density and level from slope cells. Thricing is the three bandwidths."""
+    x_arr = np.asarray(x, dtype=float)
+    la = None if level_at is None else np.asarray(level_at, dtype=float)
+    same = la is not None and la.shape == x_arr.shape and np.array_equal(la, x_arr)
+    if la is None or same:
+        d, level = _weighted_slope(x_arr, cells, h, weights)
+        return -float(F) * d, (level if la is not None else None)
+    n_x = int(x_arr.size)
+    pts = np.concatenate([x_arr.ravel(), la.ravel()])
+    d_all, level_all = _weighted_slope(pts, cells, h, weights)
+    q = (-float(F) * d_all[:n_x]).reshape(x_arr.shape)
+    return q, level_all[n_x:].reshape(la.shape)
 
 
 def _conv_dx(Ks, h):
