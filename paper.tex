@@ -190,7 +190,7 @@ Observed calls at strikes \(0<K_1<\cdots<K_m\) supply values \(\tilde C_i=C_i/(S
 \;+\;
 c\,F^3\int\bigl(f''(K)\bigr)^2\,\mathrm{d}K.
 \end{equation}
-The factor \(F^3\) makes \(c\) dimensionless. The value is read from the thriced interpolant, the estimator at penalty zero. On \([0.55F,1.40F]\) let \(t\) be the total variation of its positive part, divided by twice the maximum, the functional in the caption of Table~\ref{tab:listed}. The variation includes the step from zero up to the left endpoint and the step from the right endpoint back to zero. With those steps \(t\ge 1\), and a unimodal curve scores \(1\). Let \(\delta\) be the median spacing of the knots in \eqref{eq:smooth-penalty}. The thriced kernel integrates to one and changes sign. Its signed total variation, the integral of the absolute kernel on the bandwidth scale, equals \(v_*=1.196\), so the negative sidelobes contribute the excess \(v_*-1=0.196\). Scored by the same positive-part functional, that kernel is \(t_*=1.007\). The allowance in the rule is that score. An interpolant that scores \(t_*\) or less receives none, and the kernel's own sidelobes leave the penalty at zero.
+The factor \(F^3\) makes \(c\) dimensionless. The value is read from the thriced interpolant, the estimator at penalty zero. On \([0.60F,1.30F]\) let \(t\) be the total variation of its positive part, divided by twice the maximum. Table~\ref{tab:listed} reports that functional on \([0.55F,1.40F]\). The variation includes the step from zero up to the left endpoint and the step from the right endpoint back to zero. With those steps \(t\ge 1\), and a unimodal curve scores \(1\). Let \(\delta\) be the median spacing of the knots in \eqref{eq:smooth-penalty}. The thriced kernel integrates to one and changes sign. Its signed total variation, the integral of the absolute kernel on the bandwidth scale, equals \(v_*=1.196\), so the negative sidelobes contribute the excess \(v_*-1=0.196\). Scored by the same positive-part functional, that kernel is \(t_*=1.007\). The allowance in the rule is that score. An interpolant that scores \(t_*\) or less receives none, and the kernel's own sidelobes leave the penalty at zero.
 
 On a uniform knot spacing the smoothing spline multiplies a Fourier mode \(e^{\mathrm{i}\omega x}\) by \(1/(1+\lambda\delta\omega^4)\), with \(\lambda=c F^3\). Count the excess \((t-t_*)_+\) in units of \(v_*-1\), and call that count \(\rho\). Attenuating the kernel frequency \(\omega=1/h\) by the factor \(1/(1+\rho)\) fixes \(\lambda\delta=\rho h^4\), and
 \begin{equation}
@@ -623,7 +623,7 @@ RUT 18 Dec 2026 & 218 & 218 & 115 & 99 & 58 \\
 \label{sec:emp-est}
 
 \paragraph{Ours}
-Start from the projected calls of Section~\ref{sec:data}. Set \(P_i=1-C_i/(S_0e^{-qT})\). Fit \eqref{eq:smooth-penalty} with the tail knots of Section~\ref{sec:tails}, and invert at \eqref{eq:h-d2} with thricing. The constant \(c\) is \eqref{eq:penalty-rule}. On these four chains the selected values are \(7.03\times 10^{-7}\), \(0\), \(4.17\times 10^{-6}\), and \(2.34\times 10^{-6}\). Prices are floored at zero, with puts by parity.
+Start from the projected calls of Section~\ref{sec:data}. Set \(P_i=1-C_i/(S_0e^{-qT})\). Fit \eqref{eq:smooth-penalty} with the tail knots of Section~\ref{sec:tails}, and invert at \eqref{eq:h-d2} with thricing. The constant \(c\) is \eqref{eq:penalty-rule}. On these four chains the selected values are \(3.35\times 10^{-7}\), \(0\), \(3.98\times 10^{-6}\), and \(8.10\times 10^{-7}\). Prices are floored at zero, with puts by parity.
 
 \paragraph{\citeauthor{aitsahalia2003}}
 Start from the projected calls of Section~\ref{sec:data}. The price is a Gaussian local linear regression of those values. The bandwidth is the plug-in in their Section 3.5, taken from \citet{fangijbels1996}: a global polynomial of order four supplies the pilot curvature, the weight equals one within 1.5 standard deviations of the mean strike, the Gaussian constant is \(0.776\), and the rate is \(n^{-1/5}\). The widths are \(h=140.9\), \(256.1\), \(715.3\), and \(68.8\). The density is \(e^{rT}\) times the strike derivative of the local slope, scaled so that the mass on \([\max(50,0.2F),2.4F]\) equals one and shifted so that the mean equals the forward. Their May 1999 figure uses the bandwidth that minimised integrated squared error in a Monte Carlo sample of \(25\) strikes. That optimum is not stated as a formula, and the listed row uses the plug-in. The curves have \(2\), \(1\), \(4\), and \(4\) peaks. Prices in the table are the local-linear calls, floored, with puts by parity. 
@@ -654,7 +654,7 @@ Hold-out refits the projection and every tuned method on the training strikes on
   \multicolumn{1}{c}{Mass} & \multicolumn{1}{c}{TV} \\
 \midrule
 SPX Dec & Ours
-  & 0.042 & 0.036 & 0.033 & 0.042 & 1.0 & 1.0 \\
+  & 0.038 & 0.034 & 0.033 & 0.039 & 1.0 & 1.0 \\
 SPX Dec & PCA
   & 0.055 & 0.051 & 0.053 & 0.048 & 1.0 & 1.0 \\
 SPX Dec & \citeauthor{grith2012}, IV, \(2\times\)
@@ -688,7 +688,7 @@ SPX Mar & \citeauthor{grith2012}, call, CV
   & 18.635 & 0.042 & 0.040 & 0.048 & 1.0 & 1.0 \\
 \midrule
 NDX Dec & Ours
-  & 1.085 & 1.057 & 1.096 & 0.845 & 1.0 & 1.0 \\
+  & 1.084 & 1.056 & 1.095 & 0.840 & 1.0 & 1.0 \\
 NDX Dec & PCA
   & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.4 \\
 NDX Dec & \citeauthor{grith2012}, IV, \(2\times\)
@@ -705,7 +705,7 @@ NDX Dec & \citeauthor{grith2012}, call, CV
   & 79.411 & 0.867 & 0.922 & 0.523 & 0.9 & 2.8 \\
 \midrule
 RUT Dec & Ours
-  & 0.031 & 0.031 & 0.030 & 0.032 & 1.0 & 1.0 \\
+  & 0.029 & 0.025 & 0.026 & 0.025 & 1.0 & 1.0 \\
 RUT Dec & PCA
   & 0.067 & 0.058 & 0.066 & 0.043 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV, \(2\times\)
@@ -722,7 +722,7 @@ RUT Dec & \citeauthor{grith2012}, call, CV
   & 7.026 & 0.022 & 0.022 & 0.023 & 1.0 & 1.1 \\
 \midrule
 Average & Ours
-  & 0.302 & 0.292 & 0.300 & 0.243 & 1.0 & 1.0 \\
+  & 0.301 & 0.290 & 0.299 & 0.239 & 1.0 & 1.0 \\
 Average & PCA
   & 0.380 & 0.331 & 0.324 & 0.368 & 1.0 & 1.1 \\
 Average & \citeauthor{grith2012}, IV, \(2\times\)
@@ -744,7 +744,7 @@ Average & \citeauthor{grith2012}, call, CV
 
 A fit inside the decreasing-convex cone cannot undercut the gap between the quoted calls and that cone. The plug-in local linear of \citeauthor{aitsahalia2003} remains far from the quotes. The positive convolution tracks them much more closely, and its NDX density has four peaks.
 
-The estimator of this paper has the smallest hold-out in Table~\ref{tab:listed} on each of the four chains, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. The penalty is zero on SPX March and positive on the other three chains. In sample the estimator is below the positive convolution on each chain. The cross-validated call cubic of \citeauthor{grith2012} is tighter in sample on each chain. The cross-validated implied-volatility cubic is tighter in sample on SPX December, NDX, and RUT; on SPX March the estimator is slightly smaller. The hold-out reverses that comparison on each chain. The call cubic fails in the far wing, where a one-sided fit on the held-out strikes misses the put. \citeauthor{aitsahalia1998} keeps one peak, with a larger pricing error.
+The estimator of this paper has the smallest hold-out in Table~\ref{tab:listed} on each of the four chains, and the same ranking holds in the average. Each density has one peak, unit mass, and total variation at one. The penalty is zero on SPX March and positive on the other three chains. In sample the estimator is below the positive convolution on each chain. The cross-validated call cubic of \citeauthor{grith2012} is tighter in sample on each chain. The cross-validated implied-volatility cubic is tighter in sample on SPX December and NDX; on SPX March and RUT the estimator is slightly smaller. The hold-out is smaller for the estimator on each chain. The call cubic fails in the far wing, where a one-sided fit on the held-out strikes misses the put. \citeauthor{aitsahalia1998} keeps one peak, with a larger pricing error.
 
 Total variation, defined in the caption of Table~\ref{tab:listed}, charges an extra oscillation by its height relative to the mode. The cross-validated cubics oscillate. They are drawn in \ref{app:wiggly} rather than on the axes of Figure~\ref{fig:listed}. The doubled cubics, the plug-in local linear, and \citeauthor{aitsahalia1998} are on the left of that figure.
 
@@ -778,7 +778,7 @@ The cross-validated call cubic of \citeauthor{grith2012}, and that paper's impli
 
 Table~\ref{tab:extra} applies \eqref{eq:penalty-rule} to twenty-three further expiries from the same feeds, and scores PCA on each chain. The four chains of Section~\ref{sec:emp} are left out. The screens of Section~\ref{sec:data} are unchanged, including the discount rate \(r=0.04\). Only the standard monthly roots are kept. Maturity runs from fourteen days to two years, each chain has at least forty strikes, and each root keeps at most eight expiries spread across the calendar. SPX, NDX, and RUT are the 23~September 2026 snapshots. DJX is the 19~September 2026 snapshot. Average is the equal-weight mean of these twenty-three chains. Grand is the equal-weight mean of these chains and the four chains in Table~\ref{tab:listed}. These quotes are not in that table and not in the replication files. Under the Cboe Global Markets North American Data Policies, effective 1~September 2026, a recipient of delayed Cboe options quotes may not redistribute them externally except to a named affiliate, and historical quotes may be redistributed to anyone else only under a data agreement and Cboe's approval.
 
-The rule does not count modes. Two chains keep two peaks. SPX 17~September 2027 has penalty zero and variation \(1.004\): the lower maximum is about nine tenths of the mode, and the dip between them is under half of one percent of that mode. DJX 17~September 2027 has variation \(1.460\) and penalty \(3.58\times 10^{-4}\); the lower maximum is a little over half the mode. On SPX 16~June 2028 and NDX 17~December 2027 the fitted density has one peak, with penalties \(4.33\times 10^{-4}\) and \(5.03\times 10^{-4}\). Several long-dated NDX hold-outs are large because the quotes themselves are large. The average hold-out is smaller than PCA, and so is the average that adds the four chains of Table~\ref{tab:listed}. PCA is smaller on SPX 16~April 2027, NDX 16~October 2026, NDX 17~December 2027, RUT 19~March 2027, and DJX 17~September 2027.
+The rule does not count modes. Two chains keep two peaks. SPX 17~September 2027 has penalty zero and variation \(1.004\): the lower maximum is about nine tenths of the mode, and the dip between them is under half of one percent of that mode. DJX 17~September 2027 has variation \(1.461\) and penalty \(3.56\times 10^{-4}\); the lower maximum is a little over half the mode. On SPX 16~June 2028 and NDX 17~December 2027 the fitted density has one peak, with penalties \(4.33\times 10^{-4}\) and \(5.03\times 10^{-4}\). Several long-dated NDX hold-outs are large because the quotes themselves are large. The average hold-out is smaller than PCA, and so is the average that adds the four chains of Table~\ref{tab:listed}. PCA is smaller on SPX 16~April 2027, NDX 16~October 2026, NDX 17~December 2027, and DJX 17~September 2027. On RUT 19~March 2027 the two hold-outs both print \(0.147\).
 
 \begingroup
 \setlength{\tabcolsep}{3pt}%
@@ -807,10 +807,10 @@ The rule does not count modes. Two chains keep two peaks. SPX 17~September 2027 
 SPX 16 Oct 2026 & Ours & 438 & 0.024 & 0.021 & 0.019 & 0.025 & 1.0 & 1.0 \\*
 SPX 16 Oct 2026 & PCA & 438 & 0.065 & 0.064 & 0.072 & 0.035 & 1.0 & 1.0 \\
 \midrule
-SPX 15 Jan 2027 & Ours & 395 & 0.044 & 0.038 & 0.036 & 0.044 & 1.0 & 1.0 \\*
+SPX 15 Jan 2027 & Ours & 395 & 0.042 & 0.038 & 0.036 & 0.044 & 1.0 & 1.0 \\*
 SPX 15 Jan 2027 & PCA & 395 & 0.064 & 0.053 & 0.053 & 0.054 & 1.0 & 1.0 \\
 \midrule
-SPX 16 Apr 2027 & Ours & 217 & 0.228 & 0.108 & 0.077 & 0.181 & 1.0 & 1.0 \\*
+SPX 16 Apr 2027 & Ours & 217 & 0.227 & 0.070 & 0.061 & 0.096 & 1.0 & 1.0 \\*
 SPX 16 Apr 2027 & PCA & 217 & 0.152 & 0.115 & 0.073 & 0.205 & 1.0 & 1.0 \\
 \midrule
 SPX 17 Jun 2027 & Ours & 235 & 0.146 & 0.130 & 0.113 & 0.178 & 1.0 & 1.0 \\*
@@ -828,25 +828,25 @@ SPX 17 Dec 2027 & PCA & 143 & 0.606 & 0.459 & 0.276 & 0.824 & 1.0 & 1.4 \\
 SPX 16 Jun 2028 & Ours & 199 & 1.552 & 1.660 & 1.594 & 1.863 & 1.0 & 1.0 \\*
 SPX 16 Jun 2028 & PCA & 199 & 2.290 & 2.336 & 2.487 & 1.746 & 1.0 & 1.0 \\
 \midrule
-NDX 16 Oct 2026 & Ours & 269 & 0.463 & 0.410 & 0.346 & 0.581 & 1.0 & 1.0 \\*
+NDX 16 Oct 2026 & Ours & 269 & 0.460 & 0.406 & 0.344 & 0.571 & 1.0 & 1.0 \\*
 NDX 16 Oct 2026 & PCA & 269 & 0.458 & 0.395 & 0.346 & 0.531 & 1.0 & 1.2 \\
 \midrule
-NDX 20 Nov 2026 & Ours & 252 & 1.162 & 1.171 & 1.109 & 1.370 & 1.0 & 1.0 \\*
+NDX 20 Nov 2026 & Ours & 252 & 1.157 & 1.165 & 1.106 & 1.353 & 1.0 & 1.0 \\*
 NDX 20 Nov 2026 & PCA & 252 & 1.236 & 1.067 & 1.072 & 1.047 & 1.0 & 1.4 \\
 \midrule
-NDX 19 Feb 2027 & Ours & 95 & 1.237 & 0.669 & 0.678 & 0.642 & 1.0 & 1.0 \\*
+NDX 19 Feb 2027 & Ours & 95 & 0.996 & 0.669 & 0.678 & 0.642 & 1.0 & 1.0 \\*
 NDX 19 Feb 2027 & PCA & 95 & 1.276 & 1.149 & 1.128 & 1.202 & 1.0 & 1.0 \\
 \midrule
-NDX 19 Mar 2027 & Ours & 110 & 0.763 & 0.540 & 0.472 & 0.702 & 1.0 & 1.0 \\*
+NDX 19 Mar 2027 & Ours & 110 & 0.746 & 0.517 & 0.445 & 0.685 & 1.0 & 1.0 \\*
 NDX 19 Mar 2027 & PCA & 110 & 1.243 & 0.967 & 0.637 & 1.577 & 1.0 & 1.0 \\
 \midrule
 NDX 16 Apr 2027 & Ours & 83 & 1.039 & 0.726 & 0.777 & 0.601 & 1.0 & 1.0 \\*
 NDX 16 Apr 2027 & PCA & 83 & 1.646 & 1.276 & 1.034 & 1.690 & 1.0 & 1.0 \\
 \midrule
-NDX 21 May 2027 & Ours & 68 & 5.799 & 1.386 & 1.056 & 2.083 & 1.0 & 1.1 \\*
+NDX 21 May 2027 & Ours & 68 & 2.719 & 0.768 & 0.661 & 1.022 & 1.0 & 1.1 \\*
 NDX 21 May 2027 & PCA & 68 & 6.347 & 2.927 & 0.768 & 5.702 & 1.0 & 1.0 \\
 \midrule
-NDX 17 Sep 2027 & Ours & 96 & 10.974 & 1.763 & 1.739 & 1.838 & 1.0 & 1.0 \\*
+NDX 17 Sep 2027 & Ours & 96 & 3.139 & 1.763 & 1.739 & 1.838 & 1.0 & 1.0 \\*
 NDX 17 Sep 2027 & PCA & 96 & 13.202 & 8.906 & 2.187 & 17.774 & 1.0 & 1.0 \\
 \midrule
 NDX 17 Dec 2027 & Ours & 117 & 33.875 & 28.238 & 25.348 & 37.817 & 1.0 & 1.0 \\*
@@ -855,28 +855,28 @@ NDX 17 Dec 2027 & PCA & 117 & 30.636 & 30.312 & 26.360 & 42.826 & 1.0 & 1.0 \\
 RUT 16 Oct 2026 & Ours & 219 & 0.022 & 0.018 & 0.018 & 0.018 & 1.0 & 1.0 \\*
 RUT 16 Oct 2026 & PCA & 219 & 0.041 & 0.038 & 0.037 & 0.040 & 1.0 & 1.0 \\
 \midrule
-RUT 20 Nov 2026 & Ours & 203 & 0.031 & 0.028 & 0.030 & 0.027 & 1.0 & 1.0 \\*
+RUT 20 Nov 2026 & Ours & 203 & 0.031 & 0.026 & 0.028 & 0.025 & 1.0 & 1.0 \\*
 RUT 20 Nov 2026 & PCA & 203 & 0.059 & 0.055 & 0.071 & 0.038 & 1.0 & 1.0 \\
 \midrule
-RUT 19 Mar 2027 & Ours & 131 & 0.241 & 0.139 & 0.084 & 0.266 & 1.0 & 1.1 \\*
+RUT 19 Mar 2027 & Ours & 131 & 0.147 & 0.034 & 0.030 & 0.047 & 1.0 & 1.1 \\*
 RUT 19 Mar 2027 & PCA & 131 & 0.147 & 0.146 & 0.145 & 0.152 & 1.0 & 1.0 \\
 \midrule
 RUT 17 Jun 2027 & Ours & 69 & 0.053 & 0.037 & 0.043 & 0.026 & 1.0 & 1.0 \\*
 RUT 17 Jun 2027 & PCA & 69 & 0.373 & 0.177 & 0.224 & 0.092 & 1.0 & 1.0 \\
 \midrule
-DJX 19 Mar 2027 & Ours & 44 & 0.052 & 0.021 & 0.018 & 0.029 & 1.0 & 1.1 \\*
+DJX 19 Mar 2027 & Ours & 44 & 0.052 & 0.018 & 0.017 & 0.023 & 1.0 & 1.1 \\*
 DJX 19 Mar 2027 & PCA & 44 & 0.154 & 0.104 & 0.101 & 0.114 & 1.0 & 1.0 \\
 \midrule
-DJX 17 Jun 2027 & Ours & 57 & 0.063 & 0.052 & 0.048 & 0.062 & 1.0 & 1.1 \\*
+DJX 17 Jun 2027 & Ours & 57 & 0.055 & 0.035 & 0.039 & 0.011 & 1.0 & 1.1 \\*
 DJX 17 Jun 2027 & PCA & 57 & 0.377 & 0.118 & 0.130 & 0.072 & 1.0 & 1.0 \\
 \midrule
-DJX 17 Sep 2027 & Ours & 41 & 0.476 & 0.363 & 0.243 & 0.597 & 1.0 & 1.5 \\*
+DJX 17 Sep 2027 & Ours & 41 & 0.474 & 0.361 & 0.242 & 0.595 & 1.0 & 1.5 \\*
 DJX 17 Sep 2027 & PCA & 41 & 0.356 & 0.209 & 0.225 & 0.147 & 1.0 & 1.0 \\
 \midrule
-Average & Ours & 169 & 2.576 & 1.671 & 1.509 & 2.175 & 1.0 & 1.0 \\*
+Average & Ours & 169 & 2.085 & 1.635 & 1.486 & 2.111 & 1.0 & 1.0 \\*
 Average & PCA & 169 & 2.671 & 2.234 & 1.646 & 3.331 & 1.0 & 1.1 \\
 \midrule
-Grand & Ours & 184 & 2.239 & 1.466 & 1.330 & 1.889 & 1.0 & 1.0 \\*
+Grand & Ours & 184 & 1.821 & 1.436 & 1.310 & 1.834 & 1.0 & 1.0 \\*
 Grand & PCA & 184 & 2.332 & 1.952 & 1.450 & 2.892 & 1.0 & 1.1 \\
 \end{longtable}
 \endgroup

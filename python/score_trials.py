@@ -1,7 +1,8 @@
-"""Score the trial switches against the unscaled bandwidth.
+"""Score optional switches against the paper estimator.
 
-On this branch ``estimate_rnd`` defaults to the clipped butterfly scale.
-The ``paper`` row passes ``shape=False`` and is the unscaled rule.
+``estimate_rnd`` defaults to the clipped butterfly scale, which is the
+paper rule. The ``paper`` row passes ``shape=False`` and is the unscaled
+bandwidth kept for comparison.
 
 Not part of the replication. From the repository root::
 

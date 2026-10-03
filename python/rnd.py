@@ -15,9 +15,10 @@ be compiled, ``"fast"`` uses the sampled-spline FFT; ``"fft"`` and
 
 Thricing and the closed-form penalty are on by default. That penalty is
 ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``: ``t`` is the clipped total
-variation of the thriced interpolant on ``[0.55F, 1.40F]``, completed to
+variation of the thriced interpolant on ``[0.60F, 1.30F]``, completed to
 zero at the two endpoints and divided by twice the maximum. A unimodal
-curve scores 1. ``v_* - 1`` is the excess variation of that kernel, ``δ``
+curve scores 1. The tables report that functional on ``[0.55F, 1.40F]``.
+``v_* - 1`` is the excess variation of that kernel, ``δ``
 is the median knot spacing, and ``tv_cap`` defaults to the kernel's own
 positive-part score, about ``1.007``. ``penalty="search"`` replaces the formula by
 the 17-point grid and the curvature corner. The default bandwidth is
@@ -93,15 +94,19 @@ def estimate_rnd(
 
     The default is the estimator in the paper: tails, thricing, bandwidth
     ``γ deriv_c F σ_ATM √T n^{-1/9}`` with ``deriv_c=0.34``, and the penalty
-    ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``γ`` is the butterfly
-    interquartile range divided by the normal interquartile range of scale
-    ``F σ_ATM √T``, clipped to ``[shape_lo, shape_hi]``. ``tv_cap`` defaults
+    ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``t`` is the clipped
+    variation of the thriced interpolant on ``[0.60F, 1.30F]``. ``γ`` is
+    the butterfly interquartile range divided by the normal interquartile
+    range of scale ``F σ_ATM √T``, clipped to ``[shape_lo, shape_hi]``.
+    ``tv_cap`` defaults
     to the thriced kernel's positive-part score.
 
     Parameters
     ----------
     K, C : array_like
-        Quoted strikes and European call prices, one expiry.
+        Strikes and European call prices, one expiry. The paper passes the
+        decreasing-convex projection of the quoted calls. This function
+        does not project.
     S0, r, T : float
         Spot, continuously compounded rate, time to expiry in years.
     q : float
@@ -126,7 +131,8 @@ def estimate_rnd(
         the knots.
     penalty : {"closed", "rule", "search"}
         Used when ``c="rule"``. ``"closed"`` (the default) and ``"rule"``
-        are ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``"search"``
+        are ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``, with ``t`` on
+        ``[0.60F, 1.30F]``. ``"search"``
         is the ``SMOOTH_C`` grid and the curvature corner.
     tv_cap : float, optional
         Clipped-variation allowance for both selectors. The default is the
@@ -871,7 +877,7 @@ TV_CAP = positive_kernel_score()
 
 
 def _shape_scores(q, q_plain, F, s):
-    m = (s >= 0.55 * F) & (s <= 1.40 * F)
+    m = (s >= 0.60 * F) & (s <= 1.30 * F)
     corr = float(np.sqrt(np.mean((q[m] - q_plain[m]) ** 2)))
     p = np.maximum(np.nan_to_num(np.asarray(q, float)), 0.0)
     core = p[m]
@@ -912,8 +918,8 @@ def _kernel_excess(weights):
 def _closed_penalty(Ks, Ps, h, F, weights, tv_cap=None, method="fast"):
     """``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)`` from one interpolant.
 
-    ``t`` is the clipped total variation of the thriced interpolant, completed
-    to zero at the window ends. ``δ``
+    ``t`` is the clipped total variation of the thriced interpolant on
+    ``[0.60F, 1.30F]``, completed to zero at the window ends. ``δ``
     is the median knot spacing, the gap in the smoothing-spline damper
     ``1/(1 + λ δ ω^4)``. The frequency ``ω = 1/h`` turns an excess count
     ``ρ`` into ``λ δ = ρ h^4``.
