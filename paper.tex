@@ -649,7 +649,7 @@ Hold-out refits the projection and every tuned method on the training strikes on
 \begin{tabular}{ll *{4}{S[table-format=3.3]} S[table-format=2.1] S[table-format=2.1]}
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} &
-  \multicolumn{1}{c}{Hold-out} & \multicolumn{1}{c}{RMSE OTM} &
+  \multicolumn{1}{c}{Hold-out} & \multicolumn{1}{c}{OTM} &
   \multicolumn{1}{c}{Puts} & \multicolumn{1}{c}{Calls} &
   \multicolumn{1}{c}{Mass} & \multicolumn{1}{c}{TV} \\
 \midrule
@@ -776,14 +776,14 @@ The cross-validated call cubic of \citeauthor{grith2012}, and that paper's impli
 \section{Further listed chains}
 \label{app:chains}
 
-Table~\ref{tab:extra} applies \eqref{eq:penalty-rule} to twenty-three further expiries from the same feeds, and scores PCA on each chain. The four chains of Section~\ref{sec:emp} are left out. The screens of Section~\ref{sec:data} are unchanged, including the discount rate \(r=0.04\). Only the standard monthly roots are kept. Maturity runs from fourteen days to two years, each chain has at least forty strikes, and each root keeps at most eight expiries spread across the calendar. SPX, NDX, and RUT are the 23~September 2026 snapshots. DJX is the 19~September 2026 snapshot. Average is the equal-weight mean of these twenty-three chains. Grand is the equal-weight mean of these chains and the four chains in Table~\ref{tab:listed}. These quotes are not in that table and not in the replication files. Under the Cboe Global Markets North American Data Policies, effective 1~September 2026, a recipient of delayed Cboe options quotes may not redistribute them externally except to a named affiliate, and historical quotes may be redistributed to anyone else only under a data agreement and Cboe's approval.
+Table~\ref{tab:extra} applies \eqref{eq:penalty-rule} to twenty-three further expiries from the same feeds, and scores PCA on each chain. PCA is the closest competitor on the average hold-out in Table~\ref{tab:listed} once the oscillating cubics of \ref{app:wiggly} are set aside. Scoring every method on these chains would not fit. The four chains of Section~\ref{sec:emp} are left out. The screens of Section~\ref{sec:data} are unchanged, including the discount rate \(r=0.04\). Only the standard monthly roots are kept. Maturity runs from fourteen days to two years, each chain has at least forty strikes, and each root keeps at most eight expiries spread across the calendar. SPX, NDX, and RUT are the 23~September 2026 snapshots. DJX is the 19~September 2026 snapshot. Average is the equal-weight mean of these twenty-three chains. Grand is the equal-weight mean of these chains and the four chains in Table~\ref{tab:listed}. These quotes are not in that table and not in the replication files. Under the Cboe Global Markets North American Data Policies, effective 1~September 2026, a recipient of delayed Cboe options quotes may not redistribute them externally except to a named affiliate, and historical quotes may be redistributed to anyone else only under a data agreement and Cboe's approval.
 
 The rule does not count modes. Two chains keep two peaks. SPX 17~September 2027 has penalty zero and variation \(1.004\): the lower maximum is about nine tenths of the mode, and the dip between them is under half of one percent of that mode. DJX 17~September 2027 has variation \(1.457\) and penalty \(3.56\times 10^{-4}\); the lower maximum is a little over half the mode. On SPX 16~June 2028 and NDX 17~December 2027 the fitted density has one peak, with penalties \(4.33\times 10^{-4}\) and \(5.03\times 10^{-4}\). Several long-dated NDX hold-outs are large because the quotes themselves are large. The average hold-out is smaller than PCA, and so is the average that adds the four chains of Table~\ref{tab:listed}. PCA is smaller on SPX 16~April 2027, NDX 16~October 2026, NDX 17~December 2027, and DJX 17~September 2027. On RUT 19~March 2027 the two hold-outs both print \(0.147\).
 
 \begingroup
 \setlength{\tabcolsep}{3pt}%
 \begin{longtable}{@{}ll S[table-format=3.0] *{4}{S[table-format=2.3]} *{2}{S[table-format=1.1]}@{}}
-\caption{The estimator \eqref{eq:penalty-rule} on expiries outside Table~\ref{tab:listed}.}
+\caption{The estimator \eqref{eq:penalty-rule} and PCA on expiries outside Table~\ref{tab:listed}. PCA is the closest competitor on the average hold-out in that table once the oscillating cubics are set aside, and the other methods would not fit.}
 \label{tab:extra}\\
 \toprule
 \multicolumn{1}{c}{Chain} & \multicolumn{1}{c}{Method} & \multicolumn{1}{c}{\(n\)} &
