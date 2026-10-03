@@ -190,7 +190,7 @@ Observed calls at strikes \(0<K_1<\cdots<K_m\) supply values \(\tilde C_i=C_i/(S
 \;+\;
 c\,F^3\int\bigl(f''(K)\bigr)^2\,\mathrm{d}K.
 \end{equation}
-The factor \(F^3\) makes \(c\) dimensionless. The value is read from the thriced interpolant, the estimator at penalty zero. On \([0.60F,1.30F]\) let \(t\) be the total variation of its positive part, divided by twice the maximum. Table~\ref{tab:listed} reports that functional on \([0.55F,1.40F]\). The variation includes the step from zero up to the left endpoint and the step from the right endpoint back to zero. With those steps \(t\ge 1\), and a unimodal curve scores \(1\). Let \(\delta\) be the median spacing of the knots in \eqref{eq:smooth-penalty}. The thriced kernel integrates to one and changes sign. Its signed total variation, the integral of the absolute kernel on the bandwidth scale, equals \(v_*=1.196\), so the negative sidelobes contribute the excess \(v_*-1=0.196\). Scored by the same positive-part functional, that kernel is \(t_*=1.007\). The allowance in the rule is that score. An interpolant that scores \(t_*\) or less receives none, and the kernel's own sidelobes leave the penalty at zero.
+The factor \(F^3\) makes \(c\) dimensionless. The value is read from the thriced interpolant, the estimator at penalty zero. On \([0.60F,1.30F]\) let \(t\) be the total variation of its positive part, divided by twice the maximum. Table~\ref{tab:listed} reports that functional. The variation includes the step from zero up to the left endpoint and the step from the right endpoint back to zero. With those steps \(t\ge 1\), and a unimodal curve scores \(1\). Let \(\delta\) be the median spacing of the knots in \eqref{eq:smooth-penalty}. The thriced kernel integrates to one and changes sign. Its signed total variation, the integral of the absolute kernel on the bandwidth scale, equals \(v_*=1.196\), so the negative sidelobes contribute the excess \(v_*-1=0.196\). Scored by the same positive-part functional, that kernel is \(t_*=1.007\). The allowance in the rule is that score. An interpolant that scores \(t_*\) or less receives none, and the kernel's own sidelobes leave the penalty at zero.
 
 On a uniform knot spacing the smoothing spline multiplies a Fourier mode \(e^{\mathrm{i}\omega x}\) by \(1/(1+\lambda\delta\omega^4)\), with \(\lambda=c F^3\). Count the excess \((t-t_*)_+\) in units of \(v_*-1\), and call that count \(\rho\). Attenuating the kernel frequency \(\omega=1/h\) by the factor \(1/(1+\rho)\) fixes \(\lambda\delta=\rho h^4\), and
 \begin{equation}
@@ -632,7 +632,7 @@ Start from the projected calls of Section~\ref{sec:data}. The price is a Gaussia
 Start from the projected calls of Section~\ref{sec:data}. The density is the convolution of a Gaussian kernel on the spot with a discrete probability. The nodes are equally spaced from the first quoted strike to the last, and the spacing is the bandwidth, with the count kept between 12 and 61. The weights are nonnegative, sum to one, and have mean \(F\). Each node prices a call by the Bachelier formula. The bandwidth minimises the even/odd out-of-the-money error. The selected widths are \(h=188.0\), \(364.1\), \(400.0\), and \(171.3\). The NDX curve has four peaks. Prices in Table~\ref{tab:listed} are those calls, floored, with puts by parity.
 
 \paragraph{\citeauthor{aitsahalia1998}}
-Start from the projected calls of Section~\ref{sec:data}. On one maturity the futures price and the expiry are constant, and the semiparametric regression reduces to Nadaraya--Watson of Black--Scholes implied volatility on moneyness \(K/F\). The kernel on that regressor is the order-2 Gaussian. {\color{red}\textbf{The bandwidth is not their Appendix A rule. Carried onto these chains that rule gives \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\), about one standard deviation of moneyness, and the smile is flat. The width used here is the smallest value on a geometric grid from \(0.01\) to \(0.40\) at which the density has one peak and total variation at most \(1.05\).}} The selected widths are \(h=0.036\), \(0.030\), \(0.044\), and \(0.036\). Prices are the Black--Scholes calls at the smoothed volatility, floored, with puts by parity. The density is the strike derivative of that call. Each curve has one peak and mass \(1.0\).
+Start from the projected calls of Section~\ref{sec:data}. On one maturity the futures price and the expiry are constant, and the semiparametric regression reduces to Nadaraya--Watson of Black--Scholes implied volatility on moneyness \(K/F\). The kernel on that regressor is the order-2 Gaussian. {\color{red}\textbf{The bandwidth is not their Appendix A rule. Carried onto these chains that rule gives \(h=0.171\), \(0.303\), \(0.247\), and \(0.315\), about one standard deviation of moneyness, and the smile is flat. The width used here is the smallest value on a geometric grid from \(0.01\) to \(0.40\) at which the density, scored on \([0.55F,1.40F]\), has one peak and total variation at most \(1.05\).}} The selected widths are \(h=0.036\), \(0.030\), \(0.044\), and \(0.036\). Prices are the Black--Scholes calls at the smoothed volatility, floored, with puts by parity. The density is the strike derivative of that call. Each curve has one peak and mass \(1.0\).
 
 \paragraph{\citeauthor{grith2012}\noperiod}
 Start from the projected calls of Section~\ref{sec:data}. Both objects are a local cubic with the quartic kernel, and \(h\) is the half-width of that kernel. The bandwidth minimises the leave-one-out squared error of the local cubic, the cross-validation they compute and then set aside because the density is wiggly. The width in their comparison figure is twice that value: on the DAX chain, \(114\) against \(228\). The call row divides the call by the spot, reads the density as \(e^{rT}\) times the scaled second derivative, and prices from the local level. Cross-validation selects \(h=52.2\), \(317.9\), \(498.7\), and \(110.7\), so the doubled widths are \(104.4\), \(635.7\), \(997.4\), and \(221.5\). The implied-volatility row is a local cubic of Black--Scholes implied volatility against the strike, with Black--Scholes prices at the local level and a density that uses the local slope and curvature. Its cross-validated widths are \(h=88.9\), \(504.8\), \(498.7\), and \(204.0\), and the doubled widths are \(177.9\), \(1009.6\), \(997.4\), and \(407.9\). Their DAX figure for this row shows one widened curve, at \(372\), and does not print the cross-validated width, so the same doubling is used. The doubled call cubic and the doubled implied-volatility cubic are drawn on the left of Figure~\ref{fig:listed}, with \citeauthor{aitsahalia1998}. The cross-validated call cubic and the cross-validated implied-volatility cubic are wiggly. They are drawn in \ref{app:wiggly} so they do not crowd that figure. Prices are floored, with puts by parity.
@@ -641,7 +641,7 @@ Hold-out refits the projection and every tuned method on the training strikes on
 
 \begin{table}[p]
 \centering
-\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=79.4\), \(133.6\), \(488.0\), \(47.5\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.030\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV completes \(\max(\hat q,0)\) to zero at the ends of \([0.55F,1.40F]\) and divides its variation by twice the maximum. A unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Ours has one peak and total variation \(1.0\), and the smallest hold-out on each chain and in the average.}
+\caption{Out-of-the-money repricing. Every fit starts from the projection in Section~\ref{sec:data} and is scored on the quoted mids. Ours is the smoothing spline \eqref{eq:smooth-penalty}, thriced at \eqref{eq:h-d2} (\(h=79.4\), \(133.6\), \(488.0\), \(47.5\)). \citeauthor{aitsahalia2003} is the constrained local linear at the Fan--Gijbels plug-in; the mass is that density after the unit-mass scaling. {\color{red}\textbf{\citeauthor{aitsahalia1998} does not use the Appendix A bandwidth;}} the widths are the unimodal rule in that paragraph, \(h=0.036\), \(0.030\), \(0.044\), and \(0.036\). Each \citeauthor{grith2012} object is shown at the leave-one-out width and at twice that width. The mass is the density of that same fit. PCA is priced from the Gaussian convolution on the spot. OTM is put RMSE for \(K\le F\) and call RMSE for \(K\ge F\), premiums floored at zero. Mass is \(\int\max(\hat q,0)\) on \([\max(50,0.2F),2.4F]\). TV completes \(\max(\hat q,0)\) to zero at the ends of \([0.60F,1.30F]\) and divides its variation by twice the maximum. A unimodal curve scores \(1.0\). Hold-out refits the projection and the tuning on each half. Average is the equal-weight mean of the four chains. Ours has one peak and total variation \(1.0\), and the smallest hold-out on each chain and in the average.}
 \label{tab:listed}
 {\fontsize{9.5}{11}\selectfont
 \setlength{\tabcolsep}{4pt}%
@@ -690,7 +690,7 @@ SPX Mar & \citeauthor{grith2012}, call, CV
 NDX Dec & Ours
   & 1.084 & 1.056 & 1.095 & 0.840 & 1.0 & 1.0 \\
 NDX Dec & PCA
-  & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.4 \\
+  & 1.324 & 1.151 & 1.117 & 1.304 & 1.0 & 1.3 \\
 NDX Dec & \citeauthor{grith2012}, IV, \(2\times\)
   & 1.236 & 0.946 & 0.991 & 0.686 & 1.0 & 1.2 \\
 NDX Dec & \citeauthor{grith2012}, IV, CV
@@ -709,9 +709,9 @@ RUT Dec & Ours
 RUT Dec & PCA
   & 0.067 & 0.058 & 0.066 & 0.043 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.116 & 0.042 & 0.047 & 0.033 & 1.3 & 1.5 \\
+  & 0.116 & 0.042 & 0.047 & 0.033 & 1.3 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, IV, CV
-  & 0.039 & 0.026 & 0.027 & 0.025 & 1.0 & 1.1 \\
+  & 0.039 & 0.026 & 0.027 & 0.025 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{aitsahalia1998}
   & 1.117 & 1.117 & 1.262 & 0.870 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{aitsahalia2003}
@@ -719,14 +719,14 @@ RUT Dec & \citeauthor{aitsahalia2003}
 RUT Dec & \citeauthor{grith2012}, call, \(2\times\)
   & 0.432 & 0.056 & 0.051 & 0.063 & 1.0 & 1.0 \\
 RUT Dec & \citeauthor{grith2012}, call, CV
-  & 7.026 & 0.022 & 0.022 & 0.023 & 1.0 & 1.1 \\
+  & 7.026 & 0.022 & 0.022 & 0.023 & 1.0 & 1.0 \\
 \midrule
 Average & Ours
   & 0.301 & 0.290 & 0.299 & 0.239 & 1.0 & 1.0 \\
 Average & PCA
   & 0.380 & 0.331 & 0.324 & 0.368 & 1.0 & 1.1 \\
 Average & \citeauthor{grith2012}, IV, \(2\times\)
-  & 0.422 & 0.296 & 0.303 & 0.243 & 1.1 & 1.2 \\
+  & 0.422 & 0.296 & 0.303 & 0.243 & 1.1 & 1.1 \\
 Average & \citeauthor{grith2012}, IV, CV
   & 0.363 & 0.244 & 0.257 & 0.160 & 1.0 & 1.6 \\
 Average & \citeauthor{aitsahalia1998}
@@ -778,7 +778,7 @@ The cross-validated call cubic of \citeauthor{grith2012}, and that paper's impli
 
 Table~\ref{tab:extra} applies \eqref{eq:penalty-rule} to twenty-three further expiries from the same feeds, and scores PCA on each chain. The four chains of Section~\ref{sec:emp} are left out. The screens of Section~\ref{sec:data} are unchanged, including the discount rate \(r=0.04\). Only the standard monthly roots are kept. Maturity runs from fourteen days to two years, each chain has at least forty strikes, and each root keeps at most eight expiries spread across the calendar. SPX, NDX, and RUT are the 23~September 2026 snapshots. DJX is the 19~September 2026 snapshot. Average is the equal-weight mean of these twenty-three chains. Grand is the equal-weight mean of these chains and the four chains in Table~\ref{tab:listed}. These quotes are not in that table and not in the replication files. Under the Cboe Global Markets North American Data Policies, effective 1~September 2026, a recipient of delayed Cboe options quotes may not redistribute them externally except to a named affiliate, and historical quotes may be redistributed to anyone else only under a data agreement and Cboe's approval.
 
-The rule does not count modes. Two chains keep two peaks. SPX 17~September 2027 has penalty zero and variation \(1.004\): the lower maximum is about nine tenths of the mode, and the dip between them is under half of one percent of that mode. DJX 17~September 2027 has variation \(1.461\) and penalty \(3.56\times 10^{-4}\); the lower maximum is a little over half the mode. On SPX 16~June 2028 and NDX 17~December 2027 the fitted density has one peak, with penalties \(4.33\times 10^{-4}\) and \(5.03\times 10^{-4}\). Several long-dated NDX hold-outs are large because the quotes themselves are large. The average hold-out is smaller than PCA, and so is the average that adds the four chains of Table~\ref{tab:listed}. PCA is smaller on SPX 16~April 2027, NDX 16~October 2026, NDX 17~December 2027, and DJX 17~September 2027. On RUT 19~March 2027 the two hold-outs both print \(0.147\).
+The rule does not count modes. Two chains keep two peaks. SPX 17~September 2027 has penalty zero and variation \(1.004\): the lower maximum is about nine tenths of the mode, and the dip between them is under half of one percent of that mode. DJX 17~September 2027 has variation \(1.457\) and penalty \(3.56\times 10^{-4}\); the lower maximum is a little over half the mode. On SPX 16~June 2028 and NDX 17~December 2027 the fitted density has one peak, with penalties \(4.33\times 10^{-4}\) and \(5.03\times 10^{-4}\). Several long-dated NDX hold-outs are large because the quotes themselves are large. The average hold-out is smaller than PCA, and so is the average that adds the four chains of Table~\ref{tab:listed}. PCA is smaller on SPX 16~April 2027, NDX 16~October 2026, NDX 17~December 2027, and DJX 17~September 2027. On RUT 19~March 2027 the two hold-outs both print \(0.147\).
 
 \begingroup
 \setlength{\tabcolsep}{3pt}%
@@ -843,7 +843,7 @@ NDX 19 Mar 2027 & PCA & 110 & 1.243 & 0.967 & 0.637 & 1.577 & 1.0 & 1.0 \\
 NDX 16 Apr 2027 & Ours & 83 & 1.039 & 0.726 & 0.777 & 0.601 & 1.0 & 1.0 \\*
 NDX 16 Apr 2027 & PCA & 83 & 1.646 & 1.276 & 1.034 & 1.690 & 1.0 & 1.0 \\
 \midrule
-NDX 21 May 2027 & Ours & 68 & 2.719 & 0.768 & 0.661 & 1.022 & 1.0 & 1.1 \\*
+NDX 21 May 2027 & Ours & 68 & 2.719 & 0.768 & 0.661 & 1.022 & 1.0 & 1.0 \\*
 NDX 21 May 2027 & PCA & 68 & 6.347 & 2.927 & 0.768 & 5.702 & 1.0 & 1.0 \\
 \midrule
 NDX 17 Sep 2027 & Ours & 96 & 3.139 & 1.763 & 1.739 & 1.838 & 1.0 & 1.0 \\*
@@ -858,7 +858,7 @@ RUT 16 Oct 2026 & PCA & 219 & 0.041 & 0.038 & 0.037 & 0.040 & 1.0 & 1.0 \\
 RUT 20 Nov 2026 & Ours & 203 & 0.031 & 0.026 & 0.028 & 0.025 & 1.0 & 1.0 \\*
 RUT 20 Nov 2026 & PCA & 203 & 0.059 & 0.055 & 0.071 & 0.038 & 1.0 & 1.0 \\
 \midrule
-RUT 19 Mar 2027 & Ours & 131 & 0.147 & 0.034 & 0.030 & 0.047 & 1.0 & 1.1 \\*
+RUT 19 Mar 2027 & Ours & 131 & 0.147 & 0.034 & 0.030 & 0.047 & 1.0 & 1.0 \\*
 RUT 19 Mar 2027 & PCA & 131 & 0.147 & 0.146 & 0.145 & 0.152 & 1.0 & 1.0 \\
 \midrule
 RUT 17 Jun 2027 & Ours & 69 & 0.053 & 0.037 & 0.043 & 0.026 & 1.0 & 1.0 \\*
@@ -867,7 +867,7 @@ RUT 17 Jun 2027 & PCA & 69 & 0.373 & 0.177 & 0.224 & 0.092 & 1.0 & 1.0 \\
 DJX 19 Mar 2027 & Ours & 44 & 0.052 & 0.018 & 0.017 & 0.023 & 1.0 & 1.1 \\*
 DJX 19 Mar 2027 & PCA & 44 & 0.154 & 0.104 & 0.101 & 0.114 & 1.0 & 1.0 \\
 \midrule
-DJX 17 Jun 2027 & Ours & 57 & 0.055 & 0.035 & 0.039 & 0.011 & 1.0 & 1.1 \\*
+DJX 17 Jun 2027 & Ours & 57 & 0.055 & 0.035 & 0.039 & 0.011 & 1.0 & 1.0 \\*
 DJX 17 Jun 2027 & PCA & 57 & 0.377 & 0.118 & 0.130 & 0.072 & 1.0 & 1.0 \\
 \midrule
 DJX 17 Sep 2027 & Ours & 41 & 0.474 & 0.361 & 0.242 & 0.595 & 1.0 & 1.5 \\*

@@ -17,7 +17,7 @@ Thricing and the closed-form penalty are on by default. That penalty is
 ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``: ``t`` is the clipped total
 variation of the thriced interpolant on ``[0.60F, 1.30F]``, completed to
 zero at the two endpoints and divided by twice the maximum. A unimodal
-curve scores 1. The tables report that functional on ``[0.55F, 1.40F]``.
+curve scores 1. The tables report that same functional.
 ``v_* - 1`` is the excess variation of that kernel, ``δ``
 is the median knot spacing, and ``tv_cap`` defaults to the kernel's own
 positive-part score, about ``1.007``. ``penalty="search"`` replaces the formula by

@@ -191,21 +191,27 @@ def _exact(label, p, calls, q_true, K_eval):
 
 
 _ASL_H = np.geomspace(0.01, 0.40, 21)
+# Reported total variation and peak counts. The penalty in rnd._shape_scores
+# uses this same interval. The Aït-Sahalia–Lo screen stays wider: on SPX March
+# the reported interval selects a smaller bandwidth than the published 0.030.
+_REPORT_LO, _REPORT_HI = 0.60, 1.30
+_ASL_SCREEN_LO, _ASL_SCREEN_HI = 0.55, 1.40
 
 
 def asl_shape_bandwidth(K, C, S0, r, T, q, F):
     """Smallest moneyness bandwidth that leaves one peak and TV at most 1.05.
 
     Not the Aït-Sahalia–Lo Appendix A rule. That rule is about one moneyness
-    standard deviation on these chains and flattens the smile.
+    standard deviation on these chains and flattens the smile. The screen is
+    scored on [0.55F, 1.40F], not on the interval the tables report.
     """
     K = np.asarray(K, float)
     s = np.linspace(max(50.0, 0.2 * float(F)), 2.4 * float(F), 501)
     chosen = float(_ASL_H[-1])
     for h in _ASL_H:
         _, qhat = asl_fit(K, C, S0, r, T, q, F, K[:1], s, float(h))
-        _, peaks = _mass_peaks(F, qhat, s)
-        tv = _variation(F, qhat, s)
+        _, peaks = _mass_peaks(F, qhat, s, _ASL_SCREEN_LO, _ASL_SCREEN_HI)
+        tv = _variation(F, qhat, s, _ASL_SCREEN_LO, _ASL_SCREEN_HI)
         if peaks <= 1 and tv <= 1.05:
             chosen = float(h)
             break
@@ -279,21 +285,22 @@ def _otm(sl, C_hat):
     return r(np.ones(len(e), bool)), r(left), r(right)
 
 
-def _variation(F, q, s):
-    """Total variation of max(q, 0) on [0.55F, 1.40F], over twice the maximum.
+def _variation(F, q, s, lo=_REPORT_LO, hi=_REPORT_HI):
+    """Total variation of max(q, 0) on [lo*F, hi*F], over twice the maximum.
 
-    The curve is completed to zero at the endpoints, so a unimodal curve
-    scores 1 and the score is at least 1. Scaling by the forward cancels,
-    so the score is the same in strike units and in moneyness.
+    The default interval is [0.60F, 1.30F], the same window as the penalty
+    and as the tables. The curve is completed to zero at the endpoints, so a
+    unimodal curve scores 1 and the score is at least 1. Scaling by the
+    forward cancels, so the score is the same in strike units and in moneyness.
     """
-    m = (s >= 0.55 * F) & (s <= 1.40 * F)
+    m = (s >= lo * F) & (s <= hi * F)
     return clipped_variation(np.asarray(q, float)[m])
 
 
-def _mass_peaks(F, q, s):
+def _mass_peaks(F, q, s, lo=_REPORT_LO, hi=_REPORT_HI):
     qq = np.maximum(np.nan_to_num(q), 0.0)
     mass = float(np.trapezoid(qq, s))
-    core = (s >= 0.55 * F) & (s <= 1.40 * F)
+    core = (s >= lo * F) & (s <= hi * F)
     y = qq[core]
     peaks = 0
     if y.size > 4 and np.nanmax(y) > 0:
@@ -1350,7 +1357,7 @@ def _score_smoothing_c(base, c):
 def _choose_smoothing_c(rows, curv_min=0.5):
     """Smallest unimodal penalty, then the L-curve corner when the bend is sharp.
 
-    Unimodal means one peak and total variation at most 1 on [0.55F, 1.40F].
+    Unimodal means one peak and total variation at most 1 on [0.60F, 1.30F].
     The corner is of log call residual against log gap between the thriced
     density and the plain Gaussian. A flat bend keeps the unimodal penalty.
     """
@@ -1642,7 +1649,7 @@ def extra_chains():
                     note = f" h={fit['h']:.4f} c={fit['c']:.6e} shape={fit['shape']:.4f}"
                 if peaks >= 2:
                     yy = np.maximum(np.nan_to_num(qhat), 0.0)
-                    core = (s >= 0.55 * sl.F) & (s <= 1.40 * sl.F)
+                    core = (s >= _REPORT_LO * sl.F) & (s <= _REPORT_HI * sl.F)
                     yy = yy[core]
                     loc = (yy[1:-1] > yy[:-2]) & (yy[1:-1] > yy[2:]) & (yy[1:-1] > 0.2 * yy.max())
                     heights = np.sort(yy[1:-1][loc])
