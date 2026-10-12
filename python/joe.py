@@ -238,6 +238,20 @@ def tune_ghs_loo_call(mult=1.0):
     return _tune
 
 
+def tune_rule_h(scale=1.0):
+    """The rule bandwidth (16) of our estimator, handed to another method.
+
+    ``scale`` converts a Gaussian standard deviation into the method's own
+    bandwidth unit: the quartic kernel on [-h, h] has standard deviation
+    h / sqrt(7), so its half-width at equal spread is sqrt(7) h.
+    """
+
+    def _tune(K, C, S0, r, T, q, F):
+        return scale * estimate_rnd(K, C, S0, r, T, q, K_eval=np.asarray(K, float)[:1])["h"]
+
+    return _tune
+
+
 # name -> (fit key, tune, label, group)
 METHODS = {
     "ours_rule": ("ours", tune_rule_ours, "Ours, rule", "main"),
@@ -253,7 +267,13 @@ METHODS = {
     "ghs_iv_loo2": ("ghs_iv", tune_ghs_loo_iv(2.0), "GHS IV, 2$\\times$LOO", "rule"),
     "ghs_call_loo": ("ghs_call", tune_ghs_loo_call(1.0), "GHS call, LOO", "rule"),
     "ghs_call_loo2": ("ghs_call", tune_ghs_loo_call(2.0), "GHS call, 2$\\times$LOO", "rule"),
+    "pca_ruleh": ("pca", tune_rule_h(1.0), "PCA, at (16)", "transfer"),
+    "asl_ruleh": ("asl", tune_rule_h(1.0), "AS--Lo, at (16)", "transfer"),
+    "asd_ruleh": ("asd", tune_rule_h(1.0), "AS--Duarte, at (16)", "transfer"),
+    "ghs_iv_ruleh": ("ghs_iv", tune_rule_h(np.sqrt(7.0)), "GHS IV, at (16)", "transfer"),
+    "ghs_call_ruleh": ("ghs_call", tune_rule_h(np.sqrt(7.0)), "GHS call, at (16)", "transfer"),
 }
+TRANSFER = [k for k, v in METHODS.items() if v[3] == "transfer"]
 MAIN = [k for k, v in METHODS.items() if v[3] == "main"]
 RULE = [k for k, v in METHODS.items() if v[3] == "rule"]
 
@@ -393,7 +413,7 @@ LISTED = (
 )
 
 
-def run_listed(names=None):
+def run_listed(names=None, out="listed.json"):
     names = list(METHODS) if names is None else names
     result = {}
     for csv, title in LISTED:
@@ -401,7 +421,7 @@ def run_listed(names=None):
         print(f"\n{title}  n={len(sl.K)}  F={sl.F:.1f}")
         meta, rows = score_chain(sl, names)
         result[title] = dict(meta=meta, rows=rows)
-        (OUT / "listed.json").write_text(json.dumps(result, indent=1))
+        (OUT / out).write_text(json.dumps(result, indent=1))
     return result
 
 
@@ -590,14 +610,26 @@ def run_mc(n_reps=200, sds=(0.005, 0.01, 0.02), names=None, workers=2, chains=("
             for sd in sds:
                 tag = f"{model}/{chain}/{sd}"
                 have = result.get(tag, {}).get("reps", [])
-                if len(have) >= n_reps:
+                missing = [n for n in names if have and n not in have[0]]
+                if len(have) >= n_reps and not missing:
                     print(f"{tag}: done")
                     continue
                 t0 = time.time()
+                if missing and have:
+                    # Same seeds, so the new methods see the same draws as the old ones.
+                    todo = list(range(min(len(have), n_reps)))
+                    with ProcessPoolExecutor(max_workers=workers) as ex:
+                        extra = list(ex.map(mc_one, [model] * len(todo), [chain] * len(todo), [sd] * len(todo), todo,
+                                            [missing] * len(todo), chunksize=4))
+                    for old, new in zip(have, extra):
+                        old.update(new)
+                    names_all = list(have[0])
+                else:
+                    names_all = names
                 todo = list(range(len(have), n_reps))
                 with ProcessPoolExecutor(max_workers=workers) as ex:
                     reps = list(ex.map(mc_one, [model] * len(todo), [chain] * len(todo), [sd] * len(todo), todo,
-                                       [names] * len(todo), chunksize=4))
+                                       [names_all] * len(todo), chunksize=4))
                 have = have + reps
                 result[tag] = dict(model=model, chain=chain, sd=sd, reps=have)
                 path.write_text(json.dumps(result))
@@ -741,6 +773,9 @@ if __name__ == "__main__":
         run_sensitivity()
     elif what == "oracle":
         run_mc_oracle()
+    elif what == "transfer":
+        run_listed(names=TRANSFER, out="listed_transfer.json")
+        run_mc(n_reps=100, sds=(0.01,), names=TRANSFER, chains=("dense", "sparse", "listed"))
     elif what == "figures":
         pass
     else:

@@ -120,9 +120,15 @@ def mc_tables():
     mc = _load("mc")
     if mc is None:
         return
-    names = [n for n in MAIN + RULE if any(n in r for tag in mc for r in mc[tag]["reps"][:1])]
+    from joe import TRANSFER
 
     def one(tags, fname, with_reps=True):
+        present = set()
+        for tag in tags:
+            if tag in mc:
+                for r in mc[tag]["reps"]:
+                    present.update(r)
+        names = [n for n in MAIN + RULE + TRANSFER if n in present]
         mat = np.full((len(names), len(tags)), np.nan)
         se = np.full_like(mat, np.nan)
         nrep = {}
@@ -303,6 +309,10 @@ def listed_tables():
     titles = list(data)
     write("listed_main", "\n".join(_listed_rows(data, MAIN, titles)))
     write("listed_rule", "\n".join(_listed_rows(data, RULE, titles)))
+    tr = _load("listed_transfer")
+    if tr is not None:
+        from joe import TRANSFER
+        write("listed_transfer", "\n".join(_listed_rows(tr, TRANSFER, list(tr))))
     # bandwidths of every method, in strike units, and ours penalty
     lines = []
     for title in titles:
