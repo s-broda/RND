@@ -210,6 +210,61 @@ def oracle_table():
     (TAB / "mc_oracle_cols.tex").write_text(" & ".join(f"{MODEL[t.split('/')[0]]} {t.split('/')[1]}" for t in tags) + "\n")
 
 
+def variants_table():
+    mc = _load("variants")
+    li = _load("variants_listed")
+    if mc is None and li is None:
+        return
+    lines = []
+    if mc is not None:
+        for design, cols in (("iv", ["rule", "rule_pos", "gcv", "gcv_pos"]),
+                             ("price", ["rule", "rule_pos", "gcv", "rule_w", "rule_w_pos", "gcv_w"])):
+            head = {"rule": "rule", "rule_pos": "rule+", "gcv": "GCV", "gcv_pos": "GCV+", "rule_w": "rule, w",
+                    "rule_w_pos": "rule, w+", "gcv_w": "GCV, w"}
+            lines.append("\\begin{tabular}{@{}l " + "r" * len(cols) + "@{}}")
+            lines.append("\\toprule")
+            title = "Implied-volatility noise" if design == "iv" else "Heteroskedastic price noise"
+            lines.append(f"\\multicolumn{{{len(cols)+1}}}{{@{{}}l}}{{{title}}} \\\\")
+            lines.append("Design & " + " & ".join(head[c] for c in cols) + " \\\\")
+            lines.append("\\midrule")
+            for m in ("heston", "vg", "bates"):
+                for c in ("dense", "sparse", "listed"):
+                    tag = f"{design}/{m}/{c}"
+                    if tag not in mc:
+                        continue
+                    reps = mc[tag]["reps"]
+                    cells = []
+                    vals = []
+                    for col in cols:
+                        v = np.array([r[col]["ise"] for r in reps if col in r], float) * 1e4
+                        vals.append((v.mean(), v.std(ddof=1) / np.sqrt(v.size)) if v.size else (np.nan, np.nan))
+                    best = np.nanmin([x[0] for x in vals])
+                    for (mu, se) in vals:
+                        t = f"{mu:.2f} ({se:.2f})" if np.isfinite(mu) else "{--}"
+                        if np.isfinite(mu) and mu <= best + 1e-12:
+                            t = f"\\textbf{{{t}}}"
+                        cells.append(t)
+                    lines.append(f"{MODEL[m]}, {c} & " + " & ".join(cells) + " \\\\")
+            lines.append("\\bottomrule")
+            lines.append("\\end{tabular}\\par\\medskip")
+    if li is not None:
+        cols = ["rule", "gcv", "rule_w", "gcv_w"]
+        lines.append("\\begin{tabular}{@{}l rrrr rrrr@{}}")
+        lines.append("\\toprule")
+        lines.append("\\multicolumn{9}{@{}l}{Listed chains} \\\\")
+        lines.append(" & \\multicolumn{4}{c}{Hold-out, half-spreads} & \\multicolumn{4}{c}{Modes} \\\\")
+        lines.append("\\cmidrule(lr){2-5}\\cmidrule(lr){6-9}")
+        lines.append("Chain & rule & GCV & rule, w & GCV, w & rule & GCV & rule, w & GCV, w \\\\")
+        lines.append("\\midrule")
+        for title, rows in li.items():
+            hs = [rows[c]["ho_spread"] for c in cols]
+            pk = [rows[c]["peaks"] for c in cols]
+            lines.append(title + " & " + " & ".join(f"{v:.3f}" for v in hs) + " & " + " & ".join(str(v) for v in pk) + " \\\\")
+        lines.append("\\bottomrule")
+        lines.append("\\end{tabular}")
+    write("variants", "\n".join(lines))
+
+
 # ---------------------------------------------------------------- listed
 
 
@@ -331,6 +386,7 @@ if __name__ == "__main__":
     exact_tables()
     mc_tables()
     oracle_table()
+    variants_table()
     listed_tables()
     extra_tables()
     sens_tables()

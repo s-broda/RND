@@ -357,7 +357,11 @@ Estimator & \tabinput{tables/mc_oracle_cols} \\
 \end{table}
 
 \paragraph{Results}
-%%MCPROSE%%
+At \(\mathrm{sd}=0.01\) the rule estimator has the smallest mean ISE, or one within two standard errors of the smallest, in seven of the nine designs of Table~\ref{tab:mc}: all three meshes on Heston and on Bates, and the listed mesh on variance gamma. Its advantage is largest on the listed mesh, which is the most realistic of the three, where the next method is PCA at four to five times the error on Heston and Bates. On the dense mesh the margin over PCA is a factor of \(1.8\) on Heston and \(1.9\) on Bates. The two exceptions are both variance gamma, whose density is much more peaked than the other two: on the dense mesh PCA is better by a factor of two, and on the sparse mesh the cross-validated implied-volatility kernel of \citeauthor{aitsahalia1998} is better by a factor of \(2.6\). Table~\ref{tab:sens} shows that the rule bandwidth is wider than the variance-gamma optimum, but even the best constant does not close the gap on the dense chain, so the peak is where the sixth-order kernel's negative sidelobes cost most.
+
+The cross-validated kernel smoothers, the implied-volatility kernel, the local linear and the two local cubics, are one to two orders of magnitude worse than the rule on the dense and listed meshes. Their price cross-validation selects the grid floor, as on the listed chains, and the resulting second derivative is noise; on the sparse mesh, where the grid floor is wider relative to the strike range, the same methods are competitive, and the implied-volatility kernel is within a factor of \(1.3\) of the rule on Heston. The source papers' own rules do better than their cross-validated versions on the dense mesh and worse on the sparse one, the plug-in of \citeauthor{aitsahalia2003} being the most accurate of them on dense chains. ``Ours, CV'' is also affected: it is within two standard errors of the rule on the sparse mesh and three to twelve times worse on the listed mesh. The rule bandwidth does not suffer from this, because it is tied to the scale of the distribution and to \(n^{-1/9}\) rather than to a pricing criterion that cannot see the second derivative.
+
+Table~\ref{tab:mc-noise} varies the noise. At \(\mathrm{sd}=0.005\) the dense-mesh ranking is unchanged, and on the sparse mesh the implied-volatility kernel is best on Heston and variance gamma, because with little noise and few strikes the cross-validation is close to interpolation of a smooth smile. At \(\mathrm{sd}=0.02\) the rule estimator is best or tied on Heston and Bates and PCA is best on variance gamma, with a margin of four on the dense chain. The diagnostics of Table~\ref{tab:mc-diag} show that the penalty rule is active on every noisy replication, and that the negative mass of the thriced estimate is below \(0.01\) on average and at most \(0.04\) on any draw, so that clipping at zero and renormalizing changes the ISE in the third digit (Section~\ref{sec:variants}).
 
 Table~\ref{tab:mc-diag} records, for the rule estimator at \(\mathrm{sd}=0.01\), the mean bandwidth, the share of replications on which the penalty rule was positive, and the negative mass \(\int\fhat^-\) on the evaluation window.
 
@@ -404,6 +408,22 @@ Design & Penalty & \tabinput{tables/sens_consts} & & & & & \\
 \end{table}
 
 Two conclusions follow from Table~\ref{tab:sens}. The bandwidth constant hardly matters on the listed chains between \(0.20\) and \(0.45\): the hold-out moves by a few thousandths of a half-spread, and the density keeps one mode at every constant once the penalty is on. At \(0.60\) the bandwidth is wide enough to bias the far wings of the longer chain. In the simulations the ISE at \(c_0=0.34\) is within a factor of \(1.3\) of the best constant on every Heston and Bates design and within \(1.4\) on variance gamma, whose peaked density prefers a slightly wider bandwidth; the constant \(0.20\) is clearly too narrow at this noise level. The penalty, by contrast, does real work on noisy chains: with the penalty switched off the ISE is thirty to a hundred times larger at \(c_0=0.34\), because the interpolating spline transmits the noise to the second derivative, and on NDX the interpolant has eight modes at the narrowest constant. On the listed chains the penalty barely changes the pricing error, which is the point of Section~\ref{sec:emp-results}: pricing does not see the roughness that the density shows.
+
+\subsection{Variants of the estimator}
+\label{sec:variants}
+
+Three modifications were tried and are reported for completeness in Table~\ref{tab:variants}. The first replaces the penalty rule \eqref{eq:penalty-rule} by generalized cross-validation of the smoothing spline \citep{wahba1977,green1994}, with the trace of the smoother estimated by Hutchinson's method; this is the textbook choice and removes the window and allowance constants of Section~\ref{sec:rules}. The second clips the thriced density at zero and renormalizes it to unit mass, which makes the estimate a density. The third weights the observations in \eqref{eq:smooth-penalty} by the inverse squared half-spread, the generalized-least-squares choice when the noise is proportional to the spread; it is evaluated on the listed chains, where spreads are observed, and under a heteroskedastic design in which the out-of-the-money premium receives noise with standard deviation \(0.01+0.02\times\)premium and the weights are the true inverse variances.
+
+\begin{table}[H]
+\centering
+\caption{Variants of the estimator. Simulation panel: mean ISE (\(\times 10^4\)) over one hundred replications at \(\mathrm{sd}=0.01\) (implied-volatility noise) and under the heteroskedastic price-noise design; ``+'' is the positive-part renormalized estimate, ``w'' the inverse-variance weighted spline. Listed panel: nested hold-out in half-spreads and number of modes.}
+\label{tab:variants}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\tabinput{tables/variants}
+\end{table}
+
+%%VARPROSE%%
 
 \section{Listed Chains}
 \label{sec:emp}
