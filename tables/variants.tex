@@ -1,3 +1,35 @@
+\begin{tabular}{@{}l rrrr@{}}
+\toprule
+\multicolumn{5}{@{}l}{Implied-volatility noise} \\
+Design & rule & rule+ & GCV & GCV+ \\
+\midrule
+Heston, dense & \textbf{2.28 (0.14)} & 2.28 (0.14) & 105.96 (4.78) & 101.99 (4.41) \\
+Heston, sparse & \textbf{3.88 (0.34)} & 3.88 (0.34) & 70.59 (6.47) & 67.20 (5.86) \\
+Heston, listed & 2.74 (0.13) & \textbf{2.72 (0.13)} & 63.66 (3.10) & 60.85 (2.89) \\
+VG, dense & 18.07 (1.28) & \textbf{18.06 (1.28)} & 331.17 (16.81) & 286.70 (12.80) \\
+VG, sparse & 26.61 (2.69) & \textbf{26.50 (2.64)} & 188.66 (23.65) & 141.38 (14.34) \\
+VG, listed & \textbf{13.13 (0.70)} & 13.14 (0.70) & 172.52 (7.78) & 159.63 (6.86) \\
+Bates, dense & \textbf{1.71 (0.12)} & 1.71 (0.12) & 76.83 (4.03) & 74.79 (3.75) \\
+Bates, sparse & 2.42 (0.21) & \textbf{2.41 (0.21)} & 62.17 (5.19) & 60.16 (4.82) \\
+Bates, listed & 3.52 (0.17) & \textbf{3.51 (0.17)} & 61.04 (2.72) & 56.50 (2.40) \\
+\bottomrule
+\end{tabular}\par\medskip
+\begin{tabular}{@{}l rrrrrr@{}}
+\toprule
+\multicolumn{7}{@{}l}{Heteroskedastic price noise} \\
+Design & rule & rule+ & GCV & rule, w & rule, w+ & GCV, w \\
+\midrule
+Heston, dense & \textbf{0.55 (0.03)} & 0.55 (0.03) & 20.70 (1.40) & 4.19 (0.11) & 4.20 (0.11) & 6.52 (0.59) \\
+Heston, sparse & 0.94 (0.06) & \textbf{0.94 (0.06)} & 10.01 (1.48) & 4.68 (0.16) & 4.66 (0.16) & 4.00 (0.97) \\
+Heston, listed & 0.94 (0.04) & \textbf{0.94 (0.04)} & 10.33 (0.63) & 2.18 (0.08) & 2.18 (0.08) & 10.28 (0.62) \\
+VG, dense & \textbf{4.51 (0.19)} & 4.51 (0.19) & 52.60 (3.16) & 16.50 (0.30) & 16.52 (0.30) & 10.23 (0.81) \\
+VG, sparse & \textbf{6.58 (0.28)} & 6.58 (0.28) & 21.57 (2.39) & 17.82 (0.51) & 17.83 (0.51) & 10.12 (0.85) \\
+VG, listed & \textbf{5.04 (0.17)} & 5.05 (0.17) & 27.57 (1.35) & 11.08 (0.24) & 11.10 (0.24) & 27.09 (1.32) \\
+Bates, dense & \textbf{0.44 (0.03)} & 0.44 (0.03) & 17.30 (0.89) & 4.20 (0.11) & 4.20 (0.11) & 7.02 (0.52) \\
+Bates, sparse & 0.72 (0.04) & \textbf{0.71 (0.04)} & 7.35 (1.11) & 4.34 (0.14) & 4.32 (0.14) & 2.35 (0.30) \\
+Bates, listed & 1.17 (0.04) & \textbf{1.16 (0.04)} & 10.75 (0.50) & 3.10 (0.10) & 3.09 (0.10) & 10.70 (0.50) \\
+\bottomrule
+\end{tabular}\par\medskip
 \begin{tabular}{@{}l rrrr rrrr@{}}
 \toprule
 \multicolumn{9}{@{}l}{Listed chains} \\
