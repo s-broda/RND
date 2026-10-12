@@ -426,7 +426,7 @@ Three modifications were tried and are reported for completeness in Table~\ref{t
 \tabinput{tables/variants}
 \end{table}
 
-%%VARPROSE%%
+None of the three variants improves on the estimator as published. Generalized cross-validation selects a penalty close to zero on every noisy design and the ISE is twenty to forty times that of the rule: GCV targets the fit to \(P\), for which the interpolant is nearly optimal, and is blind to the roughness of the second derivative, which is the quantity of interest. On the listed chains GCV prices as well as the rule but gives the NDX density three modes. The positive-part correction changes the ISE in the third digit, because the negative mass of the thriced estimate is already small; it is a free way of reporting a proper density and we recommend it for that purpose, but the tables of this paper report the uncorrected estimate so that the negative mass stays visible. Inverse-variance weights make the estimator worse by a factor of four to eight under the heteroskedastic design and do not help on the listed chains. The weights move the fit toward the cheap wing options, whose premiums are precise, and away from the body of the distribution, where the density lives; the penalty rule, which was calibrated for unit weights, is also disturbed. We take this as evidence that the unweighted spline with a global penalty is the right default, not that weighting could never help, and leave a re-calibrated weighted version for future work.
 
 \subsection{The competitors at our bandwidth}
 \label{sec:transfer}
