@@ -403,7 +403,7 @@ Design & Penalty & \tabinput{tables/sens_consts} & & & & & \\
 \end{tabular}
 \end{table}
 
-%%SENSPROSE%%
+Two conclusions follow from Table~\ref{tab:sens}. The bandwidth constant hardly matters on the listed chains between \(0.20\) and \(0.45\): the hold-out moves by a few thousandths of a half-spread, and the density keeps one mode at every constant once the penalty is on. At \(0.60\) the bandwidth is wide enough to bias the far wings of the longer chain. In the simulations the ISE at \(c_0=0.34\) is within a factor of \(1.3\) of the best constant on every Heston and Bates design and within \(1.4\) on variance gamma, whose peaked density prefers a slightly wider bandwidth; the constant \(0.20\) is clearly too narrow at this noise level. The penalty, by contrast, does real work on noisy chains: with the penalty switched off the ISE is thirty to a hundred times larger at \(c_0=0.34\), because the interpolating spline transmits the noise to the second derivative, and on NDX the interpolant has eight modes at the narrowest constant. On the listed chains the penalty barely changes the pricing error, which is the point of Section~\ref{sec:emp-results}: pricing does not see the roughness that the density shows.
 
 \section{Listed Chains}
 \label{sec:emp}
@@ -464,7 +464,9 @@ Chain & Method & pts & hs & bp & hs & Mass & Neg. & Modes & TV \\
 \end{tabular}
 \end{table}
 
-%%LISTEDPROSE%%
+Table~\ref{tab:listed} reports the four chains. Three observations organize it. First, under the common tuning the rule estimator has the smallest nested hold-out error on every chain in half-spread units; in index points it is the smallest or within a few thousandths of a point of its own cross-validated version; in implied volatility it is the smallest on three chains, and on SPX March the cross-validated local linear is smaller, because that metric is dominated by the far put wing, where premiums of a quarter point move implied volatility by tens of basis points. The hold-out is \(0.07\)--\(0.11\) half-spreads: the fitted price of a held-out option sits about a tenth of the way from the mid to the quoted bid or ask. The nearest competitor is the cross-validated implied-volatility cubic of \citeauthor{grith2012}, at \(0.10\)--\(0.38\) half-spreads, followed by PCA at \(0.14\)--\(0.34\); the kernel smoothers of \citeauthor{aitsahalia1998} and \citeauthor{aitsahalia2003}, and the call cubic, are further off. Second, the price cross-validation that tunes the competitors selects the floor of the grid for the implied-volatility kernel and the local linear on every chain, and their densities are not usable: they have nine to thirty modes, and on NDX the local linear has negative mass of seventy-six. Pricing error between neighbouring strikes does not penalize a rough second derivative, which is why Section~\ref{sec:rules} sets the bandwidth by a rate rather than by cross-validation; the same effect shows in ``Ours, CV'', which prices as well as the rule but has four modes on NDX. Third, among the methods whose densities are well behaved, the differences in pricing are small in economic terms: every one of them prices inside the quoted spread in sample, and the hold-out of the best three differs by a tenth of a half-spread. The case for the estimator on listed data is therefore that it delivers one mode, unit mass and no negative mass to three decimals on every chain, with the smallest pricing error, rather than that it prices dramatically better.
+
+Table~\ref{tab:data} lists the tuned bandwidths. The rule bandwidth \eqref{eq:h-d2} is one to two percent of the forward; the cross-validated version is narrower on SPX December and NDX, which is the under-smoothing just described. The penalty \eqref{eq:penalty-rule} is zero on SPX March and between \(3\times 10^{-7}\) and \(4\times 10^{-6}\) on the other three chains. Figure~\ref{fig:listed} draws the December chains. The rule estimator, PCA and the doubled implied-volatility cubic agree on the body of the density and differ in the left tail, where the quotes are sparse; the plug-in local linear is visibly oversmoothed.
 
 \begin{figure}[H]
 \centering
@@ -494,7 +496,7 @@ Method & mean & median & rank & wins & bp & unimodal, \% & neg. \\
 \end{tabular}
 \end{table}
 
-%%EXTRAPROSE%%
+Over the \nextra{} further chains the ranking of Table~\ref{tab:listed} is preserved in the average but not on every chain. The rule estimator has the smallest mean and median hold-out (\(0.18\) and \(0.11\) half-spreads) and the best mean rank (\(2.4\)) among the rule-based and cross-validated methods other than its own cross-validated version, which has a slightly better mean rank but is unimodal on only \(39\%\) of the chains. The implied-volatility cubic is close behind (\(0.23\) and \(0.13\), rank \(2.6\)) and is the better of the two on the long-dated NDX chains, where the quoted mesh widens to a thousand points and the rule bandwidth is narrow relative to the gaps; PCA is third. The rule estimator is unimodal on \(90\%\) of the chains; the exceptions are three chains of a year or more to expiry on which the fitted density has a second mode of about half the height of the first, which the rule, by design, does not remove. Its negative mass is \(0.001\) on average. The implied-volatility kernel and the local linear, tuned by price cross-validation, are unimodal on \(3\%\) and \(13\%\) of chains.
 
 \section{Conclusion}
 \label{sec:conc}

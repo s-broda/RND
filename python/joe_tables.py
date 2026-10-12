@@ -143,7 +143,7 @@ def mc_tables():
                 col = mat[:, j]
                 # bold every entry within two standard errors of the column minimum
                 jmin = int(np.nanargmin(col))
-                if v - mat[jmin, j] <= 2.0 * np.sqrt(se[i, j] ** 2 + se[jmin, j] ** 2) + 1e-12:
+                if v - mat[jmin, j] <= 2.0 * se[jmin, j] + 1e-12:
                     s = f"\\textbf{{{s}}}"
                 cells.append(f"{s} ({se[i, j]:.2f})" if se[i, j] < 10 else f"{s} ({se[i, j]:.0f})")
             out.append(LABEL[name] + " & " + " & ".join(cells) + " \\\\")
@@ -202,7 +202,7 @@ def oracle_table():
             v = mat[i, j]
             s = f"{v:.2f}" if v < 100 else f"{v:.0f}"
             jmin = int(np.nanargmin(mat[:, j]))
-            if v - mat[jmin, j] <= 2.0 * np.sqrt(se[i, j] ** 2 + se[jmin, j] ** 2) + 1e-12:
+            if v - mat[jmin, j] <= 2.0 * se[jmin, j] + 1e-12:
                 s = f"\\textbf{{{s}}}"
             cells.append(f"{s} ({se[i, j]:.2f})" if se[i, j] < 10 else f"{s} ({se[i, j]:.0f})")
         out.append(names[k] + " & " + " & ".join(cells) + " \\\\")
