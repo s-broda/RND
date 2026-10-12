@@ -635,7 +635,7 @@ def run_mc(n_reps=200, sds=(0.005, 0.01, 0.02), names=None, workers=2, chains=("
                 path.write_text(json.dumps(result))
                 print(f"{tag}: {len(have)} reps in {time.time()-t0:.0f}s", flush=True)
                 for name in names:
-                    v = np.array([r[name]["ise"] for r in have], float)
+                    v = np.array([r[name]["ise"] for r in have if name in r], float)
                     v = v[np.isfinite(v)]
                     print(f"   {METHODS[name][2]:22} mean ISE {v.mean():.3e}  se {v.std(ddof=1)/np.sqrt(v.size):.1e}  median {np.median(v):.3e}")
     return result
