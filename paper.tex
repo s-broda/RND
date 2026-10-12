@@ -1,7 +1,7 @@
 %% Journal of Econometrics submission, Elsevier elsarticle (Harvard/authoryear).
 \documentclass[preprint,12pt,authoryear,times]{elsarticle}
 
-\usepackage{amssymb,mathtools,amsthm,booktabs,float,longtable,siunitx,xcolor,etoolbox}
+\usepackage{amssymb,mathtools,amsthm,booktabs,float,longtable,siunitx,xcolor,etoolbox,rotating}
 \usepackage[hidelinks]{hyperref}
 \mathtoolsset{showonlyrefs}
 \makeatletter
@@ -302,12 +302,12 @@ Table~\ref{tab:exact-comp} scores the estimator against the methods of Section~\
 
 Noise is added in implied volatility: each quote receives an independent \(N(0,\mathrm{sd}^2)\) perturbation of its Black--Scholes implied volatility, with \(\mathrm{sd}\in\{0.005,0.01,0.02\}\), values clipped to \([0.02,2.5]\), and the call rebuilt. Every replication starts from the decreasing-convex projection of the noisy calls, and every method, including ours, is tuned on that draw as described in Section~\ref{sec:methods}. Table~\ref{tab:mc} reports the mean ISE over \mcrepsmain{} replications at \(\mathrm{sd}=0.01\), with Monte Carlo standard errors in parentheses, for the three targets and three meshes; Table~\ref{tab:mc-noise} repeats the dense and sparse designs at the two other noise levels with \mcrepsnoise{} replications. In each column every entry within two standard errors of the column minimum is in bold.
 
-\begin{table}[H]
+\begin{sidewaystable}
 \centering
 \caption{Mean integrated squared error (\(\times 10^4\)) on noisy quotes, implied-volatility noise \(\mathrm{sd}=0.01\), \mcrepsmain{} replications, Monte Carlo standard error in parentheses. The first block is the common cross-validation of Section~\ref{sec:methods}; the second block is the rule of each source paper. Entries within two standard errors of the column minimum are in bold.}
 \label{tab:mc}
 \footnotesize
-\setlength{\tabcolsep}{2.5pt}
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}l *{9}{r}@{}}
 \toprule
  & \multicolumn{3}{c}{Heston} & \multicolumn{3}{c}{VG} & \multicolumn{3}{c}{Bates} \\
@@ -317,36 +317,37 @@ Estimator & dense & sparse & listed & dense & sparse & listed & dense & sparse &
 \tabinput{tables/mc_main}
 \bottomrule
 \end{tabular}
-\end{table}
+\end{sidewaystable}
 
 \begin{table}[H]
 \centering
-\caption{Mean integrated squared error (\(\times 10^4\)) at \(\mathrm{sd}=0.005\) and \(\mathrm{sd}=0.02\), dense and sparse chains, \mcrepsnoise{} replications. Layout as in Table~\ref{tab:mc}.}
+\caption{Mean integrated squared error (\(\times 10^4\)) at \(\mathrm{sd}=0.005\) (upper panel) and \(\mathrm{sd}=0.02\) (lower panel), dense and sparse chains, \mcrepsnoise{} replications. Layout as in Table~\ref{tab:mc}.}
 \label{tab:mc-noise}
 \footnotesize
-\setlength{\tabcolsep}{2pt}
-\begin{tabular}{@{}l *{12}{r}@{}}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}l *{6}{r}@{}}
 \toprule
- & \multicolumn{6}{c}{\(\mathrm{sd}=0.005\)} & \multicolumn{6}{c}{\(\mathrm{sd}=0.02\)} \\
-\cmidrule(lr){2-7}\cmidrule(lr){8-13}
- & \multicolumn{2}{c}{Heston} & \multicolumn{2}{c}{VG} & \multicolumn{2}{c}{Bates}
  & \multicolumn{2}{c}{Heston} & \multicolumn{2}{c}{VG} & \multicolumn{2}{c}{Bates} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}\cmidrule(lr){12-13}
-Estimator & dense & sparse & dense & sparse & dense & sparse & dense & sparse & dense & sparse & dense & sparse \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Estimator & dense & sparse & dense & sparse & dense & sparse \\
 \midrule
-\tabinput{tables/mc_noise}
+\multicolumn{7}{@{}l}{\(\mathrm{sd}=0.005\)} \\
+\tabinput{tables/mc_noise_a}
+\midrule
+\multicolumn{7}{@{}l}{\(\mathrm{sd}=0.02\)} \\
+\tabinput{tables/mc_noise_b}
 \bottomrule
 \end{tabular}
 \end{table}
 
 Table~\ref{tab:mc-oracle} separates the estimator from its tuning. For each method and each replication it reports the ISE at the infeasible oracle bandwidth, the point of the common grid that minimizes the ISE on that draw; our estimator keeps the penalty rule at every candidate. The oracle rows bound what any tuning rule could achieve.
 
-\begin{table}[H]
+\begin{sidewaystable}
 \centering
 \caption{Mean integrated squared error (\(\times 10^4\)) at the oracle bandwidth, \(\mathrm{sd}=0.01\), one hundred replications, standard error in parentheses. The oracle bandwidth minimizes the ISE of the draw on the common grid and is infeasible. Entries within two standard errors of the column minimum are in bold.}
 \label{tab:mc-oracle}
 \footnotesize
-\setlength{\tabcolsep}{2.5pt}
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}l *{9}{r}@{}}
 \toprule
 Estimator & \tabinput{tables/mc_oracle_cols} \\
@@ -354,7 +355,7 @@ Estimator & \tabinput{tables/mc_oracle_cols} \\
 \tabinput{tables/mc_oracle}
 \bottomrule
 \end{tabular}
-\end{table}
+\end{sidewaystable}
 
 \paragraph{Results}
 At \(\mathrm{sd}=0.01\) the rule estimator has the smallest mean ISE, or one within two standard errors of the smallest, in seven of the nine designs of Table~\ref{tab:mc}: all three meshes on Heston and on Bates, and the listed mesh on variance gamma. Its advantage is largest on the listed mesh, which is the most realistic of the three, where the next method is PCA at four to five times the error on Heston and Bates. On the dense mesh the margin over PCA is a factor of \(1.8\) on Heston and \(1.9\) on Bates. The two exceptions are both variance gamma, whose density is much more peaked than the other two: on the dense mesh PCA is better by a factor of two, and on the sparse mesh the cross-validated implied-volatility kernel of \citeauthor{aitsahalia1998} is better by a factor of \(2.6\). Table~\ref{tab:sens} shows that the rule bandwidth is wider than the variance-gamma optimum, but even the best constant does not close the gap on the dense chain, so the peak is where the sixth-order kernel's negative sidelobes cost most.

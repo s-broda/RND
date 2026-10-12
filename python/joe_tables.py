@@ -19,7 +19,9 @@ TAB.mkdir(exist_ok=True)
 
 LABEL = {k: v[2] for k, v in METHODS.items()}
 SHORT = {"ours_rule": "Ours, rule", "ours_cv": "Ours, CV", "pca_cv": "PCA", "asl_cv": "AS--Lo",
-         "asd_cv": "AS--D", "ghs_iv_cv": "GHS IV", "ghs_call_cv": "GHS call"}
+         "asd_cv": "AS--D", "ghs_iv_cv": "GHS IV", "ghs_call_cv": "GHS call",
+         "asl_app": "AS--Lo, A", "asd_plug": "AS--D, plug", "ghs_iv_loo": "GHS IV, LOO",
+         "ghs_iv_loo2": "GHS IV, 2LOO", "ghs_call_loo": "GHS call, LOO", "ghs_call_loo2": "GHS call, 2LOO"}
 MODEL = {"heston": "Heston", "vg": "VG", "bates": "Bates"}
 CHAIN = {"dense": "dense", "sparse": "sparse", "listed": "listed"}
 NESTED = {"quoted": "Quoted spline", "tails": "Tails", "twice": "Tails + twice", "thrice": "Tails + thrice"}
@@ -154,8 +156,10 @@ def mc_tables():
 
     tags = [f"{m}/{c}/0.01" for m in ("heston", "vg", "bates") for c in ("dense", "sparse", "listed")]
     n1 = one(tags, "mc_main")
-    tags = [f"{m}/{c}/{sd}" for sd in (0.005, 0.02) for m in ("heston", "vg", "bates") for c in ("dense", "sparse")]
-    n2 = one(tags, "mc_noise")
+    tags = [f"{m}/{c}/0.005" for m in ("heston", "vg", "bates") for c in ("dense", "sparse")]
+    n2 = one(tags, "mc_noise_a")
+    tags = [f"{m}/{c}/0.02" for m in ("heston", "vg", "bates") for c in ("dense", "sparse")]
+    n2.update(one(tags, "mc_noise_b"))
     (TAB / "mc_reps.tex").write_text(
         f"\\newcommand{{\\mcrepsmain}}{{{min(n1.values()) if n1 else 0}}}"
         f"\\newcommand{{\\mcrepsnoise}}{{{min(n2.values()) if n2 else 0}}}\n"
