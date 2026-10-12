@@ -304,7 +304,7 @@ Noise is added in implied volatility: each quote receives an independent \(N(0,\
 
 \begin{sidewaystable}
 \centering
-\caption{Mean integrated squared error (\(\times 10^4\)) on noisy quotes, implied-volatility noise \(\mathrm{sd}=0.01\), \mcrepsmain{} replications, Monte Carlo standard error in parentheses. The first block is the common cross-validation of Section~\ref{sec:methods}; the second block is the rule of each source paper. Entries within two standard errors of the column minimum are in bold.}
+\caption{Mean integrated squared error (\(\times 10^4\)) on noisy quotes, implied-volatility noise \(\mathrm{sd}=0.01\), \mcrepsmain{} replications, Monte Carlo standard error in parentheses. The first block is the common cross-validation of Section~\ref{sec:methods}; the second block is the rule of each source paper; the third block is each competitor at our rule bandwidth \eqref{eq:h-d2} (Section~\ref{sec:transfer}). Entries within two standard errors of the column minimum are in bold.}
 \label{tab:mc}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
@@ -431,7 +431,25 @@ None of the three variants improves on the estimator as published. Generalized c
 \subsection{The competitors at our bandwidth}
 \label{sec:transfer}
 
-%%TRANSFER%%
+If the advantage of the procedure lay in the bandwidth rule rather than in the estimator, handing the rule to the competitors should close the gap. Table~\ref{tab:mc} contains the rows ``at \eqref{eq:h-d2}'', in which each competitor is evaluated at our rule bandwidth, converted to its own unit (divided by \(F\) for the moneyness kernel; multiplied by \(\sqrt7\) for the quartic half-width, which equates the standard deviations), and Table~\ref{tab:listed-transfer} repeats the exercise on the listed chains. The transfer fails in both directions. At our bandwidth the competitors are four to thirty times worse than our estimator in the simulations and are as far from their own oracles as under their published rules; on the listed chains their hold-out is at least twice ours, and for the call-space methods orders of magnitude more, and most of their densities acquire extra modes. The reason is visible in the oracle bandwidths of Table~\ref{tab:mc-oracle} and in Table~\ref{tab:data}: the implied-volatility smoothers want bandwidths of a few strike gaps, one fifth to one tenth of ours, because they smooth an almost flat function and pay for every bit of width in bias, whereas our estimator smooths the integrated-tail distribution, whose second derivative is the target, with a sixth-order kernel whose bias is small at a width of one to two percent of the forward. The rule \eqref{eq:h-d2} is the right scale for that construction and the wrong scale for theirs. The two pieces, the kernel and the rule, are therefore not separable: the kernel without the rule has no feasible tuning that reaches its oracle, as Section~\ref{sec:variants} shows for GCV and Table~\ref{tab:mc} for cross-validation, and the rule without the kernel is of no use to the other estimators. That is what we mean by a procedure.
+
+\begin{table}[H]
+\centering
+\caption{Listed chains, each competitor at the rule bandwidth \eqref{eq:h-d2} of our estimator. Columns as in Table~\ref{tab:listed}.}
+\label{tab:listed-transfer}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{0.9}
+\begin{tabular}{@{}ll r r r r r r r r@{}}
+\toprule
+ & & \multicolumn{3}{c}{Hold-out} & In-sample & & & & \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-6}
+Chain & Method & pts & hs & bp & hs & Mass & Neg. & Modes & TV \\
+\midrule
+\tabinput{tables/listed_transfer}
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Listed Chains}
 \label{sec:emp}
@@ -531,7 +549,7 @@ Over the \nextra{} further chains the ranking of Table~\ref{tab:listed} is prese
 
 The normalized call of a single maturity is the survival function of the integrated-tail distribution of the underlying, and the risk-neutral density is minus the forward times the second derivative of that distribution function. The estimator of this paper fits that function by a cubic smoothing spline, completes the unquoted wings, and smooths the derivative of the spline by a sixth-order Gaussian jackknife kernel; the convolution is in closed form, the density and the fitted call are two readings of one object, and the bandwidth and penalty follow rules that need no search. The estimator is in-fill consistent under additive noise.
 
-The evidence is as follows. On exact quotes the wings and the higher-order kernel reduce the error of a plain spline by several orders of magnitude. On noisy quotes the estimator is the most accurate, or statistically tied with the most accurate, in most of the Heston, variance-gamma and Bates designs, with the implied-volatility kernel of \citeauthor{aitsahalia1998} as the closest competitor. On listed index chains it has the smallest nested out-of-sample pricing error on each chain in index points, half-spreads and implied volatility, and it is the only method among those compared that delivers one mode, unit mass, and no negative mass on every chain; the same ordering holds on average over \nextra{} further chains scored with the rules fixed. The comparison also documents that pricing cross-validation under-smooths every density estimator on dense chains, which argues for rate-based bandwidth rules of the kind used here.
+The evidence is as follows. On exact quotes the wings and the higher-order kernel reduce the error of a plain spline by several orders of magnitude. On noisy quotes the estimator is the most accurate, or statistically tied with the most accurate, in most of the Heston, variance-gamma and Bates designs, with the implied-volatility kernel of \citeauthor{aitsahalia1998} as the closest competitor. On listed index chains it has the smallest nested out-of-sample pricing error on each chain in index points, half-spreads and implied volatility, and it is the only method among those compared that delivers one mode, unit mass, and no negative mass on every chain; the same ordering holds on average over \nextra{} further chains scored with the rules fixed. Two further findings qualify the claim. At infeasible oracle bandwidths the implied-volatility smoothers are more accurate than our kernel on regular meshes, and pricing cross-validation under-smooths every density estimator on dense chains, ours included; what distinguishes the procedure proposed here is that its rule-based tuning reaches within a factor of two to four of its oracle, while no feasible tuning does so for the competitors, and the rule does not transfer to them. The contribution is the whole: the transform, the spline, the higher-order kernel, and the two rules.
 
 Several extensions are natural. The theorem gives consistency; a rate and a limiting distribution for the penalized estimator, and hence confidence bands, would make the estimator usable for inference about tail probabilities and pricing kernels. The tail completion is linear and could be replaced by a parametric tail fitted to the last quotes, as in \citet{figlewski2010}. Finally, a panel of dates rather than one snapshot would allow the stability of the estimate over time to be assessed, which is the criterion most of the applied literature uses.
 

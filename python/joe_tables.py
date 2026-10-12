@@ -138,7 +138,7 @@ def mc_tables():
             for i, name in enumerate(names):
                 m, s, k = _mc_cell(mc[tag]["reps"], name)
                 mat[i, j], se[i, j] = m, s
-                nrep[tag] = k
+                nrep[tag] = max(nrep.get(tag, 0), k)
         out = []
         for i, name in enumerate(names):
             cells = []
