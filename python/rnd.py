@@ -89,6 +89,7 @@ def estimate_rnd(
     shape=True,
     shape_lo=0.90,
     shape_hi=1.10,
+    obs_weights=None,
 ):
     """Risk-neutral density of ``S_T`` from one expiry's calls.
 
@@ -178,8 +179,8 @@ def estimate_rnd(
         kernel = higher
     if method not in ("fast", "fft", "naive"):
         raise ValueError("method must be 'naive', 'fft', or 'fast'")
-    if penalty not in ("search", "closed", "rule"):
-        raise ValueError("penalty must be 'search', 'closed', or 'rule'")
+    if penalty not in ("search", "closed", "rule", "gcv"):
+        raise ValueError("penalty must be 'search', 'closed', 'rule', or 'gcv'")
     tv_cap = TV_CAP if tv_cap is None else float(tv_cap)
     weights = _kernel_weights(kernel)
     K = np.asarray(K, dtype=float)
@@ -203,6 +204,10 @@ def estimate_rnd(
     else:
         h_use = float(h)
     Ks, Ps = _knots(K, C, stock, F, disc, tails=tails)
+    Ws = None
+    if obs_weights is not None:
+        w = np.asarray(obs_weights, dtype=float)[order]
+        Ws = _knot_weights(K, C, Ks, w, F, disc, tails=tails)
     n_fill = 0
     if fill:
         mode = "interior" if fill is True else str(fill)
@@ -223,14 +228,16 @@ def estimate_rnd(
             c_use = _choose_penalty(
                 K, C, Ks, Ps, h_use, stock, F, weights, method=method, tv_cap=tv_cap,
             )
+        elif penalty == "gcv":
+            c_use = _gcv_penalty(Ks, Ps, F, w=Ws)
         else:
             c_use = _closed_penalty(
                 Ks, Ps, h_use, F, weights, method=method, tv_cap=tv_cap,
             )
-        spl = _rule_spline(Ks, Ps, c_use, F)
+        spl = _rule_spline(Ks, Ps, c_use, F, w=Ws)
     else:
         c_use = float(c)
-        spl = CubicSpline(Ks, Ps, bc_type="natural") if c_use <= 0.0 else _rule_spline(Ks, Ps, c_use, F)
+        spl = CubicSpline(Ks, Ps, bc_type="natural") if c_use <= 0.0 else _rule_spline(Ks, Ps, c_use, F, w=Ws)
     level_at = None if K_price is None else np.asarray(K_price, dtype=float)
     n_pieces = 0
     if pieces:
@@ -836,11 +843,63 @@ def _convolve(spl, Ks, h, F, x, weights, level_at=None, with_plain=False, method
     raise ValueError("method must be 'naive', 'fft', or 'fast'")
 
 
-def _rule_spline(Ks, Ps, c, F):
+def _rule_spline(Ks, Ps, c, F, w=None):
     from scipy.interpolate import make_smoothing_spline
 
     lam = 0.0 if c <= 0.0 else float(c) * float(F) ** 3
-    return make_smoothing_spline(Ks, Ps, lam=lam)
+    if w is None:
+        return make_smoothing_spline(Ks, Ps, lam=lam)
+    return make_smoothing_spline(Ks, Ps, lam=lam, w=w)
+
+
+def _knot_weights(K, C, Ks, w, F, disc, tails=True):
+    """Weights on the knots of ``_knots``: the quoted weights, and the median weight on tail knots."""
+    w = np.maximum(np.asarray(w, dtype=float), 1e-12)
+    w = w / np.mean(w)
+    out = []
+    j = 0
+    K = np.asarray(K, dtype=float)
+    med = float(np.median(w))
+    for k in Ks:
+        while j < K.size and K[j] < k - 1e-8:
+            j += 1
+        if j < K.size and abs(K[j] - k) <= 1e-8:
+            out.append(w[j])
+        else:
+            out.append(med)
+    return np.asarray(out, dtype=float)
+
+
+def _gcv_penalty(Ks, Ps, F, w=None, grid=None, probes=24, seed=0):
+    """Generalized cross-validation of the smoothing spline on its own knots.
+
+    GCV(λ) = n RSS(λ) / (n − tr S(λ))^2. The trace of the smoother matrix is
+    estimated by Hutchinson's method with ``probes`` Rademacher vectors, the
+    same vectors at every λ. The grid is the dimensionless ``c`` of (8).
+    """
+    from scipy.interpolate import make_smoothing_spline
+
+    Ks = np.asarray(Ks, dtype=float)
+    Ps = np.asarray(Ps, dtype=float)
+    n = Ks.size
+    cs = np.geomspace(1e-9, 1e-2, 29) if grid is None else np.asarray(grid, float)
+    ww = np.ones(n) if w is None else np.asarray(w, dtype=float)
+    rng = np.random.default_rng(seed)
+    Z = rng.choice([-1.0, 1.0], size=(int(probes), n))
+    best_c, best = 0.0, np.inf
+    for c in cs:
+        lam = float(c) * float(F) ** 3
+        try:
+            fit = make_smoothing_spline(Ks, Ps, lam=lam, w=ww)(Ks)
+            tr = float(np.mean([z @ make_smoothing_spline(Ks, z, lam=lam, w=ww)(Ks) for z in Z]))
+        except Exception:
+            continue
+        rss = float(np.sum(ww * (Ps - fit) ** 2))
+        denom = max(n - tr, 1e-8)
+        score = n * rss / denom ** 2
+        if score < best:
+            best, best_c = score, float(c)
+    return best_c
 
 
 def clipped_variation(p):
