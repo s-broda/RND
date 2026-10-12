@@ -178,6 +178,38 @@ def mc_tables():
     write("mc_ours_diag", "\n".join(lines))
 
 
+def oracle_table():
+    mc = _load("mc")
+    orc = _load("mc_oracle")
+    if mc is None or orc is None:
+        return
+    keys = ["ours", "pca", "asl", "asd", "ghs_iv", "ghs_call"]
+    names = {"ours": "Ours", "pca": "PCA", "asl": "AS--Lo", "asd": "AS--Duarte", "ghs_iv": "GHS IV", "ghs_call": "GHS call"}
+    feas = {"ours": "ours_rule", "pca": "pca_cv", "asl": "asl_cv", "asd": "asd_cv", "ghs_iv": "ghs_iv_cv", "ghs_call": "ghs_call_cv"}
+    tags = [f"{m}/{c}/0.01" for m in ("heston", "vg", "bates") for c in ("dense", "sparse", "listed")]
+    tags = [t for t in tags if t in orc]
+    mat = np.full((len(keys), len(tags)), np.nan)
+    se = np.full_like(mat, np.nan)
+    for j, tag in enumerate(tags):
+        for i, k in enumerate(keys):
+            v = np.array([r[k]["ise"] for r in orc[tag]["reps"]], float) * 1e4
+            v = v[np.isfinite(v)]
+            mat[i, j], se[i, j] = v.mean(), v.std(ddof=1) / np.sqrt(v.size)
+    out = []
+    for i, k in enumerate(keys):
+        cells = []
+        for j, tag in enumerate(tags):
+            v = mat[i, j]
+            s = f"{v:.2f}" if v < 100 else f"{v:.0f}"
+            jmin = int(np.nanargmin(mat[:, j]))
+            if v - mat[jmin, j] <= 2.0 * np.sqrt(se[i, j] ** 2 + se[jmin, j] ** 2) + 1e-12:
+                s = f"\\textbf{{{s}}}"
+            cells.append(f"{s} ({se[i, j]:.2f})" if se[i, j] < 10 else f"{s} ({se[i, j]:.0f})")
+        out.append(names[k] + " & " + " & ".join(cells) + " \\\\")
+    write("mc_oracle", "\n".join(out))
+    (TAB / "mc_oracle_cols.tex").write_text(" & ".join(f"{MODEL[t.split('/')[0]]} {t.split('/')[1]}" for t in tags) + "\n")
+
+
 # ---------------------------------------------------------------- listed
 
 
@@ -298,6 +330,7 @@ def sens_tables():
 if __name__ == "__main__":
     exact_tables()
     mc_tables()
+    oracle_table()
     listed_tables()
     extra_tables()
     sens_tables()

@@ -339,6 +339,23 @@ Estimator & dense & sparse & dense & sparse & dense & sparse & dense & sparse & 
 \end{tabular}
 \end{table}
 
+Table~\ref{tab:mc-oracle} separates the estimator from its tuning. For each method and each replication it reports the ISE at the infeasible oracle bandwidth, the point of the common grid that minimizes the ISE on that draw; our estimator keeps the penalty rule at every candidate. The oracle rows bound what any tuning rule could achieve.
+
+\begin{table}[H]
+\centering
+\caption{Mean integrated squared error (\(\times 10^4\)) at the oracle bandwidth, \(\mathrm{sd}=0.01\), one hundred replications, standard error in parentheses. The oracle bandwidth minimizes the ISE of the draw on the common grid and is infeasible. Entries within two standard errors of the column minimum are in bold.}
+\label{tab:mc-oracle}
+\footnotesize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}l *{9}{r}@{}}
+\toprule
+Estimator & \tabinput{tables/mc_oracle_cols} \\
+\midrule
+\tabinput{tables/mc_oracle}
+\bottomrule
+\end{tabular}
+\end{table}
+
 \paragraph{Results}
 %%MCPROSE%%
 

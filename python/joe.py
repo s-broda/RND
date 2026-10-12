@@ -609,6 +609,60 @@ def run_mc(n_reps=200, sds=(0.005, 0.01, 0.02), names=None, workers=2, chains=("
     return result
 
 
+def mc_oracle_one(model, chain, sd, rep, keys):
+    """Infeasible oracle: for each method, the grid bandwidth that minimizes the ISE on this draw."""
+    p, calls, dens = models()[model]
+    K = CHAINS[chain]
+    K_eval = np.linspace(60.0, 150.0, 401)
+    q_true = dens(K_eval)
+    rng = np.random.default_rng([20260923, rep, {"heston": 1, "vg": 2, "bates": 3}[model],
+                                 {"dense": 1, "sparse": 2, "listed": 3}[chain], int(round(sd * 1e4))])
+    C_true = np.maximum(calls(K), 0.0)
+    C_obs = iv_noise(K, C_true, p.S0, p.r, p.T, p.q, rng, sd)
+    Cp = projected_calls(K, C_obs, p.r, p.T, p.forward)
+    grid = common_grid(K, Cp, p.S0, p.r, p.T, p.q, p.forward)
+    out = {}
+    for key in keys:
+        fit = FITS[key]
+        best, best_h = np.inf, float("nan")
+        for h in grid:
+            try:
+                _, q_hat, _ = fit(K, Cp, p.S0, p.r, p.T, p.q, p.forward, K[:1], K_eval, float(h))
+            except Exception:
+                continue
+            err = ise(K_eval, q_hat, q_true)
+            if err < best:
+                best, best_h = err, float(h)
+        out[key] = dict(ise=best, h=best_h)
+    return out
+
+
+def run_mc_oracle(n_reps=100, sd=0.01, workers=2, chains=("dense", "sparse", "listed"),
+                  model_names=("heston", "vg", "bates")):
+    from concurrent.futures import ProcessPoolExecutor
+
+    keys = list(FITS)
+    path = OUT / "mc_oracle.json"
+    result = json.loads(path.read_text()) if path.exists() else {}
+    for model in model_names:
+        for chain in chains:
+            tag = f"{model}/{chain}/{sd}"
+            if len(result.get(tag, {}).get("reps", [])) >= n_reps:
+                continue
+            t0 = time.time()
+            with ProcessPoolExecutor(max_workers=workers) as ex:
+                reps = list(ex.map(mc_oracle_one, [model] * n_reps, [chain] * n_reps, [sd] * n_reps,
+                                   range(n_reps), [keys] * n_reps, chunksize=4))
+            result[tag] = dict(model=model, chain=chain, sd=sd, reps=reps)
+            path.write_text(json.dumps(result))
+            print(f"{tag}: {n_reps} oracle reps in {time.time()-t0:.0f}s", flush=True)
+            for key in keys:
+                v = np.array([r[key]["ise"] for r in reps], float)
+                v = v[np.isfinite(v)]
+                print(f"   {key:10} oracle mean ISE {v.mean():.3e}  se {v.std(ddof=1)/np.sqrt(v.size):.1e}")
+    return result
+
+
 # ----------------------------------------------------------------------
 # Sensitivity of the rule
 # ----------------------------------------------------------------------
@@ -685,6 +739,8 @@ if __name__ == "__main__":
         run_mc()
     elif what == "sens":
         run_sensitivity()
+    elif what == "oracle":
+        run_mc_oracle()
     elif what == "figures":
         pass
     else:
