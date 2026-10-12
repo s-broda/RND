@@ -174,13 +174,22 @@ FITS = {
 # ----------------------------------------------------------------------
 
 
-def tune_cv(fit):
-    """Even/odd out-of-the-money pricing error on the common grid."""
+def tune_cv(fit, floor=None):
+    """Even/odd out-of-the-money pricing error on the common grid.
+
+    ``floor(K)`` is a method-specific lower bound on the bandwidth below which
+    the method is not defined as its authors intend it; PCA needs a kernel at
+    least as wide as its node spacing, which is the strike range over sixty
+    once the node count is capped.
+    """
 
     def _tune(K, C, S0, r, T, q, F):
         K = np.asarray(K, dtype=float)
         C = np.asarray(C, dtype=float)
         grid = common_grid(K, C, S0, r, T, q, F)
+        if floor is not None:
+            lo = float(floor(K))
+            grid = grid[grid >= lo] if np.any(grid >= lo) else np.array([lo])
         best_h, best = float(grid[0]), np.inf
         for h in grid:
             errs = []
@@ -233,7 +242,7 @@ def tune_ghs_loo_call(mult=1.0):
 METHODS = {
     "ours_rule": ("ours", tune_rule_ours, "Ours, rule", "main"),
     "ours_cv": ("ours", tune_cv(fit_ours), "Ours, CV", "main"),
-    "pca_cv": ("pca", tune_cv(fit_pca), "PCA, CV", "main"),
+    "pca_cv": ("pca", tune_cv(fit_pca, floor=lambda K: (K[-1] - K[0]) / 60.0), "PCA, CV", "main"),
     "asl_cv": ("asl", tune_cv(fit_asl), "AS--Lo, CV", "main"),
     "asd_cv": ("asd", tune_cv(fit_asd), "AS--Duarte, CV", "main"),
     "ghs_iv_cv": ("ghs_iv", tune_cv(fit_ghs_iv), "GHS IV, CV", "main"),
