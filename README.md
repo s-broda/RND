@@ -1,12 +1,32 @@
-# Thricing Is All You Need
+# Thricing: A Sixth-Order Kernel Estimator of the Risk-Neutral Density from a Single Option Chain
 
 Replication code for
 
-> Simon A. Broda, *Thricing Is All You Need: Identifying Risk-Neutral Densities from an Empirical Measure of Listed Quotes*.
+> Simon A. Broda, *Thricing: A Sixth-Order Kernel Estimator of the Risk-Neutral Density from a Single Option Chain*.
 
 The headline estimator rescales European calls to a complementary cdf, fits that measure with a smoothing spline, completes the unquoted tails, and applies a Gaussian convolution with the three-bandwidth jackknife \(\tfrac83 f_h-2f_{h\sqrt{2}}+\tfrac13 f_{2h}\). `estimate_rnd` in `python/rnd.py` is that estimator. `method` selects the convolution. `naive` sums the closed-form cell integrals. `fft` is one real FFT of the sampled spline. `fast`, the default, is one FFT of the order-eight box moments in `python/density_closed.c`, with thricing as one multiplier. `estimate_rnd` compiles that file when a C compiler is present. If it cannot be compiled, `fast` uses the sampled-spline FFT. `fft` and `naive` do not use the compiler. The penalty is zero when the thriced interpolant scores at most the kernel's own positive-part variation, about \(1.007\), on \([0.60F, 1.30F]\). The tables report that same functional. The bandwidth is \(0.34\gamma F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\). The factor \(\gamma\) is the interquartile range of the positive call butterflies, divided by the normal interquartile range of scale \(F \sigma_{\mathrm{ATM}} \sqrt{T}\), and clipped to \([0.90, 1.10]\). The defaults are thricing, tails, the `n^{-1/9}` bandwidth, `penalty="closed"`, `tv_cap` equal to that kernel score, and `method="fast"`. `penalty="closed"` is `((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)`, with `t` the clipped variation of the thriced interpolant on `[0.60F, 1.30F]`. `penalty="search"` keeps the 17-point grid and the curvature corner. Pass `c=0` for the cubic through the knots, `kernel="twice"` or `kernel="plain"` for the other convolutions, `tails=False` to drop the endpoint knots, and `h` or `deriv_c` to change the bandwidth.
 
-## Run
+## Run (paper tables and figures)
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 python/joe.py exact      # Tables 1-2: exact quotes
+python3 python/joe.py mc         # Tables 3-5: Monte Carlo (several hours on two cores)
+python3 python/joe.py sens       # Table 6: sensitivity to the bandwidth constant and penalty
+python3 python/joe.py listed     # Tables 7-8, B.1: the four listed chains
+python3 python/joe.py extra      # Table 9, C.1: every further monthly chain (needs the Cboe dumps)
+python3 python/joe.py figures    # figures/ccdf_listed.pdf
+python3 python/joe_tables.py     # writes tables/*.tex from python/results/joe/*.json
+```
+
+`joe.py` tunes every method by the same even/odd pricing cross-validation on a common geometric
+bandwidth grid, nested inside the hold-out, and also reports the rules of the source papers.
+Errors are reported in index points, in quoted half-spreads (the slices carry the bid-ask spread of
+the quoted side), and in implied volatility. The Monte Carlo covers Heston, variance gamma and the
+Bates jump diffusion (`src/bates.py`) at three noise levels on three meshes. `replicate.py` is the
+earlier replication script and still runs; `joe.py` supersedes it for the paper.
+
+## Run (earlier replication script)
 
 ```bash
 python3 -m pip install -r requirements.txt
