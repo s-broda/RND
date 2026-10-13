@@ -18,8 +18,8 @@ paper_v2.out
 paper_v2.spl
 elsarticle-harv.bst
 *.synctex.gz
-figures/
 python/results/cboe_*.json
 python/results/__pycache__/
 .venv/
 venv/
+python/results/tables/*.log

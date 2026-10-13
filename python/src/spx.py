@@ -36,6 +36,7 @@ class SpxSlice:
     C: np.ndarray
     source: np.ndarray  # "P" or "C"
     root: str = "SPX"
+    spread: np.ndarray | None = None  # bid-ask spread of the quoted OTM side
 
     @property
     def disc(self) -> float:
@@ -138,16 +139,18 @@ def build_otm_slice(
     disc = math.exp(-r * T)
     dfq = math.exp(-q * T)
 
-    Ks, Ps, Cs, src = [], [], [], []
+    Ks, Ps, Cs, src, spr = [], [], [], [], []
     for K in sorted(set(puts) | set(calls)):
         if K <= F and K in puts:
             P = puts[K]["mid"]
             C = P + dfq * S0 - K * disc
             side = "P"
+            width = puts[K]["spread"]
         elif K >= F and K in calls:
             C = calls[K]["mid"]
             P = C - dfq * S0 + K * disc
             side = "C"
+            width = calls[K]["spread"]
         else:
             continue
         if P <= 0.0 or C <= 0.0:
@@ -156,15 +159,17 @@ def build_otm_slice(
         Ps.append(P)
         Cs.append(C)
         src.append(side)
+        spr.append(width)
 
-    Ks, Ps, Cs = np.asarray(Ks), np.asarray(Ps), np.asarray(Cs)
+    Ks, Ps, Cs, spr = np.asarray(Ks), np.asarray(Ps), np.asarray(Cs), np.asarray(spr)
     # Drop leftover deep-OTM puts that are still ticks after parity (left wing only).
     keep = np.ones(len(Ks), dtype=bool)
     left = Ks < 0.70 * F
     keep[left] &= Ps[left] >= 0.50
-    Ks, Ps, Cs, src = Ks[keep], Ps[keep], Cs[keep], np.asarray(src)[keep]
+    Ks, Ps, Cs, src, spr = Ks[keep], Ps[keep], Cs[keep], np.asarray(src)[keep], spr[keep]
     return SpxSlice(
-        S0=S0, r=r, q=q, T=T, F=F, expiry=expiry, asof=ts, K=Ks, P=Ps, C=Cs, source=src, root=root
+        S0=S0, r=r, q=q, T=T, F=F, expiry=expiry, asof=ts, K=Ks, P=Ps, C=Cs, source=src,
+        root=root, spread=spr,
     )
 
 
@@ -177,9 +182,14 @@ def save_slice(sl: SpxSlice, path: Path) -> None:
             f"# root={sl.root} expiry={sl.expiry.isoformat()} asof={sl.asof} "
             f"S0={sl.S0:.8g} r={sl.r:.8g} q={sl.q:.12g} T={sl.T:.12g} F={sl.F:.12g}\n"
         )
-        f.write("K,P,C,source\n")
-        for K, P, C, src in zip(sl.K, sl.P, sl.C, sl.source):
-            f.write(f"{K:.8g},{P:.8g},{C:.8g},{src}\n")
+        if sl.spread is None:
+            f.write("K,P,C,source\n")
+            for K, P, C, src in zip(sl.K, sl.P, sl.C, sl.source):
+                f.write(f"{K:.8g},{P:.8g},{C:.8g},{src}\n")
+        else:
+            f.write("K,P,C,source,spread\n")
+            for K, P, C, src, w in zip(sl.K, sl.P, sl.C, sl.source, sl.spread):
+                f.write(f"{K:.8g},{P:.8g},{C:.8g},{src},{w:.8g}\n")
 
 
 def load_slice(path: Path) -> SpxSlice:
@@ -194,15 +204,18 @@ def load_slice(path: Path) -> SpxSlice:
                 k, v = part.split("=", 1)
                 meta[k] = v
         start = 1
-    Ks, Ps, Cs, src = [], [], [], []
+    Ks, Ps, Cs, src, spr = [], [], [], [], []
     for line in lines[start + 1 :]:
         if not line.strip():
             continue
-        k, p, c, s = line.split(",")
+        parts = line.split(",")
+        k, p, c, s = parts[:4]
         Ks.append(float(k))
         Ps.append(float(p))
         Cs.append(float(c))
         src.append(s.strip())
+        if len(parts) > 4:
+            spr.append(float(parts[4]))
     exp = date.fromisoformat(meta["expiry"])
     return SpxSlice(
         S0=float(meta["S0"]),
@@ -217,6 +230,7 @@ def load_slice(path: Path) -> SpxSlice:
         C=np.asarray(Cs),
         source=np.asarray(src),
         root=meta.get("root", "SPX"),
+        spread=np.asarray(spr) if len(spr) == len(Ks) and spr else None,
     )
 
 

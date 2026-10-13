@@ -1,4 +1,13 @@
-all: replicate
+all: tables
+
+tables:
+	python3 python/replicate.py exact
+	python3 python/replicate.py listed
+	python3 python/replicate.py extra
+	python3 python/replicate.py sens
+	python3 python/replicate.py mc
+	python3 python/replicate.py figures
+	python3 python/tables.py
 
 replicate:
 	python3 python/replicate.py
