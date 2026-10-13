@@ -13,16 +13,23 @@ thricing as one multiplier. ``"fast"`` is the default. If that file cannot
 be compiled, ``"fast"`` uses the sampled-spline FFT; ``"fft"`` and
 ``"naive"`` do not depend on the compiler.
 
-Thricing and the closed-form penalty are on by default. That penalty is
-``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``: ``t`` is the clipped total
-variation of the thriced interpolant on ``[0.60F, 1.30F]``, completed to
-zero at the two endpoints and divided by twice the maximum. A unimodal
-curve scores 1. The tables report that same functional.
-``v_* - 1`` is the excess variation of that kernel, ``δ``
-is the median knot spacing, and ``tv_cap`` defaults to the kernel's own
-positive-part score, about ``1.007``. ``penalty="search"`` replaces the formula by
-the 17-point grid and the curvature corner. The default bandwidth is
-``0.34 F σ_ATM √T n^{-1/9}``.
+Thricing and the closed-form penalty are on by default. The smoothing
+spline is thriced as well: ``S = 1 - (1 - S_λ)^3``, the cubic smoothing
+spline applied to the knots, then twice to its own residuals, with the
+three fits added. The roughness ``ρ = (t - tv_cap)_+ / (v_* - 1)`` reads
+``t``, the clipped total variation of the thriced interpolant on
+``[0.60F, 1.30F]``, completed to zero at the two endpoints and divided by
+twice the maximum; a unimodal curve scores 1, and the tables report that
+same functional. ``v_* - 1`` is the excess variation of the kernel and
+``tv_cap`` defaults to the kernel's own positive-part score, about
+``1.007``. The penalty is ``c = x h^4 / (δ F^3)`` with ``x = t_3/(1 - t_3)``,
+``t_3 = (ρ/(1+ρ))^{1/3}``, so that the thriced spline attenuates the
+frequency ``1/h`` by ``1/(1+ρ)``; ``δ`` is the median knot spacing. The
+bandwidth is ``h = h_0 (1 + ρ_0)^{1/6}``, where ``h_0 = 0.34 γ F σ_ATM √T
+n^{-1/9}`` and ``ρ_0`` is the roughness read at ``h_0``; the penalty uses
+the roughness read at ``h``. ``penalty="search"`` replaces the formula by
+the 17-point grid and the curvature corner. ``spline_k=1`` and ``widen=0``
+give the cubic smoothing spline and the unwidened bandwidth.
 
 Pass ``c=0`` for the cubic through the knots, ``kernel="twice"`` or
 ``kernel="plain"`` for the other convolutions, and ``tails=False`` to drop
@@ -90,17 +97,22 @@ def estimate_rnd(
     shape_lo=0.90,
     shape_hi=1.10,
     obs_weights=None,
+    spline_k=3,
+    widen=1.0 / 6.0,
 ):
     """Risk-neutral density of ``S_T`` from one expiry's calls.
 
-    The default is the estimator in the paper: tails, thricing, bandwidth
-    ``γ deriv_c F σ_ATM √T n^{-1/9}`` with ``deriv_c=0.34``, and the penalty
-    ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``. ``t`` is the clipped
-    variation of the thriced interpolant on ``[0.60F, 1.30F]``. ``γ`` is
-    the butterfly interquartile range divided by the normal interquartile
-    range of scale ``F σ_ATM √T``, clipped to ``[shape_lo, shape_hi]``.
-    ``tv_cap`` defaults
-    to the thriced kernel's positive-part score.
+    The default is the estimator in the paper: tails, a thriced kernel, a
+    thriced smoothing spline, the bandwidth ``h_0 (1 + ρ_0)^{1/6}`` with
+    ``h_0 = γ deriv_c F σ_ATM √T n^{-1/9}``, ``deriv_c=0.34``, and the
+    penalty ``x h^4 / (δ F^3)`` with ``x = t_3/(1 - t_3)``,
+    ``t_3 = (ρ/(1+ρ))^{1/3}``. ``ρ = (t - tv_cap)_+ / (v_* - 1)`` is the
+    roughness of the thriced interpolant, read from its clipped variation
+    ``t`` on ``[0.60F, 1.30F]``; ``ρ_0`` is read at ``h_0`` and ``ρ`` at
+    ``h``. ``γ`` is the butterfly interquartile range divided by the normal
+    interquartile range of scale ``F σ_ATM √T``, clipped to
+    ``[shape_lo, shape_hi]``. ``tv_cap`` defaults to the thriced kernel's
+    positive-part score.
 
     Parameters
     ----------
@@ -118,8 +130,9 @@ def estimate_rnd(
         Strikes at which to return calls. Omitted if None.
     h : float or "deriv", optional
         Bandwidth. ``"deriv"`` (the default) is the rule above, including
-        the butterfly factor when ``shape`` is true. A number is used as
-        given and is not scaled again.
+        the butterfly factor when ``shape`` is true and the widening by
+        ``(1 + ρ_0)^widen``. A number is used as given: it is neither
+        scaled nor widened.
     tails : bool
         Add the knots ``(0, 0)`` and, when the call has not died,
         ``(K_end, 1)``.
@@ -132,8 +145,8 @@ def estimate_rnd(
         the knots.
     penalty : {"closed", "rule", "search"}
         Used when ``c="rule"``. ``"closed"`` (the default) and ``"rule"``
-        are ``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)``, with ``t`` on
-        ``[0.60F, 1.30F]``. ``"search"``
+        are ``x h^4 / (δ F^3)`` with ``x`` the attenuation solve above, with
+        ``t`` on ``[0.60F, 1.30F]``. ``"search"``
         is the ``SMOOTH_C`` grid and the curvature corner.
     tv_cap : float, optional
         Clipped-variation allowance for both selectors. The default is the
@@ -168,12 +181,21 @@ def estimate_rnd(
         ``"fast"`` transforms the box moments. ``"fft"`` transforms the
         sampled spline. ``"naive"`` sums the cell integrals. ``"fast"``
         falls back to ``"fft"`` when ``density_closed.c`` cannot be compiled.
+    spline_k : int
+        Number of passes of the smoothing spline, ``1 - (1 - S_λ)^k``.
+        ``3`` is the paper's thriced spline; ``1`` is the cubic smoothing
+        spline itself. The penalty rule solves for the attenuation of the
+        ``k``-pass spline.
+    widen : float
+        Exponent of the bandwidth widening ``(1 + ρ_0)^widen`` applied when
+        the bandwidth comes from the formula. ``1/6`` is the paper's rule;
+        ``0`` leaves ``h_0``.
 
     Returns
     -------
     dict
         ``q`` on ``K_eval``, ``C`` on ``K_price`` or None, ``h`` the
-        bandwidth, and ``c`` the penalty.
+        bandwidth, ``c`` the penalty, and ``rho`` the roughness at ``h``.
     """
     if higher is not None:
         kernel = higher
@@ -223,21 +245,26 @@ def estimate_rnd(
             Ks, Ps, h_use, float(K[0]), float(K[-1]),
             tails_too=(mode == "all"), min_gap=min_gap,
         )
+    rho = float("nan")
+    rule_h = h is None or h == "deriv"
     if c == "rule":
         if penalty == "search":
             c_use = _choose_penalty(
                 K, C, Ks, Ps, h_use, stock, F, weights, method=method, tv_cap=tv_cap,
+                k=spline_k,
             )
         elif penalty == "gcv":
             c_use = _gcv_penalty(Ks, Ps, F, w=Ws)
         else:
-            c_use = _closed_penalty(
-                Ks, Ps, h_use, F, weights, method=method, tv_cap=tv_cap,
-            )
-        spl = _rule_spline(Ks, Ps, c_use, F, w=Ws)
+            if rule_h and widen and float(widen) > 0.0:
+                rho0 = _roughness(Ks, Ps, h_use, F, weights, method=method, tv_cap=tv_cap)
+                h_use *= (1.0 + rho0) ** float(widen)
+            rho = _roughness(Ks, Ps, h_use, F, weights, method=method, tv_cap=tv_cap)
+            c_use = _closed_penalty(Ks, Ps, h_use, F, rho=rho, k=spline_k)
+        spl = _rule_spline(Ks, Ps, c_use, F, w=Ws, k=spline_k)
     else:
         c_use = float(c)
-        spl = CubicSpline(Ks, Ps, bc_type="natural") if c_use <= 0.0 else _rule_spline(Ks, Ps, c_use, F, w=Ws)
+        spl = CubicSpline(Ks, Ps, bc_type="natural") if c_use <= 0.0 else _rule_spline(Ks, Ps, c_use, F, w=Ws, k=spline_k)
     level_at = None if K_price is None else np.asarray(K_price, dtype=float)
     n_pieces = 0
     if pieces:
@@ -264,6 +291,7 @@ def estimate_rnd(
         "n_fill": int(n_fill),
         "shape": float(shape_factor),
         "n_pieces": int(n_pieces),
+        "rho": float(rho),
     }
 
 
@@ -843,13 +871,28 @@ def _convolve(spl, Ks, h, F, x, weights, level_at=None, with_plain=False, method
     raise ValueError("method must be 'naive', 'fft', or 'fast'")
 
 
-def _rule_spline(Ks, Ps, c, F, w=None):
-    from scipy.interpolate import make_smoothing_spline
+def _rule_spline(Ks, Ps, c, F, w=None, k=3):
+    """The ``k``-pass smoothing spline ``1 - (1 - S_λ)^k`` through the knots.
+
+    The cubic smoothing spline is fitted to the knot values, then to its
+    own residuals ``k - 1`` more times, and the fits are added. Each pass is
+    a cubic spline on the same knots, so the sum is one. ``k=3`` is the
+    thriced spline of the paper; ``k=1`` is the smoothing spline itself.
+    """
+    from scipy.interpolate import BSpline, make_smoothing_spline
 
     lam = 0.0 if c <= 0.0 else float(c) * float(F) ** 3
-    if w is None:
-        return make_smoothing_spline(Ks, Ps, lam=lam)
-    return make_smoothing_spline(Ks, Ps, lam=lam, w=w)
+    kwargs = {} if w is None else {"w": w}
+    spl = make_smoothing_spline(Ks, Ps, lam=lam, **kwargs)
+    if lam <= 0.0 or int(k) <= 1:
+        return spl
+    t, coef = spl.t, spl.c.copy()
+    fit = spl(Ks)
+    for _ in range(int(k) - 1):
+        step = make_smoothing_spline(Ks, Ps - fit, lam=lam, **kwargs)
+        coef = coef + step.c
+        fit = fit + step(Ks)
+    return BSpline(t, coef, 3)
 
 
 def _knot_weights(K, C, Ks, w, F, disc, tails=True):
@@ -974,39 +1017,67 @@ def _kernel_excess(weights):
     return excess
 
 
-def _closed_penalty(Ks, Ps, h, F, weights, tv_cap=None, method="fast"):
-    """``((t - tv_cap)_+ / (v_* - 1)) h^4 / (δ F^3)`` from one interpolant.
+def _roughness(Ks, Ps, h, F, weights, tv_cap=None, method="fast"):
+    """``ρ = (t - tv_cap)_+ / (v_* - 1)`` from the thriced interpolant at ``h``.
 
     ``t`` is the clipped total variation of the thriced interpolant on
-    ``[0.60F, 1.30F]``, completed to zero at the window ends. ``δ``
-    is the median knot spacing, the gap in the smoothing-spline damper
-    ``1/(1 + λ δ ω^4)``. The frequency ``ω = 1/h`` turns an excess count
-    ``ρ`` into ``λ δ = ρ h^4``.
+    ``[0.60F, 1.30F]``, completed to zero at the window ends, and
+    ``v_* - 1`` the excess variation of the kernel, so ``ρ`` counts the
+    excess roughness in units of one kernel sidelobe.
     """
     if tv_cap is None:
         tv_cap = TV_CAP
     s = np.linspace(max(50.0, 0.2 * float(F)), 2.4 * float(F), 700)
     q, _G = _convolve(
-        _rule_spline(Ks, Ps, 0.0, F), Ks, h, F, s, weights, method=method,
+        CubicSpline(Ks, Ps, bc_type="natural"), Ks, h, F, s, weights, method=method,
     )
     t, _peaks, _corr = _shape_scores(q, q, F, s)
+    if not np.isfinite(t):
+        return 0.0
+    return max(float(t) - float(tv_cap), 0.0) / _kernel_excess(weights)
+
+
+def _spline_x(rho, k=3):
+    """``λ δ / h^4`` at which the ``k``-pass spline attenuates ``ω = 1/h`` by ``1/(1+ρ)``.
+
+    The ``k``-pass spline multiplies a Fourier mode by ``1 - (x/(1+x))^k``
+    with ``x = λ δ ω^4``. Setting that equal to ``1/(1+ρ)`` at ``ω = 1/h``
+    gives ``x = t/(1-t)`` with ``t = (ρ/(1+ρ))^{1/k}``; for ``k=1``, ``x = ρ``.
+    """
+    rho = max(float(rho), 0.0)
+    if rho <= 0.0:
+        return 0.0
+    if int(k) <= 1:
+        return rho
+    t = (rho / (1.0 + rho)) ** (1.0 / int(k))
+    return t / (1.0 - t)
+
+
+def _closed_penalty(Ks, Ps, h, F, weights=None, tv_cap=None, method="fast", rho=None, k=3):
+    """``x(ρ) h^4 / (δ F^3)``: the penalty at which the spline attenuates ``1/h`` by ``1/(1+ρ)``.
+
+    ``ρ`` is the roughness of the thriced interpolant at ``h``, computed
+    here when not supplied. ``δ`` is the median knot spacing, the gap in
+    the smoothing-spline damper ``1/(1 + λ δ ω^4)``; ``x`` is ``_spline_x``.
+    """
+    if rho is None:
+        rho = _roughness(Ks, Ps, h, F, weights, tv_cap=tv_cap, method=method)
     gaps = np.diff(np.asarray(Ks, float))
     gaps = gaps[gaps > 1e-12]
     delta = float(np.median(gaps)) if gaps.size else float(h)
-    if not np.isfinite(t) or delta <= 0.0 or float(F) == 0.0:
+    if not np.isfinite(rho) or delta <= 0.0 or float(F) == 0.0:
         return 0.0
-    rho = max(float(t) - float(tv_cap), 0.0) / _kernel_excess(weights)
-    return float(rho * (float(h) ** 4) / (delta * float(F) ** 3))
+    return float(_spline_x(rho, k) * (float(h) ** 4) / (delta * float(F) ** 3))
 
 
-def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5, method="fast", tv_cap=None):
+def _choose_penalty(K, C, Ks, Ps, h, stock, F, weights, curv_min=0.5, method="fast", tv_cap=None, k=3):
     """Smallest unimodal penalty, then the corner when the bend is sharp."""
     if tv_cap is None:
         tv_cap = TV_CAP
     s = np.linspace(max(50.0, 0.2 * F), 2.4 * F, 700)
     rows = []
     for c in SMOOTH_C:
-        spl = _rule_spline(Ks, Ps, c, F)
+        spl = _rule_spline(Ks, Ps, c, F, k=k)
         q, G, q_plain = _convolve(
             spl, Ks, h, F, s, weights, level_at=K, with_plain=True, method=method,
         )

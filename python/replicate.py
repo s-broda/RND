@@ -240,7 +240,7 @@ def tune_ghs_loo_call(mult=1.0):
 
 
 def tune_rule_h(scale=1.0):
-    """The rule bandwidth (16) of our estimator, handed to another method.
+    """The rule bandwidth of our estimator, handed to another method.
 
     ``scale`` converts a Gaussian standard deviation into the method's own
     bandwidth unit: the quartic kernel on [-h, h] has standard deviation
@@ -268,11 +268,11 @@ METHODS = {
     "ghs_iv_loo2": ("ghs_iv", tune_ghs_loo_iv(2.0), "GHS IV, 2$\\times$LOO", "rule"),
     "ghs_call_loo": ("ghs_call", tune_ghs_loo_call(1.0), "GHS call, LOO", "rule"),
     "ghs_call_loo2": ("ghs_call", tune_ghs_loo_call(2.0), "GHS call, 2$\\times$LOO", "rule"),
-    "pca_ruleh": ("pca", tune_rule_h(1.0), "PCA, at (16)", "transfer"),
-    "asl_ruleh": ("asl", tune_rule_h(1.0), "AS--Lo, at (16)", "transfer"),
-    "asd_ruleh": ("asd", tune_rule_h(1.0), "AS--Duarte, at (16)", "transfer"),
-    "ghs_iv_ruleh": ("ghs_iv", tune_rule_h(np.sqrt(7.0)), "GHS IV, at (16)", "transfer"),
-    "ghs_call_ruleh": ("ghs_call", tune_rule_h(np.sqrt(7.0)), "GHS call, at (16)", "transfer"),
+    "pca_ruleh": ("pca", tune_rule_h(1.0), "PCA, at \\eqref{eq:h-widen}", "transfer"),
+    "asl_ruleh": ("asl", tune_rule_h(1.0), "AS--Lo, at \\eqref{eq:h-widen}", "transfer"),
+    "asd_ruleh": ("asd", tune_rule_h(1.0), "AS--Duarte, at \\eqref{eq:h-widen}", "transfer"),
+    "ghs_iv_ruleh": ("ghs_iv", tune_rule_h(np.sqrt(7.0)), "GHS IV, at \\eqref{eq:h-widen}", "transfer"),
+    "ghs_call_ruleh": ("ghs_call", tune_rule_h(np.sqrt(7.0)), "GHS call, at \\eqref{eq:h-widen}", "transfer"),
 }
 TRANSFER = [k for k, v in METHODS.items() if v[3] == "transfer"]
 MAIN = [k for k, v in METHODS.items() if v[3] == "main"]
