@@ -10,32 +10,25 @@ The headline estimator rescales European calls to a complementary cdf, fits that
 
 ```bash
 python3 -m pip install -r requirements.txt
-python3 python/joe.py exact      # Tables 1-2: exact quotes
-python3 python/joe.py mc         # Tables 3-5: Monte Carlo (several hours on two cores)
-python3 python/joe.py sens       # Table 6: sensitivity to the bandwidth constant and penalty
-python3 python/joe.py listed     # Tables 7-8, B.1: the four listed chains
-python3 python/joe.py extra      # Table 9, C.1: every further monthly chain (needs the Cboe dumps)
-python3 python/joe.py figures    # figures/ccdf_listed.pdf
-python3 python/joe_tables.py     # writes tables/*.tex from python/results/joe/*.json
+python3 python/replicate.py exact      # Tables 1-2: exact quotes
+python3 python/replicate.py mc         # Tables 3-5: Monte Carlo (several hours on two cores)
+python3 python/replicate.py sens       # Table 6: sensitivity to the bandwidth constant and penalty
+python3 python/replicate.py listed     # Tables 7-8, B.1: the four listed chains
+python3 python/replicate.py extra      # Table 9, C.1: every further monthly chain (needs the Cboe dumps)
+python3 python/replicate.py figures    # figures/ccdf_listed.pdf
+python3 python/tables.py     # writes tables/*.tex from python/results/tables/*.json
 ```
 
-`joe.py` tunes every method by the same even/odd pricing cross-validation on a common geometric
+`replicate.py` tunes every method by the same even/odd pricing cross-validation on a common geometric
 bandwidth grid, nested inside the hold-out, and also reports the rules of the source papers.
 Errors are reported in index points, in quoted half-spreads (the slices carry the bid-ask spread of
 the quoted side), and in implied volatility. The Monte Carlo covers Heston, variance gamma and the
-Bates jump diffusion (`src/bates.py`) at three noise levels on three meshes. `replicate.py` is the
-earlier replication script and still runs; `joe.py` supersedes it for the paper.
-
-## Run (earlier replication script)
-
-```bash
-python3 -m pip install -r requirements.txt
-python3 python/replicate.py
-```
-
-This prints the Heston and variance-gamma ISE tables, the same competitors on those chains and on noisy Heston quotes, and the listed SPX/NDX/RUT pricing table, and writes `figures/ccdf_heston_rnd.pdf`, `figures/ccdf_vg_rnd.pdf`, `figures/ccdf_listed.pdf`, and `figures/ccdf_listed_kern.pdf`.
-
-Every listed fit starts from the same unpenalized decreasing-convex projection of the quoted calls and is scored against the quoted mids. Aït-Sahalia–Duarte is one Gaussian local linear at the Fan–Gijbels plug-in, and the density is the scaled and shifted derivative of that fit. Bondarenko’s positive convolution approximation is a Gaussian kernel on the spot, mixed on a uniform strike grid, with nonnegative weights of unit mass and mean equal to the forward; the bandwidth minimises even/odd pricing error. Aït-Sahalia–Lo is Nadaraya–Watson of implied volatility on moneyness. The listed, exact, and noisy rows use the smallest moneyness bandwidth on a grid from 0.01 to 0.40 that leaves one peak and total variation at most 1.05 on \([0.55F, 1.40F]\), not the Appendix A constant. The Grith–Härdle–Schienle bandwidth is the leave-one-out width of the local cubic, and the comparison also reports twice that width. The spline is priced at the bandwidth \(0.34\gamma F \sigma_{\mathrm{ATM}} \sqrt{T}\, n^{-1/9}\), with \(\gamma\) the clipped butterfly factor above. Exact Heston and variance-gamma quotes are scored for the spline at an oracle bandwidth and at the \(n^{-1/9}\) rule, and for the same competitors, on a dense grid and on a 32-strike grid. Noisy Heston repeats that comparison over 30 draws of implied-volatility noise with standard deviation 0.01. The reported estimator is that smoothing spline. On each of the four listed chains that row has the smallest hold-out, and the same ranking holds in the average. The row has one peak, mass 1.0, and total variation 1.0. The script prints that row on the exact chains, on the noisy Heston draws, and as the listed row, and then the wall-clock time of `naive`, `fft`, and `fast` at penalty zero, with the penalty rule not applied. The twenty-three further chains in the appendix are not in this run. Under the Cboe Global Markets North American Data Policies, effective 1 September 2026, a recipient of delayed Cboe options quotes may not redistribute them externally except to a named affiliate, and historical quotes may be redistributed to anyone else only under a data agreement and Cboe's approval. The parenthetical is that time in seconds, half-up to three decimals. Those times are the computational section of the paper, where `fast` is the FFT+ME column. The four working slices are one Cboe session, 23 September 2026.
+Bates jump diffusion (`src/bates.py`) at three noise levels on three meshes, plus an oracle-bandwidth
+run (`replicate.py oracle`) and the competitors at our bandwidth (`replicate.py transfer`).
+`variants.py` runs the GCV, positive-part and weighted variants; `mc_driver.py` is the Monte Carlo
+driver used for the paper. The Heston and variance-gamma figures of the exact designs are drawn by
+`replicate.py figures` as well. The further chains of the appendix need the Cboe dumps
+`python/results/cboe_*.json`, which are not shipped (see below).
 
 ## Data
 

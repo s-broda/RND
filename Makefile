@@ -1,13 +1,13 @@
 all: tables
 
 tables:
-	python3 python/joe.py exact
-	python3 python/joe.py listed
-	python3 python/joe.py extra
-	python3 python/joe.py sens
-	python3 python/joe.py mc
-	python3 python/joe.py figures
-	python3 python/joe_tables.py
+	python3 python/replicate.py exact
+	python3 python/replicate.py listed
+	python3 python/replicate.py extra
+	python3 python/replicate.py sens
+	python3 python/replicate.py mc
+	python3 python/replicate.py figures
+	python3 python/tables.py
 
 replicate:
 	python3 python/replicate.py

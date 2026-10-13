@@ -2,7 +2,7 @@
 
 Monte Carlo at sd = 0.01 (implied-volatility noise) and under a heteroskedastic
 price-noise design, and the listed chains with inverse-squared-half-spread
-weights. Results go to python/results/joe/variants.json; tables via joe_tables.
+weights. Results go to python/results/tables/variants.json; tables via joe_tables.
 """
 
 from __future__ import annotations
@@ -17,8 +17,8 @@ import numpy as np
 PY = Path(__file__).resolve().parent
 sys.path.insert(0, str(PY))
 
-import joe  # noqa: E402
-from joe import CHAINS, OUT, RES, _errors, _folds, _rms, density_grid, density_stats, ise, iv_noise, models, projected_calls  # noqa: E402
+import replicate as joe  # noqa: E402
+from replicate import CHAINS, OUT, RES, _errors, _folds, _rms, density_grid, density_stats, ise, iv_noise, models, projected_calls  # noqa: E402
 from rnd import estimate_rnd  # noqa: E402
 from src import black_scholes as bs  # noqa: E402
 from src.spx import load_slice  # noqa: E402

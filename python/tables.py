@@ -1,4 +1,4 @@
-"""LaTeX tables from the JSON written by ``joe.py``. Writes ``tables/*.tex``."""
+"""LaTeX tables from the JSON written by ``replicate.py``. Writes ``tables/*.tex``."""
 
 from __future__ import annotations
 
@@ -11,9 +11,9 @@ import numpy as np
 PY = Path(__file__).resolve().parent
 ROOT = PY.parent
 sys.path.insert(0, str(PY))
-from joe import MAIN, METHODS, RULE  # noqa: E402
+from replicate import MAIN, METHODS, RULE  # noqa: E402
 
-OUT = ROOT / "python" / "results" / "joe"
+OUT = ROOT / "python" / "results" / "tables"
 TAB = ROOT / "tables"
 TAB.mkdir(exist_ok=True)
 
@@ -120,7 +120,7 @@ def mc_tables():
     mc = _load("mc")
     if mc is None:
         return
-    from joe import TRANSFER
+    from replicate import TRANSFER
 
     def one(tags, fname, with_reps=True):
         present = set()
@@ -311,7 +311,7 @@ def listed_tables():
     write("listed_rule", "\n".join(_listed_rows(data, RULE, titles)))
     tr = _load("listed_transfer")
     if tr is not None:
-        from joe import TRANSFER
+        from replicate import TRANSFER
         write("listed_transfer", "\n".join(_listed_rows(tr, TRANSFER, list(tr))))
     # bandwidths of every method, in strike units, and ours penalty
     lines = []

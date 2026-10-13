@@ -23,3 +23,4 @@ python/results/cboe_*.json
 python/results/__pycache__/
 .venv/
 venv/
+python/results/tables/*.log
